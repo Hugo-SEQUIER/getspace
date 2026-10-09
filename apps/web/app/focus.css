@@ -1,0 +1,42 @@
+/* Parameters: workspace controls.
+   What it does: underlines fields and outlines workspace actions on keyboard focus.
+   Output: one visible focus indicator without changing control size. */
+.sp-app :is(button, a, summary, [tabindex], input, textarea, select):not(svg, circle):focus-visible,
+.sp-app :is(.sp-search, .sp-sidebar-page-search, .sp-command-input, .sp-doc-tree-search):focus-within {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--color-focus);
+}
+
+.sp-app :is(button, a, summary, [tabindex]):not(svg, circle):focus-visible {
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+
+.sp-app :is(button, a, summary, [tabindex]):not(input, textarea, select, svg, circle):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.sp-app :is(.sp-search, .sp-sidebar-page-search, .sp-command-input, .sp-doc-tree-search) input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.sp-app input:is([type="checkbox"], [type="radio"], [type="range"], [type="color"]):focus-visible {
+  box-shadow: 0 3px 0 var(--color-focus);
+}
+
+/* Parameters: system high-contrast preference.
+   What it does: restores an outline when shadows are suppressed.
+   Output: visible focus in forced-colors mode. */
+@media (forced-colors: active) {
+  .sp-app :is(button, a, input, textarea, select, summary, [tabindex]):not(svg, circle):focus-visible,
+  .sp-app :is(.sp-search, .sp-sidebar-page-search, .sp-command-input, .sp-doc-tree-search):focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .sp-app :is(.sp-search, .sp-sidebar-page-search, .sp-command-input, .sp-doc-tree-search) input:focus-visible {
+    outline: none;
+  }
+}

@@ -1,0 +1,111 @@
+.sp-notifications {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.sp-notifications .sp-toast {
+  position: relative;
+  inset: auto;
+  transform: none;
+  display: flex;
+  gap: 11px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  align-items: flex-start;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-ink, #252522);
+  color: #fff;
+  box-shadow: var(--shadow-pop, 0 5px 30px #0003);
+  font-family: inherit;
+  font-size: var(--text-small, 14px);
+  line-height: 1.7;
+  pointer-events: auto;
+}
+
+.sp-notifications .sp-toast-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-notifications .sp-toast > svg,
+.sp-notifications .sp-toast-error-icon,
+.sp-notifications .sp-toast-spinner {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.sp-notifications .sp-toast .sp-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-inverse-muted, #d4d4d2);
+  cursor: pointer;
+}
+
+.sp-notifications .sp-toast .sp-icon-button:hover {
+  background: rgb(255 255 255 / .12);
+  color: #fff;
+}
+
+.sp-notifications .sp-toast .sp-icon-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.sp-toast-error-icon,
+.sp-toast-spinner {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.sp-toast-error-icon {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.sp-toast-spinner {
+  border-width: 2px;
+  border-right-color: transparent;
+  animation: sp-toast-spin .8s linear infinite;
+}
+
+@keyframes sp-toast-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-toast-spinner { animation: none; }
+}
+
+@media (max-width: 760px) {
+  .sp-notifications {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: calc(100vw - 28px);
+  }
+}

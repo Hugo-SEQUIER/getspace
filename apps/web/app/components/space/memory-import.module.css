@@ -1,0 +1,54 @@
+.modal { width: min(740px, calc(100vw - 32px)); color: var(--color-ink); }
+.body { padding: 28px; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 22px; }
+.modal :global(.sp-modal-footer) { margin: 0; padding: 18px 28px; flex-wrap: wrap; position: sticky; bottom: 0; background: var(--color-surface); z-index: 2; }
+.intro { display: flex; align-items: flex-start; gap: 16px; }
+.intro > div, .confirmation > div { min-width: 0; }
+.glyph { width: 48px; height: 48px; border-radius: 12px; background: var(--color-panel); display: grid; place-items: center; flex-shrink: 0; }
+.intro h3 { margin: 1px 0 7px; font-size: 20px; letter-spacing: -.025em; font-weight: 550; }
+.intro p, .hint { margin: 0; font-size: 13px; line-height: 1.65; color: var(--color-muted); }
+.steps { display: flex; padding: 0; margin: 0; list-style: none; border-bottom: 1px solid var(--color-rule); }
+.steps li { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 0 14px; color: var(--color-muted); font-size: 12px; }
+.steps li[aria-current] { color: var(--color-ink); border-bottom: 2px solid var(--color-ink); margin-bottom: -1px; }
+.steps li span { width: 23px; height: 23px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--color-panel); font-variant-numeric: tabular-nums; }
+.dropzone { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 38px 20px; background: var(--color-paper); border: 1px dashed var(--color-selection-border); border-radius: 10px; text-align: center; cursor: pointer; }
+.dropzone strong { font-size: 14px; font-weight: 550; }
+.dropzone span { color: var(--color-muted); font-size: 12px; }
+.dropzone input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+@media (forced-colors: active) {
+  .dropzone:focus-within { outline: 2px solid Highlight; outline-offset: 3px; }
+}
+.file { display: flex; gap: 10px; align-items: center; padding: 14px; border: 1px solid var(--color-rule); border-radius: 8px; }
+.file > span { flex: 1; min-width: 0; }
+.file strong, .namespace strong { display: block; overflow-wrap: anywhere; font-size: 12px; font-weight: 550; }
+.file small, .namespace small { display: block; color: var(--color-muted); font-size: 11px; margin-top: 5px; }
+.body button { min-width: 0; max-width: 100%; font-size: 12px; white-space: normal; }
+.mappingHeading { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.mappingHeading h4, .history h4 { margin: 0; font-size: 13px; font-weight: 550; }
+.namespaces { border-block: 1px solid var(--color-rule); }
+.namespace { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(160px, .85fr); gap: 12px; align-items: center; padding: 14px 0; }
+.namespace + .namespace { border-top: 1px solid var(--color-rule); }
+.namespace select { min-width: 0; width: 100%; font-size: 12px; }
+.confirmation { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 8px; background: var(--color-panel); }
+.confirmation svg { flex-shrink: 0; margin-top: 2px; }
+.confirmation strong { font-size: 13px; font-weight: 550; }
+.confirmation p { margin: 6px 0 0; color: var(--color-text); font-size: 12px; line-height: 1.65; }
+.problems { padding: 14px 16px; margin: 0; border-radius: 8px; border: 1px solid #d9bdb3; background: #fcf4ef; color: #813e29; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.status { color: var(--color-muted); margin: 0; font-size: 13px; }
+.history { border-top: 1px solid var(--color-rule); padding-top: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.job { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 14px; border: 1px solid var(--color-rule); border-radius: 8px; }
+.job > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.job strong { font-size: 12px; font-weight: 550; }
+.job span { color: var(--color-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.job small { color: var(--color-muted); font-size: 11px; line-height: 1.6; }
+.job progress { min-width: 0; width: 100%; height: 5px; border: 0; border-radius: 4px; overflow: hidden; accent-color: var(--color-ink); }
+.job progress::-webkit-progress-bar { background: var(--color-panel); }
+.job progress::-webkit-progress-value { background: var(--color-ink); }
+.badge { background: var(--color-panel); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+@media (max-width: 600px) {
+  .body { padding: 20px; gap: 18px; }
+  .modal :global(.sp-modal-footer) { padding: 16px 20px; }
+  .intro h3 { font-size: 18px; }
+  .namespace { grid-template-columns: minmax(0, 1fr) 16px; gap: 10px; }
+  .namespace select { grid-column: 1 / -1; }
+  .file { align-items: flex-start; flex-wrap: wrap; }
+}

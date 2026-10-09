@@ -1,0 +1,2129 @@
+{
+  "claims": [
+    {
+      "id": "c001",
+      "text": "We chose pgvector because vector search then runs inside the same PostgreSQL instance as authorization and revisions, so the team keeps one store, one backup and one transaction boundary instead of a second service to operate.",
+      "topics": [
+        "database",
+        "pgvector"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c002",
+      "text": "The claim index keeps one row per current claim of the current memory revision.",
+      "topics": [
+        "indexing",
+        "memory-model"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c003",
+      "text": "Migration 0003_memory_brain fixes the embedding dimension at 1536, so a new model needs a new migration.",
+      "topics": [
+        "indexing",
+        "migrations"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c004",
+      "text": "Cosine distance ranks claims, and the model transport normalizes every vector before we write it.",
+      "topics": [
+        "ranking",
+        "embeddings"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c005",
+      "text": "We rejected a separate vector service because it adds a second store and a second authorization path.",
+      "topics": [
+        "database",
+        "pgvector"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c006",
+      "text": "The development database runs PostgreSQL 17.6 with pgvector 0.8.2 installed in the space schema.",
+      "topics": [
+        "database",
+        "pgvector"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c007",
+      "text": "The production database runs PostgreSQL 17.6 with pgvector 0.7.4, and the managed upgrade window opens in October, so we refuse an untested version bump on the store that holds every claim index row.",
+      "topics": [
+        "database",
+        "pgvector"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c008",
+      "text": "A GIN index over the cue hash array serves cue expansion, and an HNSW index serves nearest-neighbour search.",
+      "topics": [
+        "indexing",
+        "retrieval"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c009",
+      "text": "Naming a migration badly cost us an hour of confusion during the review, so revision identifiers stay descriptive.",
+      "topics": [
+        "migrations"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c010",
+      "text": "Open question: does pgvector 0.8 iterative scan behave correctly under our row-level security predicate?",
+      "topics": [
+        "pgvector",
+        "retrieval"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c011",
+      "text": "Claim text never enters the index table. It stays inside the encrypted revision under the same AES-GCM key scope as other content, so a database export reveals similarity and equality but never the wording of a claim.",
+      "topics": [
+        "memory-model",
+        "security"
+      ],
+      "source": "note-2026-08-29-database",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c012",
+      "text": "The API runs FastAPI on Python 3.13, and the website is Next.js running on Cloudflare Workers.",
+      "topics": [
+        "deployment",
+        "infrastructure"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c013",
+      "text": "Decision: PostgreSQL stays the only authoritative store, so there is no second database for vectors.",
+      "topics": [
+        "database",
+        "deployment"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c014",
+      "text": "The embedding job moved onto the processing_jobs queue because the web request timed out at 30 seconds.",
+      "topics": [
+        "queue",
+        "embeddings"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c015",
+      "text": "Priya Raman owns the claim index SQL and every migration that touches space.memory_claims.",
+      "topics": [
+        "ownership",
+        "migrations"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c016",
+      "text": "Kenji Watanabe owns ranking.py and the retrieval benchmark numbers.",
+      "topics": [
+        "ownership",
+        "retrieval"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c017",
+      "text": "Marta Keller was blocked on the embeddings vendor quota until billing raised the tier on 29 August.",
+      "topics": [
+        "embeddings",
+        "throughput"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c018",
+      "text": "Next action: Aisha must rotate the R2 access key before the staging deploy on 1 September.",
+      "topics": [
+        "secrets",
+        "deployment"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c019",
+      "text": "We standardized on uv with locked dependencies for both the backend build and the website build.",
+      "topics": [
+        "ci",
+        "deployment"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c020",
+      "text": "Correction: the first note said the embedding model returns 1024 dimensions; the real value is 1536.",
+      "topics": [
+        "corrections",
+        "embeddings"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c021",
+      "text": "Dropped: caching claim text in Redis, because the index must never hold plaintext.",
+      "topics": [
+        "memory-model",
+        "security"
+      ],
+      "source": "handoff-2026-08-29-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c022",
+      "text": "Standup 1 September: the team upgraded staging to pgvector 0.8.2 and left production on 0.7.4.",
+      "topics": [
+        "database",
+        "pgvector"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c023",
+      "text": "Tomas Dubois rebuilt the brain browser claim list so each row shows the source revision beside the claim.",
+      "topics": [
+        "website",
+        "memory-model"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c024",
+      "text": "The browser reads claims from the encrypted revision and never from the index table.",
+      "topics": [
+        "website",
+        "security"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c025",
+      "text": "Blocker: an HNSW scan returns fewer rows than the requested limit once the organization filter is applied, and under the empty-recall contract that can report nothing found while matching claims exist.",
+      "topics": [
+        "retrieval",
+        "indexing"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c026",
+      "text": "Marta raised the embedding batch to 128 claims per request to cut the number of vendor round trips.",
+      "topics": [
+        "embeddings",
+        "throughput"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c027",
+      "text": "The embeddings quota allows 3000 requests per minute on the plan the team pays for.",
+      "topics": [
+        "embeddings",
+        "limits"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c028",
+      "text": "The recall endpoint allows 300 requests per minute on the plan the team pays for.",
+      "topics": [
+        "retrieval",
+        "limits"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c029",
+      "text": "Aisha Bello joined the alert rotation this week and takes the database pages, while Priya takes the API pages.",
+      "topics": [
+        "people",
+        "alerts"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c030",
+      "text": "Jonas Lindqvist starts on 7 September as the second backend engineer.",
+      "topics": [
+        "people",
+        "onboarding"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c031",
+      "text": "We agreed that every retrieval change must report recall@10 before it merges.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c032",
+      "text": "In progress: Kenji is measuring recall@10 over a first set of 40 synthetic queries.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "standup-2026-09-01",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c033",
+      "text": "The staging database runs in Dublin and the production database runs in Frankfurt.",
+      "topics": [
+        "infrastructure",
+        "cloud"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c034",
+      "text": "Correction: an earlier note placed staging in Seoul; the real staging region is Dublin (eu-west-1).",
+      "topics": [
+        "corrections",
+        "infrastructure"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c035",
+      "text": "Tomas asked the agent why the browser lists a claim that has no embedding row yet.",
+      "topics": [
+        "errors",
+        "website"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c036",
+      "text": "Answer: a pending claim appears in the browser before the embedding worker writes its vector.",
+      "topics": [
+        "errors",
+        "embeddings"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c037",
+      "text": "We time-boxed the HNSW filter investigation to two days because it blocks the recall numbers.",
+      "topics": [
+        "retrieval",
+        "deadlines"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c038",
+      "text": "Priya reproduced the under-return with 50 claims in a staging Space and a requested limit of 10.",
+      "topics": [
+        "retrieval",
+        "evaluation"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c039",
+      "text": "The reproduction combined an embedding_model filter with the row-level security predicate.",
+      "topics": [
+        "retrieval",
+        "indexing"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c040",
+      "text": "Kenji proposed reciprocal rank fusion to merge the lexical and the vector rankings.",
+      "topics": [
+        "ranking",
+        "retrieval"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c041",
+      "text": "We adopted reciprocal rank fusion with k=60 for the first merged-ranking experiment.",
+      "topics": [
+        "ranking",
+        "retrieval"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c042",
+      "text": "Someone proposed storing claim text in the index for faster ranking; the answer is still no.",
+      "topics": [
+        "memory-model",
+        "security"
+      ],
+      "source": "chat-2026-09-02-agent",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c043",
+      "text": "We put the embedding work on the processing_jobs queue after the 30-second timeout on the web request, because one model call can outlast the budget that the API gives a browser session.",
+      "topics": [
+        "queue",
+        "embeddings"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c044",
+      "text": "The queue visibility timeout is 180 seconds so that one model call can finish before redelivery.",
+      "topics": [
+        "queue",
+        "throughput"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c045",
+      "text": "A job goes to the dead-letter queue after three failed attempts.",
+      "topics": [
+        "queue",
+        "errors"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c046",
+      "text": "We added the missing index on source_resource_id because the recall filter reads that column.",
+      "topics": [
+        "indexing",
+        "migrations"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c047",
+      "text": "We refused the index on embedding_model because that column holds only two distinct values.",
+      "topics": [
+        "indexing",
+        "database"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c048",
+      "text": "Tomas moved the memory page to server-side rendering so private content stays out of shared caches, and the website keeps no database or content-key credentials of its own while it renders readable content for an authorized person.",
+      "topics": [
+        "website",
+        "security"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c049",
+      "text": "Next action: Jonas must run the migration suite against staging during his first week.",
+      "topics": [
+        "onboarding",
+        "migrations"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c050",
+      "text": "The migration account may change schema objects but cannot read encrypted revisions.",
+      "topics": [
+        "security",
+        "migrations"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c051",
+      "text": "The runtime account may read encrypted revisions through the application but cannot run migrations.",
+      "topics": [
+        "security",
+        "database"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c052",
+      "text": "Blocked: the KMS rotation test waits for Aisha's approval on the production alias.",
+      "topics": [
+        "security",
+        "blockers"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c053",
+      "text": "Priya published the recall contract, including the empty-result rule, in docs/RETRIEVAL.md on 2 September.",
+      "topics": [
+        "retrieval",
+        "evaluation"
+      ],
+      "source": "handoff-2026-09-02-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c054",
+      "text": "Standup 3 September: the under-return fix sits in a branch but is not merged.",
+      "topics": [
+        "retrieval",
+        "evaluation"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c055",
+      "text": "Kenji raised hnsw.ef_search to 100 on staging and recall@10 moved from 0.62 to 0.81 over the 40-query development set, which was the first measurement that justified merging the retrieval branch.",
+      "topics": [
+        "retrieval",
+        "ranking"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c056",
+      "text": "hnsw.ef_search keeps its production default until the benchmark runs again in October.",
+      "topics": [
+        "retrieval",
+        "deployment"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c057",
+      "text": "The HNSW index still uses m=16 and ef_construction=64.",
+      "topics": [
+        "indexing",
+        "retrieval"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c058",
+      "text": "hnsw.iterative_scan stays off because the production pgvector build does not expose the setting.",
+      "topics": [
+        "retrieval",
+        "pgvector"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c059",
+      "text": "Marta finished the embedding cache file so the harness stops re-embedding the same claims on every run.",
+      "topics": [
+        "embeddings",
+        "evaluation"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c060",
+      "text": "The cache holds vectors for all 150 synthetic claims.",
+      "topics": [
+        "evaluation",
+        "embeddings"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c061",
+      "text": "Aisha changed the R2 bucket policy to deny public reads and removed the old allow rule.",
+      "topics": [
+        "security",
+        "cloud"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c062",
+      "text": "Incident: the staging deploy on 2 September failed because the migration ran twice.",
+      "topics": [
+        "incidents",
+        "deployment"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c063",
+      "text": "Resolution: migrations now run as a one-off task before the API container starts.",
+      "topics": [
+        "deployment",
+        "migrations"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c064",
+      "text": "Tomas is away on 4 September and returns on 7 September.",
+      "topics": [
+        "people"
+      ],
+      "source": "standup-2026-09-03",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c065",
+      "text": "Retro: the two-day HNSW time box slipped to four days because staging was unavailable for two afternoons, and the team agreed that a shared staging database needs a calendar entry before an investigation starts.",
+      "topics": [
+        "retrieval",
+        "incidents"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c066",
+      "text": "We agreed to keep synthetic corpora inside the evaluation folder and never to write to the development Space.",
+      "topics": [
+        "evaluation",
+        "security"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c067",
+      "text": "Action: Priya links the recall contract from the evaluation README so the harness and the product agree about empty results.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c068",
+      "text": "Action: Marta adds a queue alert when the dead-letter depth passes five jobs.",
+      "topics": [
+        "queue",
+        "alerts"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c069",
+      "text": "We dropped the plan to add a second embedding provider this quarter.",
+      "topics": [
+        "embeddings",
+        "backlog"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c070",
+      "text": "Marta owns the embedding cache refresh job.",
+      "topics": [
+        "ownership",
+        "embeddings"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c071",
+      "text": "Priya owns the migration that adds the cue hash index to space.memory_claims.",
+      "topics": [
+        "ownership",
+        "migrations"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c072",
+      "text": "Kenji owns the retrieval benchmark and the recall numbers in the report.",
+      "topics": [
+        "ownership",
+        "evaluation"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c073",
+      "text": "The retro ran for 45 minutes because we capped each topic at five minutes.",
+      "topics": [
+        "people",
+        "incidents"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c074",
+      "text": "Tomas raised that the browser loads a claim list before the embedding worker has finished.",
+      "topics": [
+        "website",
+        "errors"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c075",
+      "text": "We decided the product should return an explicit empty result rather than a partial one, because a short answer that hides matching claims is worse for an agent than a clear statement that nothing was found.",
+      "topics": [
+        "retrieval",
+        "memory-model"
+      ],
+      "source": "retro-2026-09-04",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c076",
+      "text": "Aisha is on holiday from 10 September to 12 September, and Priya covers the cloud pages meanwhile.",
+      "topics": [
+        "people",
+        "cloud"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c077",
+      "text": "Tomas is on holiday on 4 September only.",
+      "topics": [
+        "people"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c078",
+      "text": "Jonas asked how claims get their identifiers; the answer is the memory resource id plus the entry index.",
+      "topics": [
+        "memory-model",
+        "onboarding"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c079",
+      "text": "The identifier is a deterministic UUID, so equal text from two sources keeps separate citations.",
+      "topics": [
+        "memory-model",
+        "indexing"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c080",
+      "text": "Correction: a standup note said the embedding batch was 64; the real batch size is 128 for the chat builder.",
+      "topics": [
+        "corrections",
+        "embeddings"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c081",
+      "text": "The pgvector experiment stays in its own container with its own schema.",
+      "topics": [
+        "pgvector",
+        "testing"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c082",
+      "text": "The experiment container runs pgvector 0.8.2 and never connects to the application database.",
+      "topics": [
+        "pgvector",
+        "testing"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c083",
+      "text": "Kenji found that cue expansion returns claims ordered by memory id instead of by relevance.",
+      "topics": [
+        "retrieval",
+        "ranking"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c084",
+      "text": "Tomas asked for a relevance order in the browser list because the current order is arbitrary.",
+      "topics": [
+        "website",
+        "ranking"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c085",
+      "text": "Blocked: the staging Space has no second organization, so the row-level security filter cannot be exercised there, and the harness needs that filter to reproduce the under-return case honestly.",
+      "topics": [
+        "testing",
+        "security"
+      ],
+      "source": "chat-2026-09-04-agent",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c086",
+      "text": "The harness scores each strategy with recall at 1, 5 and 10 plus mrr at 10.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c087",
+      "text": "Every strategy runs offline against the synthetic corpus and never against a live Space.",
+      "topics": [
+        "evaluation",
+        "security"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c088",
+      "text": "The baseline strategy uses vector search only and ignores cue expansion.",
+      "topics": [
+        "retrieval",
+        "ranking"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c089",
+      "text": "A second strategy merges lexical search and vector search through reciprocal rank fusion.",
+      "topics": [
+        "ranking",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c090",
+      "text": "Kenji reports numbers, not adjectives, in every retrieval review.",
+      "topics": [
+        "evaluation",
+        "people"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c091",
+      "text": "The harness measures latency p50 and p95 for every strategy.",
+      "topics": [
+        "latency",
+        "evaluation"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c092",
+      "text": "We compute ndcg@10 only for queries that list more than one relevant claim.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c093",
+      "text": "Blocked: the harness needs a second organization before it can exercise the row-level security predicate.",
+      "topics": [
+        "testing",
+        "security"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c094",
+      "text": "Tomas wants a chart of under_return_rate per strategy in the weekly report.",
+      "topics": [
+        "website",
+        "evaluation"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c095",
+      "text": "We deferred the diversity rerank experiment to the next iteration.",
+      "topics": [
+        "ranking",
+        "backlog"
+      ],
+      "source": "handoff-2026-09-06-harness",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c096",
+      "text": "We merged the retrieval branch after recall@10 reached 0.81 on the 40-query development set, with under_return_rate at zero and a recall p95 that stayed under 200 ms.",
+      "topics": [
+        "retrieval",
+        "evaluation"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c097",
+      "text": "The merged change adds a tie-break on claim id for equal cosine scores.",
+      "topics": [
+        "ranking",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c098",
+      "text": "Recall queries now order cue-expanded claims by relevance instead of by memory id.",
+      "topics": [
+        "retrieval",
+        "ranking"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c099",
+      "text": "The merged change sets hnsw.ef_search to 100 per session for recall queries.",
+      "topics": [
+        "retrieval",
+        "deployment"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c100",
+      "text": "Latency p95 on the recall path fell from 480 ms to 180 ms after that change.",
+      "topics": [
+        "latency",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c101",
+      "text": "The harness reports mrr@10, ndcg@10 and map@10 alongside recall.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c102",
+      "text": "under_return_rate must be zero before we accept a strategy.",
+      "topics": [
+        "evaluation",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c103",
+      "text": "Marta's cache removed 150 embedding calls from every harness run.",
+      "topics": [
+        "evaluation",
+        "embeddings"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c104",
+      "text": "Jonas finished his first migration change and plans to merge it on 8 September.",
+      "topics": [
+        "onboarding",
+        "migrations"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c105",
+      "text": "We accepted that the lexical pass covers source titles and topic labels only for now.",
+      "topics": [
+        "ranking",
+        "retrieval"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c106",
+      "text": "Next action: Kenji must re-run the benchmark after the production pgvector upgrade in October.",
+      "topics": [
+        "evaluation",
+        "pgvector"
+      ],
+      "source": "handoff-2026-09-07-retrieval",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c107",
+      "text": "Standup 8 September: the merged retrieval change took the empty-result rate to zero on the development set.",
+      "topics": [
+        "retrieval",
+        "evaluation"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c108",
+      "text": "Jonas merged his first migration change on 8 September after Priya reviewed it.",
+      "topics": [
+        "onboarding",
+        "migrations"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c109",
+      "text": "Jonas owns the processing_jobs worker migration from this week.",
+      "topics": [
+        "ownership",
+        "queue"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c110",
+      "text": "The worker migration moves the retry counter into the job row so that a restart keeps the count, because the old counter lived in memory and a redelivery after a crash began again from one.",
+      "topics": [
+        "queue",
+        "migrations"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c111",
+      "text": "Correction: the onboarding note said the worker retry limit was five; the real limit is three.",
+      "topics": [
+        "corrections",
+        "queue"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c112",
+      "text": "We deleted the old Redis queue experiment from the backlog.",
+      "topics": [
+        "queue",
+        "backlog"
+      ],
+      "source": "standup-2026-09-08",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c113",
+      "text": "Priya dropped a duplicate index on memory_claims because the primary key already covers those columns.",
+      "topics": [
+        "indexing",
+        "database"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c114",
+      "text": "The database uses 12 connections from the API pool and 4 from the worker pool.",
+      "topics": [
+        "database",
+        "throughput"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c115",
+      "text": "Aisha rotated the Supabase database password after the staging incident.",
+      "topics": [
+        "secrets",
+        "incidents"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c116",
+      "text": "Nobody may run the database test suite concurrently; the root agent runs it serially.",
+      "topics": [
+        "testing",
+        "ci"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c117",
+      "text": "The KMS alias rotates every 365 days, the next rotation falls due in November, and only Aisha may rotate that alias until October.",
+      "topics": [
+        "security",
+        "secrets"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c118",
+      "text": "The R2 access key rotates every 90 days, and the next rotation falls due on 30 November.",
+      "topics": [
+        "secrets",
+        "cloud"
+      ],
+      "source": "note-2026-09-09-security",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c119",
+      "text": "Standup 10 September: Aisha is away, so Priya owns the R2 key rotation this week.",
+      "topics": [
+        "people",
+        "secrets"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c120",
+      "text": "The worker migration is blocked until the new worker queue on staging has a dead-letter queue configured.",
+      "topics": [
+        "queue",
+        "blockers"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c121",
+      "text": "Marta set the embedding batch to 128 claims for the chat builder and 24 claims for the document builder, because the two builders split one source into very different numbers of entries.",
+      "topics": [
+        "embeddings",
+        "throughput"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c122",
+      "text": "Decision: one embedding model, text-embedding-3-small, stays in use until the October review.",
+      "topics": [
+        "embeddings",
+        "memory-model"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c123",
+      "text": "The benchmark report lives in evaluations/retrieval and is regenerated by make evaluate-retrieval.",
+      "topics": [
+        "evaluation",
+        "ci"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c124",
+      "text": "Tomas shipped the correction button on the memory page on 9 September.",
+      "topics": [
+        "website",
+        "memory-model"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c125",
+      "text": "An edit keeps the claim in the index and stores the old generated text in generated_value.",
+      "topics": [
+        "memory-model",
+        "website"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c126",
+      "text": "A forget removes the claim from memory and deletes its index row, and no command restores it afterwards.",
+      "topics": [
+        "memory-model",
+        "indexing"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c127",
+      "text": "Rebuilding a source preserves every claim whose identifier still matches.",
+      "topics": [
+        "memory-model",
+        "indexing"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c128",
+      "text": "Latency p95 on the memory page is 1.2 seconds cold and 300 ms warm.",
+      "topics": [
+        "website",
+        "latency"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c129",
+      "text": "The evaluation corpus holds 150 synthetic claims taken from two weeks of team handoffs.",
+      "topics": [
+        "evaluation",
+        "memory-model"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c130",
+      "text": "The worker migration deadline moved from 12 September to 15 September because the staging queue needed a dead-letter queue first, and the release train on 15 September carries the change.",
+      "topics": [
+        "deadlines",
+        "queue"
+      ],
+      "source": "standup-2026-09-10",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c131",
+      "text": "We dropped the review queue design because memory is live as soon as it is stored.",
+      "topics": [
+        "memory-model",
+        "backlog"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c132",
+      "text": "Blocker cleared: Aisha approved the KMS rotation test on the production alias.",
+      "topics": [
+        "security",
+        "blockers"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c133",
+      "text": "The production database region is Frankfurt, in eu-central-1.",
+      "topics": [
+        "infrastructure",
+        "cloud"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c134",
+      "text": "The staging database region is Dublin, in eu-west-1.",
+      "topics": [
+        "infrastructure",
+        "cloud"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c135",
+      "text": "The development database runs in Docker beside the API on a laptop, with no cloud region.",
+      "topics": [
+        "testing",
+        "database"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c136",
+      "text": "Marta's queue alert fires when more than five jobs sit in the dead-letter queue.",
+      "topics": [
+        "queue",
+        "alerts"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c137",
+      "text": "The dead-letter queue held three jobs after the second staging deploy.",
+      "topics": [
+        "queue",
+        "incidents"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c138",
+      "text": "Priya is on holiday from 24 September and returns on 29 September.",
+      "topics": [
+        "people"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c139",
+      "text": "The next release train leaves on 15 September and includes the worker migration.",
+      "topics": [
+        "deployment",
+        "deadlines"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c140",
+      "text": "Dropped: sending retrieval metrics to a hosted dashboard, because the JSON report is enough for now.",
+      "topics": [
+        "evaluation",
+        "backlog"
+      ],
+      "source": "handoff-2026-09-11-platform",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c141",
+      "text": "Aisha asked whether the recall limit of 300 requests per minute covers the browser refresh loop.",
+      "topics": [
+        "limits",
+        "retrieval"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c142",
+      "text": "We agreed the browser refreshes at most once every 30 seconds.",
+      "topics": [
+        "website",
+        "limits"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c143",
+      "text": "The API answers 429 with a retry-after header once the recall limit is hit.",
+      "topics": [
+        "api",
+        "limits"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c144",
+      "text": "The recall candidate set is capped at 100 claims before ranking runs.",
+      "topics": [
+        "retrieval",
+        "ranking"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c145",
+      "text": "The recall result set is capped at 10 claims for an agent and 25 for the browser.",
+      "topics": [
+        "retrieval",
+        "website"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c146",
+      "text": "Correction: a Friday note said the candidate limit was 50; the real value is 100.",
+      "topics": [
+        "corrections",
+        "retrieval"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c147",
+      "text": "Incident on 11 September: the embedding worker crashed on a malformed claim row and left two claims without vectors, which the browser then listed as pending rows for the rest of the afternoon.",
+      "topics": [
+        "incidents",
+        "embeddings"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "episodic"
+    },
+    {
+      "id": "c148",
+      "text": "Resolution: the worker now skips a row whose text hash is empty and logs the claim id.",
+      "topics": [
+        "errors",
+        "embeddings"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    },
+    {
+      "id": "c149",
+      "text": "Next action: Marta must backfill the two claims that the crash left without vectors.",
+      "topics": [
+        "embeddings",
+        "errors"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "procedural"
+    },
+    {
+      "id": "c150",
+      "text": "The queue visibility timeout stays at 180 seconds after Priya reviewed it a second time.",
+      "topics": [
+        "queue",
+        "throughput"
+      ],
+      "source": "chat-2026-09-12-infra",
+      "memory_type": "factual"
+    }
+  ],
+  "queries": [
+    {
+      "query": "Which datastore hosts similarity lookups beside relational rows?",
+      "relevant": [
+        "c001"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Can anyone read the original phrasing from a backup?",
+      "relevant": [
+        "c011"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which process handles request traffic, plus where do browsable pages execute?",
+      "relevant": [
+        "c012"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "What clearance lifted the spending ceiling?",
+      "relevant": [
+        "c017"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Why does nearest-neighbour retrieval answer with too few items despite remaining matches?",
+      "relevant": [
+        "c025"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which measurement gates a ranker patch prior to integration?",
+      "relevant": [
+        "c031"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "How long may a single job occupy a worker's attention?",
+      "relevant": [
+        "c044",
+        "c150"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which execution site assembles member-only screens without edge buffering?",
+      "relevant": [
+        "c048"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which operating identity is barred from changing table definitions?",
+      "relevant": [
+        "c051"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "What parameter tweak improved answer quality during rehearsal?",
+      "relevant": [
+        "c055"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Why does evaluation avoid paying for vectors repeatedly?",
+      "relevant": [
+        "c059",
+        "c103"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "How are schema upgrades sequenced ahead of serving traffic?",
+      "relevant": [
+        "c063"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Where do fabricated datasets belong if no live workspace may receive them?",
+      "relevant": [
+        "c066"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which reply shape beats hiding half of potential hits?",
+      "relevant": [
+        "c075"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "How can identical sentences keep distinct references?",
+      "relevant": [
+        "c079"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which approach leans purely on approximate similarity?",
+      "relevant": [
+        "c088"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which ranking metric ignores single-answer questions?",
+      "relevant": [
+        "c092"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Has variety reordering slipped into another sprint?",
+      "relevant": [
+        "c095"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Which metric has to bottom out prior to sign-off?",
+      "relevant": [
+        "c102"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Whose duty repeats timing measurements following a platform refresh?",
+      "relevant": [
+        "c106"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "What preserves machine phrasing when somebody rewrites a sentence?",
+      "relevant": [
+        "c125"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "How fast does that screen paint once caches are primed?",
+      "relevant": [
+        "c128"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Why did that delivery date move later?",
+      "relevant": [
+        "c130"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Where do developers keep throwaway copies of records?",
+      "relevant": [
+        "c135"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "How often does an interface poll for updates?",
+      "relevant": [
+        "c142"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Who repairs blank vector rows?",
+      "relevant": [
+        "c149"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "Why do unfinished rows appear on screen?",
+      "relevant": [
+        "c074",
+        "c036"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "What made that first rollout abort?",
+      "relevant": [
+        "c062"
+      ],
+      "kind": "paraphrase"
+    },
+    {
+      "query": "hnsw.ef_search 100",
+      "relevant": [
+        "c055",
+        "c099"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "pgvector 0.8.2",
+      "relevant": [
+        "c006",
+        "c022",
+        "c082"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "pgvector 0.7.4",
+      "relevant": [
+        "c007",
+        "c022"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "processing_jobs",
+      "relevant": [
+        "c014",
+        "c043",
+        "c109"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "visibility timeout 180",
+      "relevant": [
+        "c044",
+        "c150"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "3000 requests per minute",
+      "relevant": [
+        "c027"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "300 requests per minute",
+      "relevant": [
+        "c028",
+        "c141"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "under_return_rate",
+      "relevant": [
+        "c094",
+        "c096",
+        "c102"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "text-embedding-3-small",
+      "relevant": [
+        "c122"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "reciprocal rank fusion k=60",
+      "relevant": [
+        "c041"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "Jonas Lindqvist",
+      "relevant": [
+        "c030"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "KMS alias rotation approval",
+      "relevant": [
+        "c052",
+        "c117",
+        "c132"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "dead-letter queue five jobs",
+      "relevant": [
+        "c068",
+        "c136"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "recall@10 0.81",
+      "relevant": [
+        "c055",
+        "c096"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "1536 dimensions",
+      "relevant": [
+        "c003",
+        "c020"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "Dublin",
+      "relevant": [
+        "c033",
+        "c034",
+        "c134"
+      ],
+      "kind": "keyword"
+    },
+    {
+      "query": "Who owns the worker migration that is blocked by a missing staging dead-letter queue?",
+      "relevant": [
+        "c109",
+        "c120"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Who owns the refresh job for the cache that removed 150 embedding calls from each harness run?",
+      "relevant": [
+        "c070",
+        "c103"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which engineer owns the benchmark that must re-run after the October pgvector upgrade?",
+      "relevant": [
+        "c016",
+        "c072",
+        "c106"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "What must be configured on staging before the worker migration can proceed, and when is its deadline now?",
+      "relevant": [
+        "c120",
+        "c130"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Who owns the R2 key rotation while its usual owner is away, and how often does that key rotate?",
+      "relevant": [
+        "c118",
+        "c119"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which measurement had to reach zero before the retrieval branch merged, and what did recall@10 reach?",
+      "relevant": [
+        "c096",
+        "c102"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Who owns the migration that adds the cue-label hash index, and what consumes that index?",
+      "relevant": [
+        "c008",
+        "c015",
+        "c071"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which filter combination reproduced the under-return, and how large was the test Space?",
+      "relevant": [
+        "c038",
+        "c039"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which pgvector upgrade waits for the October window, and who re-runs the measurement afterwards?",
+      "relevant": [
+        "c007",
+        "c106"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "After how many failed attempts does a job reach the dead-letter queue, and at what depth does the alert fire?",
+      "relevant": [
+        "c045",
+        "c068",
+        "c136"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which identifier rule keeps equal text apart, and what parts produce that identifier?",
+      "relevant": [
+        "c078",
+        "c079"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Who owns the claim index SQL, and what did that person publish on 2 September?",
+      "relevant": [
+        "c015",
+        "c053"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Which deployment incident changed how migrations run on release?",
+      "relevant": [
+        "c062",
+        "c063"
+      ],
+      "kind": "multi-hop"
+    },
+    {
+      "query": "Where do we store claim text so recall can rank it faster?",
+      "relevant": [
+        "c011"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How many requests per minute may the recall endpoint make?",
+      "relevant": [
+        "c028",
+        "c141"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "When does the 90-day R2 credential rotation fall due next?",
+      "relevant": [
+        "c118"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Which latency number belongs to the memory page in the browser?",
+      "relevant": [
+        "c128"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How many claims can the document builder extract from one source?",
+      "relevant": [
+        "c121"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Which index did the team remove from memory_claims?",
+      "relevant": [
+        "c113"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Which environment runs the older vector extension?",
+      "relevant": [
+        "c007",
+        "c022"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Who owns the KMS rotation while Aisha is away?",
+      "relevant": [
+        "c117"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Where does the vector experiment container keep its schema?",
+      "relevant": [
+        "c081"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How many relevant claims must a query list before ndcg@10 applies?",
+      "relevant": [
+        "c092"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Which strategy ignores cue expansion?",
+      "relevant": [
+        "c088"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "What happens to a claim when an agent edits it?",
+      "relevant": [
+        "c125"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Where did the earlier note wrongly place the staging database?",
+      "relevant": [
+        "c034"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How many embedding calls did the cache save on each harness run?",
+      "relevant": [
+        "c103"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "Which date did the team originally plan for the worker migration?",
+      "relevant": [
+        "c130"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How long are deleted claims kept before permanent removal?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which second embedding model did the team select this quarter?",
+      "relevant": [
+        "c069",
+        "c122"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How many people are on the website team?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "What monthly cost does the vector database add?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "What is the p99 latency of the recall endpoint?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "When did the team downgrade pgvector in production?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "How many claims does the production HNSW index hold?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which person is the designated backup for the migration account?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "What is the retention window for messages in the processing queue?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which hosted dashboard shows the retrieval metrics?",
+      "relevant": [
+        "c140"
+      ],
+      "kind": "partial"
+    },
+    {
+      "query": "How does the team exclude a claim from recall without deleting it?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which benchmark result shows the team ahead of other retrieval systems?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "What is the API rate limit for the embeddings endpoint on the free tier?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which Cloudflare Queues product will replace processing_jobs?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Who reviewed the reciprocal rank fusion experiment before the merge?",
+      "relevant": [],
+      "kind": "negative"
+    },
+    {
+      "query": "Which weekend rotation covers the embedding worker pages?",
+      "relevant": [],
+      "kind": "negative"
+    }
+  ]
+}

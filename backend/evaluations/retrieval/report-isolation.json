@@ -1,0 +1,2122 @@
+{
+ "generated_at": "2026-09-12T08:01:30+00:00",
+ "layer": "product",
+ "path": "Workspace.context with the vendored Memora retriever",
+ "corpus": {
+  "path": "backend/evaluations/retrieval/corpus.json",
+  "claims_used": 57,
+  "queries_used": 30,
+  "kinds": {
+   "paraphrase": 9,
+   "keyword": 5,
+   "multi-hop": 2,
+   "partial": 3,
+   "negative": 11
+  }
+ },
+ "fixture": {
+  "layer": "product",
+  "path": "Workspace.context -> brain.search, cue expansion, Memora retriever",
+  "claims_indexed": 57,
+  "memory_resources": 6,
+  "model_calls": 12,
+  "provider_calls": 0
+ },
+ "limit": 10,
+ "relevant_claim_similarity": {
+  "count": 24,
+  "min": 0.2164,
+  "p05": 0.3193,
+  "p25": 0.3583,
+  "p50": 0.4104,
+  "p75": 0.5263,
+  "p95": 0.6558,
+  "max": 0.8048
+ },
+ "combinations": [
+  {
+   "expansion": "both_on",
+   "thresholds": [
+    {
+     "threshold": 0.0,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 300,
+      "under_return_rate": 0.0,
+      "under_return_rate_at_limit": 0.0,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 10.0,
+      "mean_available": 57.0,
+      "mean_candidates": 10.0,
+      "latency_p50_ms": 62.44825,
+      "latency_p95_ms": 114.894333,
+      "recall@1": 0.263158,
+      "recall@5": 0.815789,
+      "recall@10": 0.921053,
+      "mrr@10": 0.492105,
+      "ndcg@10": 0.59433,
+      "map@10": 0.481798,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.321296,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 0.75,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.486111,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c004",
+         "c008",
+         "c026",
+         "c002",
+         "c041",
+         "c016",
+         "c001",
+         "c005"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c058",
+         "c005",
+         "c057",
+         "c036",
+         "c013",
+         "c007",
+         "c055",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.2246,
+      "p25": 0.3186,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.2,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 292,
+      "under_return_rate": 0.033333,
+      "under_return_rate_at_limit": 0.033333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.733333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.733333,
+      "latency_p50_ms": 50.25325,
+      "latency_p95_ms": 64.298,
+      "recall@1": 0.315789,
+      "recall@5": 0.815789,
+      "recall@10": 0.921053,
+      "mrr@10": 0.525439,
+      "ndcg@10": 0.61971,
+      "map@10": 0.515132,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.336111,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 0.85,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.486111,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c004",
+         "c008",
+         "c026",
+         "c002",
+         "c041",
+         "c016",
+         "c001",
+         "c005"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c058",
+         "c005",
+         "c057",
+         "c036",
+         "c013",
+         "c007",
+         "c055",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.2246,
+      "p25": 0.3186,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.3,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 282,
+      "under_return_rate": 0.166667,
+      "under_return_rate_at_limit": 0.166667,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.4,
+      "mean_available": 57.0,
+      "mean_candidates": 9.4,
+      "latency_p50_ms": 47.08875,
+      "latency_p95_ms": 55.08125,
+      "recall@1": 0.342105,
+      "recall@5": 0.815789,
+      "recall@10": 0.894737,
+      "mrr@10": 0.549123,
+      "ndcg@10": 0.624784,
+      "map@10": 0.527193,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.777778,
+        "mrr@10": 0.298148,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.5,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c043",
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c029",
+         "c011"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c026",
+         "c041",
+         "c016",
+         "c032",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.1636,
+      "p25": 0.3186,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.4,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 246,
+      "under_return_rate": 0.3,
+      "under_return_rate_at_limit": 0.3,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 8.2,
+      "mean_available": 57.0,
+      "mean_candidates": 8.2,
+      "latency_p50_ms": 44.12475,
+      "latency_p95_ms": 52.197083,
+      "recall@1": 0.315789,
+      "recall@5": 0.5,
+      "recall@10": 0.552632,
+      "mrr@10": 0.47807,
+      "ndcg@10": 0.466333,
+      "map@10": 0.416813,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.111111,
+        "mrr@10": 0.055556,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.527778,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which datastore hosts similarity lookups beside relational rows?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c001"
+        ],
+        "returned": [
+         "c013",
+         "c023",
+         "c025",
+         "c055",
+         "c011"
+        ]
+       },
+       {
+        "query": "Can anyone read the original phrasing from a backup?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c011"
+        ],
+        "returned": [
+         "c024",
+         "c001",
+         "c050",
+         "c043",
+         "c051",
+         "c044",
+         "c005",
+         "c055",
+         "c003",
+         "c025"
+        ]
+       },
+       {
+        "query": "Which process handles request traffic, plus where do browsable pages execute?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c012"
+        ],
+        "returned": [
+         "c029",
+         "c055",
+         "c014",
+         "c026",
+         "c043"
+        ]
+       },
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c043",
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c029",
+         "c011"
+        ]
+       },
+       {
+        "query": "Why does nearest-neighbour retrieval answer with too few items despite remaining matches?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c025"
+        ],
+        "returned": [
+         "c008",
+         "c036",
+         "c058",
+         "c010",
+         "c016",
+         "c031",
+         "c053",
+         "c039",
+         "c041",
+         "c019"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c040",
+         "c041",
+         "c055",
+         "c045",
+         "c026",
+         "c005",
+         "c001",
+         "c003",
+         "c038",
+         "c037"
+        ]
+       },
+       {
+        "query": "Which execution site assembles member-only screens without edge buffering?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c048"
+        ],
+        "returned": [
+         "c047",
+         "c013",
+         "c055"
+        ]
+       },
+       {
+        "query": "Which operating identity is barred from changing table definitions?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c051"
+        ],
+        "returned": [
+         "c010",
+         "c024",
+         "c055",
+         "c011",
+         "c054",
+         "c013",
+         "c032",
+         "c044",
+         "c020",
+         "c034"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c013",
+         "c007",
+         "c033",
+         "c055",
+         "c040",
+         "c036",
+         "c004",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.1267,
+      "p25": 0.2489,
+      "p50": 0.336,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    }
+   ]
+  },
+  {
+   "expansion": "both_off",
+   "thresholds": [
+    {
+     "threshold": 0.0,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 300,
+      "under_return_rate": 0.0,
+      "under_return_rate_at_limit": 0.0,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 10.0,
+      "mean_available": 57.0,
+      "mean_candidates": 10.0,
+      "latency_p50_ms": 41.646167,
+      "latency_p95_ms": 47.006875,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.947368,
+      "mrr@10": 0.630702,
+      "ndcg@10": 0.688533,
+      "map@10": 0.589035,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.368519,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c032",
+         "c026",
+         "c041",
+         "c016",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.188,
+      "p05": 0.26,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.2,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 292,
+      "under_return_rate": 0.033333,
+      "under_return_rate_at_limit": 0.033333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.733333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.733333,
+      "latency_p50_ms": 43.650792,
+      "latency_p95_ms": 59.3685,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.947368,
+      "mrr@10": 0.635088,
+      "ndcg@10": 0.692182,
+      "map@10": 0.593421,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.377778,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c032",
+         "c026",
+         "c041",
+         "c016",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.188,
+      "p05": 0.26,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.3,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 277,
+      "under_return_rate": 0.2,
+      "under_return_rate_at_limit": 0.2,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.233333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.233333,
+      "latency_p50_ms": 43.06175,
+      "latency_p95_ms": 56.692625,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.894737,
+      "mrr@10": 0.619298,
+      "ndcg@10": 0.667479,
+      "map@10": 0.577632,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.777778,
+        "mrr@10": 0.344444,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c040",
+         "c046",
+         "c051"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c032",
+         "c026",
+         "c041",
+         "c016",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.131,
+      "p05": 0.2233,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.4,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 240,
+      "under_return_rate": 0.333333,
+      "under_return_rate_at_limit": 0.333333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 8.0,
+      "mean_available": 57.0,
+      "mean_candidates": 8.0,
+      "latency_p50_ms": 40.89,
+      "latency_p95_ms": 46.426166,
+      "recall@1": 0.315789,
+      "recall@5": 0.5,
+      "recall@10": 0.605263,
+      "mrr@10": 0.49269,
+      "ndcg@10": 0.488681,
+      "map@10": 0.430848,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.222222,
+        "mrr@10": 0.067901,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.583333,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which datastore hosts similarity lookups beside relational rows?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c001"
+        ],
+        "returned": [
+         "c013",
+         "c023",
+         "c025",
+         "c055",
+         "c011"
+        ]
+       },
+       {
+        "query": "Which process handles request traffic, plus where do browsable pages execute?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c012"
+        ],
+        "returned": [
+         "c029",
+         "c055",
+         "c014",
+         "c026",
+         "c043"
+        ]
+       },
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c040",
+         "c046",
+         "c051"
+        ]
+       },
+       {
+        "query": "Why does nearest-neighbour retrieval answer with too few items despite remaining matches?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c025"
+        ],
+        "returned": [
+         "c008",
+         "c036",
+         "c058",
+         "c010",
+         "c016",
+         "c039",
+         "c031",
+         "c041",
+         "c053",
+         "c038"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c040",
+         "c041",
+         "c055",
+         "c005",
+         "c001",
+         "c026",
+         "c003",
+         "c038",
+         "c037",
+         "c022"
+        ]
+       },
+       {
+        "query": "Which execution site assembles member-only screens without edge buffering?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c048"
+        ],
+        "returned": [
+         "c047",
+         "c055"
+        ]
+       },
+       {
+        "query": "Which operating identity is barred from changing table definitions?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c051"
+        ],
+        "returned": [
+         "c010",
+         "c024",
+         "c054",
+         "c013",
+         "c011",
+         "c044",
+         "c034",
+         "c025"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c013",
+         "c007",
+         "c033",
+         "c055",
+         "c040",
+         "c036",
+         "c004",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.1193,
+      "p05": 0.1654,
+      "p25": 0.2525,
+      "p50": 0.3358,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    }
+   ]
+  },
+  {
+   "expansion": "layer_a_off",
+   "thresholds": [
+    {
+     "threshold": 0.0,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 300,
+      "under_return_rate": 0.0,
+      "under_return_rate_at_limit": 0.0,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 10.0,
+      "mean_available": 57.0,
+      "mean_candidates": 10.0,
+      "latency_p50_ms": 41.560625,
+      "latency_p95_ms": 59.310292,
+      "recall@1": 0.263158,
+      "recall@5": 0.710526,
+      "recall@10": 0.921053,
+      "mrr@10": 0.496637,
+      "ndcg@10": 0.597235,
+      "map@10": 0.48633,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.330864,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 0.75,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.486111,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c004",
+         "c008",
+         "c032",
+         "c002",
+         "c026",
+         "c041",
+         "c016",
+         "c001"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c058",
+         "c005",
+         "c057",
+         "c036",
+         "c013",
+         "c007",
+         "c055",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.1636,
+      "p05": 0.2174,
+      "p25": 0.3162,
+      "p50": 0.3694,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.2,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 292,
+      "under_return_rate": 0.033333,
+      "under_return_rate_at_limit": 0.033333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.733333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.733333,
+      "latency_p50_ms": 49.160834,
+      "latency_p95_ms": 75.024625,
+      "recall@1": 0.315789,
+      "recall@5": 0.815789,
+      "recall@10": 0.921053,
+      "mrr@10": 0.53348,
+      "ndcg@10": 0.625841,
+      "map@10": 0.523173,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.353086,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 0.85,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.486111,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c004",
+         "c008",
+         "c032",
+         "c002",
+         "c026",
+         "c041",
+         "c016",
+         "c001"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c058",
+         "c005",
+         "c057",
+         "c036",
+         "c013",
+         "c007",
+         "c055",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.1636,
+      "p05": 0.2174,
+      "p25": 0.3162,
+      "p50": 0.3694,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.3,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 280,
+      "under_return_rate": 0.166667,
+      "under_return_rate_at_limit": 0.166667,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.333333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.333333,
+      "latency_p50_ms": 44.538375,
+      "latency_p95_ms": 49.882708,
+      "recall@1": 0.342105,
+      "recall@5": 0.815789,
+      "recall@10": 0.894737,
+      "mrr@10": 0.571053,
+      "ndcg@10": 0.642215,
+      "map@10": 0.549123,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.777778,
+        "mrr@10": 0.344444,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 0.625,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.5,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c040",
+         "c046",
+         "c051"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c032",
+         "c026",
+         "c041",
+         "c016",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.131,
+      "p05": 0.1698,
+      "p25": 0.3162,
+      "p50": 0.3694,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.4,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 240,
+      "under_return_rate": 0.333333,
+      "under_return_rate_at_limit": 0.333333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 8.0,
+      "mean_available": 57.0,
+      "mean_candidates": 8.0,
+      "latency_p50_ms": 43.965084,
+      "latency_p95_ms": 49.993625,
+      "recall@1": 0.315789,
+      "recall@5": 0.5,
+      "recall@10": 0.605263,
+      "mrr@10": 0.483918,
+      "ndcg@10": 0.48179,
+      "map@10": 0.422076,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.222222,
+        "mrr@10": 0.067901,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.527778,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which datastore hosts similarity lookups beside relational rows?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c001"
+        ],
+        "returned": [
+         "c013",
+         "c023",
+         "c025",
+         "c055",
+         "c011"
+        ]
+       },
+       {
+        "query": "Which process handles request traffic, plus where do browsable pages execute?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c012"
+        ],
+        "returned": [
+         "c029",
+         "c055",
+         "c014",
+         "c026",
+         "c043"
+        ]
+       },
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c040",
+         "c046",
+         "c051"
+        ]
+       },
+       {
+        "query": "Why does nearest-neighbour retrieval answer with too few items despite remaining matches?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c025"
+        ],
+        "returned": [
+         "c008",
+         "c036",
+         "c058",
+         "c010",
+         "c016",
+         "c039",
+         "c031",
+         "c041",
+         "c053",
+         "c038"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c040",
+         "c041",
+         "c055",
+         "c005",
+         "c001",
+         "c026",
+         "c003",
+         "c038",
+         "c037",
+         "c022"
+        ]
+       },
+       {
+        "query": "Which execution site assembles member-only screens without edge buffering?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c048"
+        ],
+        "returned": [
+         "c047",
+         "c055"
+        ]
+       },
+       {
+        "query": "Which operating identity is barred from changing table definitions?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c051"
+        ],
+        "returned": [
+         "c010",
+         "c024",
+         "c054",
+         "c013",
+         "c011",
+         "c044",
+         "c034",
+         "c025"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c013",
+         "c007",
+         "c033",
+         "c055",
+         "c040",
+         "c036",
+         "c004",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.1193,
+      "p05": 0.1654,
+      "p25": 0.2525,
+      "p50": 0.3358,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    }
+   ]
+  },
+  {
+   "expansion": "layer_b_off",
+   "thresholds": [
+    {
+     "threshold": 0.0,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 300,
+      "under_return_rate": 0.0,
+      "under_return_rate_at_limit": 0.0,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 10.0,
+      "mean_available": 57.0,
+      "mean_candidates": 10.0,
+      "latency_p50_ms": 50.052042,
+      "latency_p95_ms": 63.064083,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.947368,
+      "mrr@10": 0.617544,
+      "ndcg@10": 0.677993,
+      "map@10": 0.575877,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.340741,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c026",
+         "c041",
+         "c016",
+         "c032",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.188,
+      "p05": 0.26,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.2,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 292,
+      "under_return_rate": 0.033333,
+      "under_return_rate_at_limit": 0.033333,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.733333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.733333,
+      "latency_p50_ms": 42.991042,
+      "latency_p95_ms": 48.890959,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.947368,
+      "mrr@10": 0.62193,
+      "ndcg@10": 0.681642,
+      "map@10": 0.580263,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.888889,
+        "mrr@10": 0.35,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c026",
+         "c041",
+         "c016",
+         "c032",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.188,
+      "p05": 0.26,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.3,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 280,
+      "under_return_rate": 0.2,
+      "under_return_rate_at_limit": 0.2,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 9.333333,
+      "mean_available": 57.0,
+      "mean_candidates": 9.333333,
+      "latency_p50_ms": 45.996375,
+      "latency_p95_ms": 58.077,
+      "recall@1": 0.368421,
+      "recall@5": 0.815789,
+      "recall@10": 0.894737,
+      "mrr@10": 0.60614,
+      "ndcg@10": 0.656939,
+      "map@10": 0.564474,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.777778,
+        "mrr@10": 0.316667,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 1.0,
+        "mrr@10": 0.555556,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c043",
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c029",
+         "c011"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c055",
+         "c040",
+         "c026",
+         "c041",
+         "c016",
+         "c032",
+         "c004",
+         "c057",
+         "c002",
+         "c008"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.2174,
+      "p25": 0.3201,
+      "p50": 0.3738,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    },
+    {
+     "threshold": 0.4,
+     "metrics": {
+      "queries": 30,
+      "positive_queries": 19,
+      "negative_queries": 11,
+      "embed_calls": 0,
+      "candidates_read": 246,
+      "under_return_rate": 0.3,
+      "under_return_rate_at_limit": 0.3,
+      "negative_false_positive_rate": 1.0,
+      "empty_result_rate": 0.0,
+      "mean_returned": 8.2,
+      "mean_available": 57.0,
+      "mean_candidates": 8.2,
+      "latency_p50_ms": 49.853958,
+      "latency_p95_ms": 59.387208,
+      "recall@1": 0.315789,
+      "recall@5": 0.5,
+      "recall@10": 0.552632,
+      "mrr@10": 0.486842,
+      "ndcg@10": 0.473224,
+      "map@10": 0.425585,
+      "per_kind": {
+       "paraphrase": {
+        "queries": 9,
+        "recall@10": 0.111111,
+        "mrr@10": 0.055556,
+        "negative_false_positive_rate": 0.0
+       },
+       "keyword": {
+        "queries": 5,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "multi-hop": {
+        "queries": 2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "negative_false_positive_rate": 0.0
+       },
+       "partial": {
+        "queries": 3,
+        "recall@10": 0.833333,
+        "mrr@10": 0.583333,
+        "negative_false_positive_rate": 0.0
+       },
+       "negative": {
+        "queries": 11,
+        "recall@10": 0.0,
+        "mrr@10": 0.0,
+        "negative_false_positive_rate": 1.0
+       }
+      },
+      "missed_queries": [
+       {
+        "query": "Which datastore hosts similarity lookups beside relational rows?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c001"
+        ],
+        "returned": [
+         "c013",
+         "c023",
+         "c025",
+         "c055",
+         "c011"
+        ]
+       },
+       {
+        "query": "Can anyone read the original phrasing from a backup?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c011"
+        ],
+        "returned": [
+         "c024",
+         "c001",
+         "c050",
+         "c043",
+         "c051",
+         "c044",
+         "c005",
+         "c055",
+         "c003",
+         "c025"
+        ]
+       },
+       {
+        "query": "Which process handles request traffic, plus where do browsable pages execute?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c012"
+        ],
+        "returned": [
+         "c029",
+         "c055",
+         "c014",
+         "c026",
+         "c043"
+        ]
+       },
+       {
+        "query": "What clearance lifted the spending ceiling?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c017"
+        ],
+        "returned": [
+         "c043",
+         "c024",
+         "c027",
+         "c028",
+         "c020",
+         "c014",
+         "c059",
+         "c023",
+         "c029",
+         "c011"
+        ]
+       },
+       {
+        "query": "Why does nearest-neighbour retrieval answer with too few items despite remaining matches?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c025"
+        ],
+        "returned": [
+         "c008",
+         "c036",
+         "c058",
+         "c010",
+         "c016",
+         "c031",
+         "c053",
+         "c039",
+         "c041",
+         "c019"
+        ]
+       },
+       {
+        "query": "Which measurement gates a ranker patch prior to integration?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c031"
+        ],
+        "returned": [
+         "c040",
+         "c041",
+         "c055",
+         "c045",
+         "c026",
+         "c005",
+         "c001",
+         "c003",
+         "c038",
+         "c037"
+        ]
+       },
+       {
+        "query": "Which execution site assembles member-only screens without edge buffering?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c048"
+        ],
+        "returned": [
+         "c047",
+         "c013",
+         "c055"
+        ]
+       },
+       {
+        "query": "Which operating identity is barred from changing table definitions?",
+        "kind": "paraphrase",
+        "relevant": [
+         "c051"
+        ],
+        "returned": [
+         "c010",
+         "c024",
+         "c055",
+         "c011",
+         "c054",
+         "c013",
+         "c032",
+         "c044",
+         "c020",
+         "c034"
+        ]
+       },
+       {
+        "query": "Which environment runs the older vector extension?",
+        "kind": "partial",
+        "relevant": [
+         "c007",
+         "c022"
+        ],
+        "returned": [
+         "c001",
+         "c006",
+         "c013",
+         "c007",
+         "c033",
+         "c055",
+         "c040",
+         "c036",
+         "c004",
+         "c056"
+        ]
+       }
+      ]
+     },
+     "negative_similarity": {
+      "count": 110,
+      "min": 0.0,
+      "p05": 0.1267,
+      "p25": 0.2489,
+      "p50": 0.336,
+      "p75": 0.4454,
+      "p95": 0.5656,
+      "max": 0.699
+     }
+    }
+   ]
+  }
+ ]
+}

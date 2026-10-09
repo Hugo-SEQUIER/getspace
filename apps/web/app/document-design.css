@@ -1,0 +1,560 @@
+/* Document surfaces inherit the private workspace palette and native type. */
+.sp-app .sp-doc-workspace {
+  grid-template-columns: 300px minmax(0, 1fr);
+  background: var(--color-canvas, #fcfdfc);
+}
+.sp-app .sp-doc-tree-pane {
+  background: var(--color-canvas, #fcfdfc);
+  border-color: var(--color-border, #e2e7e3);
+}
+.sp-app .sp-doc-tree {
+  padding: 26px 10px 32px;
+}
+.sp-app .sp-doc-tree-search {
+  border-radius: 9px;
+  background: var(--color-surface, #fff);
+}
+.sp-app .sp-doc-tree-page {
+  border-radius: 7px;
+}
+.sp-app .sp-doc-library {
+  max-width: 1380px;
+  padding: 40px 40px 72px;
+}
+.sp-app .sp-doc-library-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+.sp-app .sp-doc-library-heading h1 {
+  margin: 0 0 9px;
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+.sp-app .sp-doc-library-heading p {
+  color: var(--color-muted, #737b76);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.sp-app .sp-doc-library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.sp-app .sp-doc-library-actions :is(button, .sp-button),
+.sp-app .sp-doc-topbar .sp-actions :is(button, .sp-button) {
+  min-height: 36px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.sp-app .sp-doc-library-actions .sp-primary {
+  padding-inline: 14px;
+  background: var(--color-accent, #42644c);
+  border-color: var(--color-accent, #42644c);
+  color: #fff;
+  box-shadow: none;
+}
+.sp-app .sp-doc-library-actions .sp-primary:hover {
+  background: #35543e;
+}
+.sp-app .sp-doc-section-title h2 {
+  font-size: 14px;
+  font-weight: 550;
+}
+.sp-app .sp-doc-private {
+  margin-top: 0;
+  font-size: 12px;
+}
+.sp-app .sp-doc-recents {
+  margin-bottom: 32px;
+}
+.sp-app .sp-doc-recent-grid {
+  gap: 12px;
+}
+.sp-app .sp-doc-card {
+  padding: 18px 18px 15px;
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+  box-shadow: none;
+}
+.sp-app .sp-doc-card:hover {
+  background: var(--color-paper, #f7f9f7);
+  border-color: #c9d4cc;
+  box-shadow: none;
+}
+.sp-app .sp-doc-card-top {
+  margin-bottom: 12px;
+}
+.sp-app .sp-doc-file {
+  width: 27px;
+  height: 29px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-accent, #42644c);
+}
+.sp-app .sp-doc-file.is-handoff {
+  background: transparent;
+  color: var(--color-accent, #42644c);
+}
+.sp-app .sp-doc-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sp-app .sp-doc-card > p {
+  height: 39px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sp-app .sp-doc-card-footer {
+  gap: 6px;
+  padding-top: 0;
+  border-top: 0;
+  font-size: 11px;
+}
+.sp-app .sp-doc-card-footer > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-app .sp-doc-card-footer > span:last-child {
+  flex-shrink: 0;
+}
+.sp-app .sp-doc-library-toolbar {
+  flex-wrap: wrap;
+  gap: 18px 20px;
+  padding-bottom: 15px;
+}
+.sp-app .sp-doc-tabs {
+  gap: 20px;
+  min-height: 36px;
+}
+.sp-app .sp-doc-tabs button {
+  position: relative;
+  min-height: 36px;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  font-size: 14px;
+  gap: 7px;
+}
+.sp-app .sp-doc-tabs button[aria-pressed="true"] {
+  background: transparent;
+  color: var(--color-accent, #42644c);
+  font-weight: 600;
+}
+.sp-app .sp-doc-tabs button[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent, #42644c);
+  border-radius: 1px;
+}
+.sp-app .sp-doc-tabs button > span {
+  color: var(--color-muted, #737b76);
+  font-size: 12px;
+  font-weight: 400;
+}
+.sp-app .sp-doc-library-controls {
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-app .sp-doc-library-controls .sp-search {
+  width: 190px;
+  min-height: 36px;
+  border-radius: 9px;
+}
+.sp-app .sp-doc-library-controls .sp-search input {
+  font-size: 13px;
+}
+.sp-app .sp-doc-library-controls select {
+  min-height: 36px;
+  border-radius: 9px;
+  font-size: 13px;
+  max-width: 160px;
+}
+.sp-app .sp-doc-collection .sp-table-wrap {
+  position: relative;
+  border: 0;
+  border-top: 1px solid var(--color-border, #e2e7e3);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.sp-app .sp-doc-table {
+  min-width: 560px;
+  font-size: 13px;
+}
+.sp-app .sp-doc-table thead {
+  background: transparent;
+}
+.sp-app .sp-doc-table th {
+  padding: 13px 10px;
+  font-size: 12px;
+  font-weight: 450;
+  background: transparent;
+}
+.sp-app .sp-doc-table td {
+  height: 66px;
+  padding: 12px 10px;
+  background: transparent;
+}
+.sp-app .sp-doc-table :is(th, td):first-child {
+  padding-left: 0;
+}
+.sp-app .sp-doc-table .sp-document-link {
+  font-size: 14px;
+  font-weight: 500;
+}
+.sp-app .sp-doc-row-icon,
+.sp-app .sp-doc-row-icon.is-handoff {
+  width: 28px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent, #42644c);
+}
+.sp-app .sp-doc-library-footer {
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 18px;
+  font-size: 12px;
+}
+.sp-app .sp-doc-topbar {
+  height: 56px;
+  min-height: 56px;
+  padding-inline: 28px;
+  background: var(--color-canvas, #fcfdfc);
+  gap: 16px;
+}
+.sp-app .sp-doc-topbar .sp-breadcrumbs {
+  font-size: 13px;
+  flex: 1;
+}
+.sp-app .sp-doc-topbar .sp-actions {
+  gap: 6px;
+}
+.sp-app .sp-doc-reading-layout {
+  grid-template-columns: minmax(0, 760px) 180px;
+  max-width: 940px;
+  min-height: calc(100svh - 112px);
+}
+.sp-app .sp-doc-reading-layout.has-panel {
+  grid-template-columns: minmax(0, 1fr) 280px;
+  max-width: none;
+}
+.sp-app .sp-document-reader.sp-doc-reader {
+  width: 100%;
+  max-width: 760px;
+  padding: 44px 40px 80px;
+  margin-inline: auto;
+}
+.sp-app .sp-doc-reader-kicker {
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--color-muted, #737b76);
+}
+.sp-app .sp-doc-title-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-bottom: 20px;
+}
+.sp-app .sp-doc-title-block .sp-doc-reader-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 44px;
+  min-height: 0;
+  margin: 1px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent, #42644c);
+  box-shadow: none;
+}
+.sp-app .sp-doc-title-block .sp-doc-reader-icon:hover {
+  background: var(--color-selection, #e6ede7);
+}
+.sp-app .sp-document-reader.sp-doc-reader h1 {
+  margin: 0;
+  font-size: 38px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.sp-app .sp-doc-reader .sp-document-meta {
+  gap: 8px;
+  padding-bottom: 24px;
+  margin-bottom: 30px;
+  border-color: var(--color-border, #e2e7e3);
+  font-size: 12px;
+  color: var(--color-muted, #737b76);
+}
+.sp-app .sp-doc-reader .sp-document-meta button {
+  font-size: inherit;
+}
+.sp-app .sp-doc-reader .sp-document-prose {
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--color-text, #515b56);
+  overflow-wrap: anywhere;
+}
+.sp-app .sp-doc-reader .sp-document-prose > p:first-child {
+  font-size: 16px;
+  line-height: 1.75;
+}
+.sp-app .sp-doc-reader .sp-document-prose h2 {
+  margin: 36px 0 14px;
+  font-size: 23px;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--color-ink, #202522);
+}
+.sp-app .sp-doc-reader .sp-document-prose h3 {
+  margin: 28px 0 12px;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--color-ink, #202522);
+}
+.sp-app .sp-doc-reader .sp-document-prose :is(p, ul, ol) {
+  margin-block: 0 18px;
+}
+.sp-app .sp-doc-reader .sp-document-prose li {
+  margin-bottom: 7px;
+}
+.sp-app .sp-doc-reader .sp-document-prose :is(h2, h3) {
+  scroll-margin-top: 132px;
+}
+.sp-app .sp-doc-rail {
+  padding: 48px 16px 32px 8px;
+}
+.sp-app .sp-doc-rail-inner {
+  top: 132px;
+}
+.sp-app .sp-doc-rail nav h2 {
+  font-size: 12px;
+  font-weight: 550;
+}
+.sp-app .sp-doc-rail nav a {
+  font-size: 12px;
+  line-height: 1.55;
+  padding-block: 7px;
+}
+.sp-app .sp-doc-rail-bottom {
+  margin-top: 40px;
+  padding-top: 24px;
+}
+.sp-app .sp-doc-rail-bottom :is(p, h3) {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.sp-app :is(.sp-doc-rail-context, .sp-doc-rail-history) {
+  padding: 0;
+  background: var(--color-canvas, #fcfdfc);
+}
+.sp-app :is(.sp-doc-rail-context, .sp-doc-rail-history) .sp-doc-rail-inner {
+  padding: 0 18px 28px;
+  top: 112px;
+  max-height: calc(100svh - 112px);
+}
+.sp-app .sp-doc-reader .sp-doc-related {
+  margin-top: 38px;
+}
+.sp-app .sp-doc-reader .sp-doc-memory-entry {
+  margin-top: 32px;
+  border-radius: 10px;
+  background: var(--color-paper, #f7f9f7);
+  box-shadow: none;
+}
+.sp-app .sp-doc-reader .sp-document-end {
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+}
+@media (max-width: 1200px) {
+  .sp-app .sp-doc-workspace {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .sp-app .sp-doc-library {
+    padding-inline: 28px;
+  }
+  .sp-app .sp-doc-reading-layout {
+    display: block;
+  }
+  .sp-app .sp-doc-rail-outline {
+    display: none;
+  }
+  .sp-app .sp-doc-card-footer {
+    flex-wrap: wrap;
+  }
+  .sp-app .sp-doc-mobile-panel :is(.sp-doc-rail-context, .sp-doc-rail-history) .sp-doc-rail-inner {
+    max-height: none;
+    padding: 0 0 16px;
+  }
+  .sp-app .sp-doc-mobile-panel .sp-doc-rail {
+    padding: 0 22px 22px;
+  }
+}
+@media (max-width: 1000px) {
+  .sp-app .sp-doc-workspace,
+  .sp-app .sp-doc-reading-layout.has-panel {
+    display: block;
+  }
+  .sp-app .sp-doc-topbar {
+    padding-inline: 24px;
+  }
+  .sp-app .sp-doc-library-actions .sp-doc-browse {
+    display: inline-flex;
+  }
+  .sp-app .sp-doc-tree-pane {
+    height: auto;
+  }
+  .sp-app .sp-doc-recent-grid {
+    display: flex;
+    overflow-x: auto;
+  }
+  .sp-app .sp-doc-card-wrap {
+    flex: 0 0 240px;
+  }
+  .sp-app .sp-doc-library-controls {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .sp-app .sp-doc-library-controls .sp-search {
+    flex: 1;
+  }
+  .sp-app .sp-doc-table {
+    min-width: 0;
+  }
+  .sp-app .sp-doc-table :is(th, td):nth-child(3),
+  .sp-app .sp-doc-table :is(th, td):last-child {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .sp-app .sp-doc-library {
+    padding: 28px 20px 48px;
+  }
+  .sp-app .sp-doc-library-heading {
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  .sp-app .sp-doc-library-heading h1 {
+    font-size: 30px;
+  }
+  .sp-app .sp-doc-library-heading p {
+    font-size: 15px;
+  }
+  .sp-app .sp-doc-library-actions {
+    gap: 7px;
+    padding-top: 0;
+  }
+  .sp-app .sp-doc-library-actions :is(button, .sp-button) {
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+  .sp-app .sp-doc-library-actions .sp-doc-browse span {
+    display: inline;
+  }
+  .sp-app .sp-doc-private {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sp-app .sp-doc-recent-grid {
+    gap: 12px;
+    margin-inline: 0;
+    padding: 0 0 6px;
+    scroll-snap-type: x proximity;
+  }
+  .sp-app .sp-doc-card-wrap {
+    flex-basis: 240px;
+    scroll-snap-align: start;
+  }
+  .sp-app .sp-doc-library-toolbar {
+    gap: 15px;
+  }
+  .sp-app .sp-doc-library-controls {
+    width: 100%;
+  }
+  .sp-app .sp-doc-library-controls .sp-search {
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .sp-app .sp-doc-library-controls select {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+  }
+  .sp-app .sp-doc-table {
+    min-width: 0;
+  }
+  .sp-app .sp-doc-table :is(th, td):first-child {
+    width: auto;
+    padding-right: 8px;
+  }
+  .sp-app .sp-doc-table :is(th, td):nth-child(4) {
+    padding-right: 0;
+    font-size: 12px;
+  }
+  .sp-app .sp-doc-table .sp-document-link {
+    font-size: 13px;
+  }
+  .sp-app .sp-doc-topbar {
+    padding-inline: 14px;
+    gap: 8px;
+  }
+  .sp-app .sp-doc-topbar .sp-breadcrumbs {
+    gap: 7px;
+    font-size: 12px;
+  }
+  .sp-app .sp-doc-topbar .sp-breadcrumbs > span:last-child {
+    display: none;
+  }
+  .sp-app .sp-doc-topbar .sp-actions {
+    gap: 3px;
+  }
+  .sp-app .sp-doc-topbar .sp-actions :is(button, .sp-button) {
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+  .sp-app .sp-document-reader.sp-doc-reader {
+    padding: 30px 22px 54px;
+  }
+  .sp-app .sp-doc-title-block {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .sp-app .sp-document-reader.sp-doc-reader h1 {
+    font-size: 32px;
+  }
+  .sp-app .sp-doc-title-block .sp-doc-reader-icon {
+    flex-basis: 30px;
+    width: 30px;
+    height: 36px;
+  }
+  .sp-app .sp-doc-reader .sp-document-meta {
+    gap: 7px;
+    padding-bottom: 22px;
+    margin-bottom: 26px;
+  }
+  .sp-app .sp-doc-reader .sp-document-prose h2 {
+    font-size: 22px;
+  }
+}

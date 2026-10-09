@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Recall"
+  short_description: "Retrieve stored context before answering"
+  default_prompt: "Use $space-recall to look up what was decided or done before answering."

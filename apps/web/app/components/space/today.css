@@ -1,0 +1,67 @@
+/* Task database rows on the Tasks board, and the picker that plans them for today. */
+.sp-task-board .sp-board-row {
+  position: relative;
+  border-style: dashed;
+}
+.sp-task-board .sp-board-row .sp-board-task-link {
+  padding-right: 34px;
+}
+.sp-board-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+.sp-board-row-unplan {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  opacity: 0;
+}
+.sp-board-row:hover .sp-board-row-unplan,
+.sp-board-row-unplan:focus-visible {
+  opacity: 1;
+}
+.sp-board-row-unplan:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+@media (hover: none) {
+  .sp-board-row-unplan { opacity: 1; }
+}
+
+.sp-today-picker { display: grid; max-height: min(420px, 55vh); overflow-y: auto; margin-top: 10px; }
+.sp-today-row { flex-wrap: wrap; }
+.sp-today-row .sp-task-name { flex: 1 1 160px; }
+.sp-today-row .sp-task-project { min-width: 0; overflow-wrap: anywhere; }
+.sp-today-row button { display: inline-flex; align-items: center; gap: 5px; }
+.sp-today-day { color: var(--color-muted); font-size: var(--text-meta); white-space: nowrap; }
+.sp-today-empty { margin: 0; padding: 14px 7px; color: var(--color-muted); font-size: var(--text-small); }
+.sp-today-empty p { margin: 0 0 12px; }
+.sp-today-create {
+  display: inline-block;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+.sp-today-create:hover { background: var(--color-hover); }
+@media (max-width: 640px) {
+  .sp-today-row .sp-task-name { flex-basis: 100%; }
+  .sp-today-picker-modal .sp-today-row .sp-task-project { display: flex; }
+}

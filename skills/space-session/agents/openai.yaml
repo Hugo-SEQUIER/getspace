@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Session"
+  short_description: "Resume, checkpoint or hand off work"
+  default_prompt: "Use $space-session to resume this work or save an accurate session handoff."

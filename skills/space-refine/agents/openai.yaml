@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Refine"
+  short_description: "Distil a conversation into Space"
+  default_prompt: "Use $space-refine to turn this conversation into a sourced handoff and a few reusable memories."

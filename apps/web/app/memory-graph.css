@@ -1,0 +1,986 @@
+/* An open network canvas. Inspectors and tools never resize the graph. */
+.sp-graph-surface {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline-offset: -3px;
+}
+.sp-graph-keyboard-nodes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.sp-graph-keyboard-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+.sp-graph-keyboard-node:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.sp-graph-worker-error {
+  position: absolute;
+  top: 70px;
+  left: 25px;
+  max-width: 350px;
+  font-size: var(--text-small);
+  color: #757575;
+}
+.sp-memory-layout,
+.sp-memory-layout.has-selection {
+  display: block;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.sp-memory-canvas {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+.sp-memory-topbar {
+  min-height: 57px;
+  padding: 12px 25px;
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+.sp-memory-topbar .sp-topbar-title {
+  margin-right: 14px;
+}
+.sp-memory-topbar .sp-segment {
+  background: transparent;
+  border-color: transparent;
+}
+.sp-memory-topbar .sp-segment button {
+  color: var(--color-text);
+  padding: 5px 12px;
+}
+.sp-memory-topbar .sp-segment button.selected {
+  background: var(--color-selection);
+  border-color: var(--color-selection-border);
+  color: var(--color-ink);
+  box-shadow: none;
+}
+.sp-memory-topbar > .sp-actions:last-child {
+  margin-left: auto;
+}
+.sp-memory-topbar > .sp-actions > button {
+  font-size: var(--text-small);
+}
+.sp-memory-scope {
+  color: var(--color-text);
+  font-size: var(--text-meta);
+  margin-right: 12px;
+}
+.sp-canvas-toolbar {
+  position: absolute;
+  z-index: 4;
+  left: 24px;
+  top: 22px;
+  right: auto;
+  padding: 0;
+  display: block;
+  pointer-events: none;
+}
+.sp-memory-search-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  pointer-events: auto;
+}
+.sp-memory-search-tools .sp-search {
+  height: 33px;
+  background: color-mix(in srgb, var(--color-surface) 93.3%, transparent);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-shadow) 1.2%, transparent);
+  border-radius: 7px;
+  width: 193px;
+}
+.sp-memory-search-tools .sp-search input {
+  width: 100%;
+  font-size: var(--text-small);
+}
+.sp-memory-search-tools select,
+.sp-memory-search-tools > button {
+  height: 32px;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-surface) 93.7%, transparent);
+  font-size: var(--text-meta);
+  padding: 5px 8px;
+}
+.sp-memory-search-tools > button {
+  width: 32px;
+  position: relative;
+}
+.sp-filter-active {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+}
+.sp-filter-panel {
+  z-index: 15;
+  right: auto;
+  left: 24px;
+  top: 64px;
+  border-radius: 9px;
+  border-color: var(--color-border);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--color-shadow) 6.3%, transparent);
+}
+.sp-memory-layout .sp-filter-panel {
+  max-height: calc(100% - 110px);
+  overflow-y: auto;
+}
+.sp-project-visibility {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sp-project-visibility legend {
+  padding: 0;
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+.sp-project-visibility-actions {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+}
+.sp-project-visibility-actions button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-caption);
+}
+.sp-project-visibility-options {
+  display: grid;
+  gap: 8px;
+  max-height: min(34vh, 270px);
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.sp-project-visibility-options .sp-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.sp-project-visibility-options input {
+  flex: none;
+  margin: 2px 0 0;
+}
+.sp-project-visibility p {
+  margin: 8px 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+}
+.sp-local-graph-bar {
+  position: absolute;
+  z-index: 3;
+  left: 25px;
+  top: 67px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 33px;
+  font-size: var(--text-meta);
+  color: var(--color-text);
+}
+.sp-local-graph-bar > button {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  padding: 5px 8px;
+  font-size: var(--text-meta);
+  border-radius: 6px;
+}
+.sp-local-graph-bar > button svg {
+  transform: rotate(180deg);
+}
+.sp-local-graph-bar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.sp-local-graph-bar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-caption);
+}
+.sp-local-graph-bar select {
+  border: 0;
+  color: var(--color-text);
+  font-size: var(--text-meta);
+  padding: 4px;
+  background: var(--color-surface);
+}
+.sp-force-graph {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.sp-force-graph .sp-vector-svg {
+  height: 100%;
+  width: 100%;
+  outline-offset: -3px;
+}
+.sp-force-graph.is-dragging .sp-vector-svg,
+.sp-force-graph.is-dragging .sp-vector-node circle,
+.sp-force-graph.is-dragging .sp-vector-node text {
+  cursor: grabbing;
+}
+.sp-force-link {
+  stroke-width: 0.65;
+  opacity: 0.35;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    stroke 140ms ease;
+}
+.sp-force-link.is-muted {
+  opacity: 0.055;
+}
+.sp-force-link.is-connected {
+  opacity: 0.8;
+  stroke-width: 1.1;
+}
+.sp-force-graph .sp-vector-node {
+  transition: opacity 140ms ease;
+}
+.sp-force-graph .sp-vector-node.is-muted {
+  opacity: 0.17;
+}
+.sp-force-graph .sp-vector-node circle[role="button"] {
+  cursor: grab;
+  stroke: var(--color-surface);
+  stroke-width: 0.8;
+}
+.sp-force-graph .sp-vector-node.is-active circle[role="button"] {
+  stroke-width: 1.6;
+}
+.sp-force-graph .sp-node-hit {
+  cursor: grab;
+}
+.sp-force-graph .sp-node-ring {
+  opacity: 0.9;
+  pointer-events: none;
+}
+.sp-force-graph .sp-vector-node text {
+  font:
+    var(--graph-label-size, var(--text-meta)) -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  fill: var(--color-text);
+  stroke: var(--color-surface);
+  stroke-width: var(--graph-label-stroke, 3px);
+  paint-order: stroke;
+  stroke-linejoin: round;
+  cursor: grab;
+  user-select: none;
+}
+.sp-force-graph .sp-vector-node .sp-node-label {
+  opacity: var(--graph-label-visibility, 1);
+}
+.sp-force-graph .sp-vector-node .sp-node-active-label {
+  fill: var(--color-text);
+  font-weight: 550;
+  font-size: var(--graph-active-label-size, var(--text-small));
+}
+.sp-graph-display {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+.sp-graph-display > button {
+  height: 32px;
+  color: var(--color-text);
+  font-size: var(--text-meta);
+  background: color-mix(in srgb, var(--color-surface) 92.9%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 7px 9px;
+}
+.sp-graph-display > button.active {
+  color: var(--color-ink);
+  background: var(--color-selection);
+}
+.sp-graph-settings {
+  position: absolute;
+  z-index: 18;
+  right: 24px;
+  top: 65px;
+  width: 265px;
+  padding: 0 19px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface) 98%, transparent);
+  box-shadow: 0 10px 40px color-mix(in srgb, var(--color-shadow) 8.6%, transparent);
+}
+.sp-graph-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0;
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.sp-graph-settings-head h2 {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  font-weight: 550;
+}
+.sp-graph-setting-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-small);
+  color: var(--color-text);
+  margin: 16px 0;
+}
+.sp-graph-setting-inline select {
+  font-size: var(--text-meta);
+  padding: 5px 6px;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.sp-graph-setting-inline input[type="checkbox"] {
+  accent-color: var(--color-focus);
+  width: 13px;
+  height: 13px;
+}
+.sp-graph-setting-group {
+  border-top: 1px solid var(--color-rule);
+  margin-top: 20px;
+  padding-top: 15px;
+}
+.sp-graph-setting-group > span {
+  font-size: var(--text-caption);
+  color: var(--color-text);
+}
+.sp-graph-setting-group label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: var(--text-small);
+  color: var(--color-text);
+  margin: 17px 0;
+}
+.sp-graph-setting-group output {
+  color: var(--color-text);
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+}
+.sp-graph-setting-group input[type="range"] {
+  width: 100%;
+  padding: 0;
+  height: 3px;
+  cursor: pointer;
+  accent-color: var(--color-focus);
+}
+.sp-graph-reset {
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  font-size: var(--text-meta);
+  color: var(--color-text);
+}
+.sp-force-graph .sp-graph-controls {
+  left: auto;
+  right: 24px;
+  bottom: 24px;
+  z-index: 5;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--color-shadow) 2.4%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 92.9%, transparent);
+}
+.sp-force-graph .sp-graph-controls button {
+  min-width: 28px;
+  height: 27px;
+  min-height: 27px;
+  border-radius: 5px;
+  border: 0;
+  color: var(--color-text);
+}
+.sp-force-graph .sp-graph-controls .sp-graph-recenter {
+  width: auto;
+  padding: 0 8px;
+}
+.sp-force-graph .sp-graph-controls button[aria-pressed="true"] {
+  color: var(--color-ink);
+  background: var(--color-selection);
+}
+.sp-force-graph .sp-graph-controls output {
+  font-size: var(--text-caption);
+  color: var(--color-text);
+  width: 39px;
+  font-variant-numeric: tabular-nums;
+}
+.sp-graph-control-divider {
+  width: 1px;
+  height: 15px;
+  background: var(--color-panel);
+  margin: 0 4px;
+}
+.sp-graph-gesture-hint {
+  position: absolute;
+  bottom: 76px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  font-size: var(--text-caption);
+  color: var(--color-text);
+  pointer-events: none;
+}
+.sp-network-caption {
+  position: absolute;
+  left: 26px;
+  bottom: 75px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  color: var(--color-text);
+  font-size: var(--text-meta);
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-surface) 87.5%, transparent);
+  border-radius: 5px;
+  padding: 2px 0;
+}
+.sp-network-caption strong {
+  color: var(--color-text);
+  font-weight: 500;
+}
+.sp-network-caption > span:before {
+  content: "·";
+  margin-right: 9px;
+  color: var(--color-text);
+}
+.sp-network-caption small {
+  width: 100%;
+  font-size: var(--text-caption);
+  color: var(--color-text);
+}
+.sp-graph-footer {
+  position: absolute;
+  bottom: 22px;
+  left: 24px;
+  right: auto;
+  border: 0;
+  padding: 0;
+  min-height: 34px;
+  background: transparent;
+  z-index: 4;
+}
+.sp-graph-footer > span {
+  display: none;
+}
+.sp-graph-footer .sp-legend {
+  gap: 5px;
+}
+.sp-graph-footer .sp-legend button {
+  min-height: 29px;
+  gap: 6px;
+  color: var(--color-text);
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--color-surface) 92.9%, transparent);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: var(--text-meta);
+}
+.sp-graph-footer .sp-legend button:hover {
+  background: var(--color-paper);
+}
+.sp-graph-footer .sp-legend button[aria-pressed="true"] {
+  border-color: var(--color-selection-border);
+  background: var(--color-selection);
+  color: var(--color-ink);
+}
+.sp-graph-footer .sp-legend i {
+  width: 7px;
+  height: 7px;
+}
+.is-live.is-graph .sp-graph-footer {
+  right: 220px;
+}
+.is-live.is-graph .sp-graph-footer .sp-legend {
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.is-live.is-graph .sp-legend button {
+  flex-shrink: 0;
+}
+.is-live.is-graph .sp-graph-gesture-hint {
+  display: none;
+}
+.sp-graph-hover-card {
+  position: absolute;
+  z-index: 3;
+  left: 25px;
+  bottom: 131px;
+  width: 255px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 96.1%, transparent);
+  border-radius: 9px;
+  padding: 15px 16px;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--color-shadow) 3.5%, transparent);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.sp-graph-hover-card > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-caption);
+  color: var(--color-text);
+}
+.sp-graph-hover-card i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.sp-graph-hover-card small {
+  margin-left: auto;
+  font-size: var(--text-caption);
+  color: var(--color-text);
+}
+.sp-graph-hover-card strong {
+  display: block;
+  font-weight: 550;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  margin: 12px 0 6px;
+}
+.sp-graph-hover-card p {
+  font-size: var(--text-small);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sp-memory-layout .sp-memory-inspector {
+  position: absolute;
+  top: 86px;
+  bottom: auto;
+  right: 24px;
+  z-index: 8;
+  width: 360px;
+  max-height: calc(100% - 168px);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 98%, transparent);
+  box-shadow:
+    0 12px 45px color-mix(in srgb, var(--color-shadow) 4.7%, transparent),
+    0 2px 8px color-mix(in srgb, var(--color-shadow) 1.6%, transparent);
+  overflow: auto;
+  animation: sp-inspector-enter 160ms ease-out;
+}
+.sp-memory-inspector .sp-inspector-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  min-height: 51px;
+  padding: 12px 19px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.sp-memory-inspector .sp-inspector-head h2 {
+  font-size: var(--text-small);
+  color: var(--color-text);
+  font-weight: 500;
+}
+.sp-memory-inspector .sp-inspector-body {
+  padding: 21px 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sp-memory-inspector .sp-memory-content {
+  font-size: var(--text-body);
+  font-weight: 400;
+  color: var(--color-ink);
+  margin: 15px 0 22px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sp-memory-inspector .sp-category-chip {
+  font-size: var(--text-caption);
+  padding: 4px 7px;
+}
+.sp-memory-inspector .sp-properties {
+  font-size: var(--text-meta);
+  margin: 22px 0;
+  padding: 10px 0;
+}
+.sp-memory-inspector .sp-properties > div {
+  grid-template-columns: 72px minmax(0, 1fr);
+  padding: 8px 0;
+}
+.sp-memory-inspector .sp-properties dt {
+  color: var(--color-text);
+}
+.sp-memory-inspector .sp-properties dd {
+  color: var(--color-text);
+}
+.sp-focus-connections {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  border: 1px solid var(--color-focus);
+  background: var(--color-paper);
+  font-size: var(--text-meta);
+  color: var(--color-text);
+  margin: 20px 0 16px;
+  padding: 9px 10px;
+  border-radius: 6px;
+}
+.sp-focus-connections > svg:last-child {
+  margin-left: auto;
+}
+.sp-memory-inspector .sp-memory-actions {
+  gap: 7px;
+}
+.sp-memory-inspector .sp-memory-actions .sp-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.sp-memory-inspector .sp-memory-actions a,
+.sp-memory-inspector .sp-memory-actions button {
+  font-size: var(--text-meta);
+  min-height: 30px;
+}
+.sp-memory-inspector .sp-memory-sharing {
+  font-size: var(--text-caption);
+  color: var(--color-text);
+  margin-bottom: 0;
+}
+.sp-memory-inspector .sp-evidence h3 {
+  font-size: var(--text-meta);
+  color: var(--color-text);
+}
+.sp-memory-inspector .sp-evidence blockquote {
+  font-size: var(--text-small);
+  line-height: 1.8;
+  color: var(--color-text);
+}
+.sp-memory-inspector .sp-stale p {
+  font-size: var(--text-caption);
+}
+.sp-memory-inspector .sp-stale > span {
+  font-size: var(--text-caption);
+}
+.sp-memory-layout.is-list .sp-memory-list {
+  position: absolute;
+  top: 82px;
+  bottom: 126px;
+  left: 24px;
+  right: 24px;
+  padding: 0;
+}
+.sp-memory-layout.is-list.has-selection .sp-memory-list {
+  right: 408px;
+}
+.sp-memory-layout.is-list .sp-memory-list-row,
+.sp-memory-layout.is-list .sp-memory-list-head {
+  grid-template-columns: minmax(0, 1fr) 110px;
+}
+/* One page of memory is read at a time; older memory sits behind this control. */
+.sp-memory-layout.is-list .sp-memory-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 6px;
+}
+.sp-memory-layout.is-list .sp-memory-more button {
+  font-size: var(--text-small);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+.sp-memory-layout.is-list .sp-memory-more button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sp-memory-layout .sp-empty,
+.sp-memory-layout .sp-memory-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(530px, 95%);
+  margin: 0;
+  padding: 20px;
+}
+@keyframes sp-inspector-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1250px) {
+  .sp-graph-gesture-hint {
+    display: none;
+  }
+  .sp-memory-search-tools .sp-search {
+    width: 160px;
+  }
+  .sp-memory-search-tools select {
+    max-width: 120px;
+  }
+  .sp-memory-layout .sp-memory-inspector {
+    width: 320px;
+  }
+  .sp-memory-layout.is-list.has-selection .sp-memory-list {
+    right: 368px;
+  }
+}
+@media (max-width: 950px) {
+  .sp-canvas-toolbar {
+    left: 17px;
+  }
+  .sp-graph-display {
+    right: 17px;
+  }
+  .sp-graph-display span {
+    display: none;
+  }
+  .sp-memory-search-tools {
+    gap: 5px;
+  }
+  .sp-memory-search-tools .sp-search {
+    width: 140px;
+  }
+  .sp-memory-search-tools select {
+    max-width: 100px;
+    font-size: var(--text-caption);
+  }
+  .sp-memory-layout.is-list.has-selection .sp-memory-list {
+    right: 24px;
+  }
+  .sp-memory-scope {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .sp-memory-topbar {
+    min-height: 54px;
+    padding: 9px 15px;
+    flex-wrap: nowrap;
+    gap: 9px;
+  }
+  .sp-memory-topbar > .sp-actions:first-child {
+    width: auto;
+    gap: 6px;
+  }
+  .sp-memory-topbar .sp-topbar-title {
+    margin-right: 3px;
+  }
+  .sp-memory-topbar > .sp-actions > button {
+    font-size: var(--text-caption);
+    padding: 6px 7px;
+  }
+  .sp-memory-topbar .sp-segment button {
+    font-size: var(--text-caption);
+    padding: 5px 7px;
+  }
+  .sp-memory-topbar .sp-segment svg {
+    width: 13px;
+  }
+  .sp-canvas-toolbar {
+    top: 15px;
+    left: 15px;
+    right: 57px;
+  }
+  .sp-memory-search-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr 29px;
+    gap: 6px;
+  }
+  .sp-memory-search-tools .sp-search {
+    width: auto;
+    grid-column: 1/-1;
+    height: 31px;
+  }
+  .sp-memory-search-tools select {
+    max-width: 100%;
+    height: 29px;
+    font-size: var(--text-caption);
+    padding: 4px 6px;
+  }
+  .sp-memory-search-tools > button {
+    height: 29px;
+    min-height: 29px;
+    width: 29px;
+  }
+  .sp-graph-display {
+    top: 15px;
+    right: 15px;
+  }
+  .sp-graph-display > button {
+    height: 31px;
+    width: 31px;
+    padding: 6px;
+  }
+  .sp-graph-display > button:first-child {
+    display: none;
+  }
+  .sp-graph-settings {
+    right: 15px;
+    top: 54px;
+    width: min(265px, calc(100% - 30px));
+  }
+  .sp-filter-panel {
+    top: 89px;
+    left: 15px;
+  }
+  .sp-local-graph-bar {
+    top: 91px;
+    left: 15px;
+    right: 15px;
+    gap: 8px;
+  }
+  .sp-local-graph-bar > span {
+    max-width: 110px;
+    font-size: var(--text-caption);
+  }
+  .sp-local-graph-bar label {
+    margin-left: auto;
+  }
+  .sp-force-graph .sp-graph-controls {
+    right: 15px;
+    bottom: 57px;
+  }
+  .sp-force-graph .sp-graph-controls button {
+    min-width: 25px;
+    width: 25px;
+    padding: 5px;
+  }
+  .sp-force-graph .sp-graph-controls output {
+    width: 34px;
+  }
+  .sp-network-caption {
+    left: 18px;
+    bottom: 101px;
+    font-size: var(--text-caption);
+    gap: 6px;
+  }
+  .sp-network-caption small {
+    font-size: var(--text-caption);
+  }
+  .sp-network-caption > span:before {
+    margin-right: 6px;
+  }
+  .sp-graph-footer,
+  .is-live.is-graph .sp-graph-footer {
+    bottom: 14px;
+    left: 12px;
+    right: 12px;
+  }
+  .sp-graph-footer .sp-legend {
+    width: 100%;
+    justify-content: space-between;
+    gap: 2px;
+  }
+  .sp-graph-footer .sp-legend button {
+    font-size: var(--text-caption);
+    padding: 5px 6px;
+  }
+  .sp-graph-hover-card {
+    display: none;
+  }
+  .sp-memory-layout .sp-memory-inspector {
+    top: auto;
+    bottom: 15px;
+    left: 15px;
+    right: 15px;
+    width: auto;
+    max-height: 70%;
+    border-radius: 12px;
+    box-shadow: 0 -5px 30px color-mix(in srgb, var(--color-shadow) 7.8%, transparent);
+    z-index: 10;
+  }
+  .sp-memory-inspector .sp-inspector-body {
+    padding: 18px 20px;
+  }
+  .sp-memory-inspector .sp-properties {
+    margin: 16px 0;
+    padding: 7px 0;
+  }
+  .sp-memory-inspector .sp-properties > div {
+    padding: 6px 0;
+  }
+  .sp-memory-inspector .sp-evidence {
+    margin: 15px 0;
+  }
+  .sp-memory-inspector .sp-focus-connections {
+    margin: 15px 0;
+  }
+  .sp-memory-inspector .sp-stale {
+    margin-bottom: 16px;
+  }
+  .sp-memory-layout.is-list .sp-memory-list {
+    top: 102px;
+    left: 15px;
+    right: 15px;
+    bottom: 154px;
+  }
+  .sp-memory-layout.is-list.has-selection .sp-memory-list {
+    right: 15px;
+  }
+  .sp-memory-layout.is-list .sp-memory-list-head,
+  .sp-memory-layout.is-list .sp-memory-list-row {
+    grid-template-columns: minmax(0, 1fr) 85px;
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-memory-inspector,
+  .sp-force-link,
+  .sp-force-graph .sp-vector-node {
+    animation: none;
+    transition: none;
+  }
+}

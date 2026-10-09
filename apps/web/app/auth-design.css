@@ -1,0 +1,279 @@
+/* The unlock card, shown wherever a locked browser needs the workspace. */
+.sp-auth-page {
+  --auth-accent: #42644c;
+  --auth-ink: #202522;
+  --auth-muted: #737b76;
+  --auth-border: #e2e7e3;
+  box-sizing: border-box;
+  min-height: 100svh;
+  padding: 44px 24px 32px;
+  background: #fff;
+  color: var(--auth-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sp-auth-page *,
+.sp-auth-page *::before,
+.sp-auth-page *::after {
+  box-sizing: border-box;
+}
+
+.sp-auth-page .sp-auth-brand {
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
+  color: var(--auth-ink);
+  text-decoration: none;
+}
+
+.sp-auth-page .sp-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.7px;
+}
+
+.sp-auth-page .sp-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  color: #fff;
+  background: var(--auth-accent);
+  border-radius: 9px;
+}
+
+.sp-auth-page .sp-mark-frame {
+  fill: var(--auth-accent);
+  stroke: var(--auth-accent);
+}
+
+.sp-auth-page .auth-card.sp-auth-card {
+  width: min(384px, 100%);
+  max-width: none;
+  margin: 64px auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sp-auth-page .sp-auth-heading {
+  display: block;
+  height: auto;
+  margin: 0 0 30px;
+  padding: 0;
+  border: 0;
+  text-align: center;
+}
+
+.sp-auth-page :is(.sp-auth-card, .sp-auth-loading) h1 {
+  margin: 0;
+  color: var(--auth-ink);
+  font-family: inherit;
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+
+.sp-auth-page .sp-auth-card .muted {
+  margin: 10px 0 0;
+  color: var(--auth-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sp-auth-page .sp-auth-card form {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+}
+
+.sp-auth-page .sp-auth-card label {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  color: var(--auth-ink);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 20px;
+}
+
+.sp-auth-page .sp-auth-card input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  padding: 11px 13px;
+  border: 1px solid var(--auth-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--auth-ink);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
+  box-shadow: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.sp-auth-page .sp-auth-card input::placeholder {
+  color: #939b95;
+  opacity: 1;
+}
+
+.sp-auth-page .sp-auth-card input:focus {
+  border-color: var(--auth-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px #42644c14;
+}
+
+.sp-auth-page .sp-auth-card .primary,
+.sp-auth-page .sp-auth-loading .sp-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin: 4px 0 0;
+  padding: 11px 18px;
+  border: 1px solid var(--auth-accent);
+  border-radius: 10px;
+  background: var(--auth-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 22px;
+  box-shadow: none;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.sp-auth-page :is(.sp-auth-card .primary, .sp-auth-loading .sp-primary):hover:not(:disabled) {
+  border-color: #35533e;
+  background: #35533e;
+}
+
+.sp-auth-page .sp-auth-card .fine-print {
+  margin: 24px 0 0;
+  color: var(--auth-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.sp-auth-page .sp-auth-card :is(.error, .notice) {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--auth-border);
+  border-radius: 10px;
+  background: #f4f7f4;
+  color: #43604b;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.sp-auth-page .sp-auth-card .error {
+  border-color: #eadbd9;
+  background: #fcf6f5;
+  color: #93473f;
+}
+
+/* Inside the form the grid gap already spaces the error from the field and the button. */
+.sp-auth-page .sp-auth-card form .error {
+  margin: 0;
+}
+
+.sp-auth-page .sp-auth-card .fine-print a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sp-auth-page .sp-auth-card .fine-print a:hover {
+  color: var(--auth-accent);
+}
+
+.sp-auth-page .sp-auth-card code {
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+.sp-auth-page .sp-auth-loading {
+  width: min(384px, 100%);
+  margin: 116px auto 44px;
+  padding: 0;
+  text-align: center;
+}
+
+.sp-auth-page .sp-auth-loading h1 {
+  font-size: 26px;
+  letter-spacing: -0.7px;
+}
+
+.sp-auth-page .sp-auth-loading p {
+  margin: 14px 0 22px;
+  color: var(--auth-muted);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.sp-auth-page .sp-loading-orbit {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 22px;
+  border-color: var(--auth-border);
+  border-top-color: var(--auth-accent);
+}
+
+.sp-auth-page :is(button, a):focus-visible {
+  outline: 2px solid var(--auth-accent);
+  outline-offset: 4px;
+}
+
+.sp-auth-page button:disabled,
+.sp-auth-page input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 520px) {
+  .sp-auth-page {
+    padding: 30px 24px;
+  }
+
+  .sp-auth-page .auth-card.sp-auth-card {
+    margin-top: 44px;
+  }
+
+  .sp-auth-page .sp-auth-heading {
+    margin-bottom: 26px;
+  }
+
+  .sp-auth-page .sp-auth-card h1 {
+    font-size: 30px;
+  }
+
+  .sp-auth-page .sp-auth-card input {
+    font-size: 16px;
+  }
+
+  .sp-auth-page .sp-auth-loading {
+    margin-top: 84px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-auth-page :is(input, button) {
+    transition: none;
+  }
+}

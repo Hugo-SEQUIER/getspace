@@ -1,0 +1,248 @@
+.settings {
+  max-width: 760px;
+}
+.settings h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings p {
+  line-height: 1.6;
+}
+.form {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.form section {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--sp-border, var(--color-border));
+}
+.form label {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.form input:not([type="checkbox"]),
+.form select,
+.roster select {
+  padding: 10px 12px;
+  border: 1px solid var(--sp-border, var(--color-border));
+  border-radius: 7px;
+  background: var(--sp-surface, var(--color-surface));
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+  max-width: 100%;
+}
+.form:disabled {
+  opacity: 0.65;
+}
+.inline,
+.copy {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.inline label,
+.copy label {
+  flex: 1;
+  margin-bottom: 0;
+}
+.copy {
+  margin: 20px 0;
+}
+.copy input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.people {
+  border: 1px solid var(--sp-border, var(--color-border));
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 18px 0;
+}
+.people legend {
+  font-size: 13px;
+  padding: 0 6px;
+}
+.people label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.people label span {
+  flex: 1;
+}
+.people input {
+  accent-color: var(--color-focus);
+}
+.people small,
+.roster small,
+.invites small {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.roster,
+.invites {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.roster li,
+.invites li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--sp-border, var(--color-border));
+  padding: 14px 0;
+}
+.roster strong,
+.invites li > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.roster select {
+  width: 100px;
+  font-size: 12px;
+  padding: 7px;
+}
+.invites small {
+  display: block;
+  margin-top: 4px;
+}
+.role {
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--color-muted);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.count {
+  background: var(--color-panel);
+  border-radius: 20px;
+  padding: 3px 7px;
+  color: var(--color-text);
+  font-size: 11px;
+}
+.callout,
+.error {
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  background: #f3f0fc;
+}
+.error {
+  background: #fff0ed;
+  color: #9d352d;
+}
+.picker {
+  position: relative;
+  flex-shrink: 0;
+}
+.picker > button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.switcher {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 0;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 80;
+  padding: 8px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-shadow) 12.5%, transparent);
+}
+.switcher section {
+  margin: 0;
+  padding: 5px 0;
+}
+.switcher h3 {
+  margin: 8px 10px;
+  text-transform: uppercase;
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  letter-spacing: 0.07em;
+  overflow-wrap: anywhere;
+}
+.switcher button,
+.switcher a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  text-decoration: none;
+  font: inherit;
+  font-size: var(--text-small);
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+.switcher button span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.switcher svg {
+  flex-shrink: 0;
+}
+.switcher small {
+  display: block;
+  color: var(--color-muted);
+  margin-top: 3px;
+  font-size: var(--text-caption);
+}
+.switcher button:hover,
+.switcher a:hover,
+.switcher button[aria-current] {
+  background: var(--color-selection);
+}
+.switcher a {
+  border-top: 1px solid var(--color-rule);
+  border-radius: 0;
+}
+@media (max-width: 600px) {
+  .roster li {
+    flex-wrap: wrap;
+  }
+  .roster strong {
+    flex-basis: calc(100% - 50px);
+  }
+  .inline,
+  .copy {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

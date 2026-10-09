@@ -1,0 +1,836 @@
+.sp-db-topbar .sp-breadcrumbs {
+  min-width: 0;
+}
+.sp-search-page .sp-tabs {
+  flex-wrap: wrap;
+}
+.sp-db-topbar .sp-breadcrumbs > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-topbar-private {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+}
+.sp-db-large-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.sp-db-library {
+  padding: 44px 42px;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+.sp-db-library-heading {
+  margin-bottom: 42px;
+}
+.sp-db-library-heading h1 {
+  font-size: 2rem;
+  font-weight: 580;
+  letter-spacing: -0.035em;
+  margin: 20px 0 12px;
+  color: var(--color-ink);
+}
+.sp-db-library-heading p {
+  color: var(--color-muted);
+  font-size: var(--text-body);
+}
+.sp-db-library-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.sp-db-library-label h2 {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  font-weight: 550;
+}
+.sp-db-library-label > span {
+  color: var(--color-faint);
+  font-size: var(--text-meta);
+}
+.sp-db-library-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.sp-db-library-card {
+  display: block;
+  padding: 21px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  min-width: 0;
+  background: var(--color-surface);
+  box-shadow: var(--sp-shadow-surface);
+  transition: box-shadow 150ms;
+}
+.sp-db-library-card:hover {
+  box-shadow: var(--sp-shadow-hover);
+}
+.sp-db-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--color-faint);
+}
+.sp-db-card-top .sp-db-large-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+.sp-db-library-card h3 {
+  margin: 20px 0 9px;
+  font-size: 1.3125rem;
+  font-weight: 540;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+.sp-db-library-card p {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  line-height: 1.8;
+  height: 40px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0 0 20px;
+}
+.sp-db-card-columns {
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  background: var(--color-paper);
+}
+.sp-db-card-columns span {
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  padding: 8px 12px;
+  border-right: 1px solid var(--color-rule);
+  white-space: nowrap;
+}
+.sp-db-card-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+}
+.sp-db-add-card {
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  min-height: 245px;
+  white-space: normal;
+}
+.sp-db-add-card > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-faint);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  margin-bottom: 5px;
+}
+.sp-db-add-card strong {
+  font-size: var(--text-body);
+  color: var(--color-muted);
+  font-weight: 500;
+}
+.sp-db-add-card small {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+.sp-db-library-note {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 27px 3px;
+  margin-top: 24px;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-faint);
+}
+.sp-db-library-note strong {
+  font-size: var(--text-small);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.sp-db-library-note p {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+  margin: 7px 0;
+}
+.sp-db-workspace {
+  padding: 38px 30px 40px;
+  min-width: 0;
+}
+.sp-db-heading {
+  padding: 0 8px 28px;
+}
+.sp-db-title-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.sp-db-title-row h1 {
+  font-size: 2.25rem;
+  font-weight: 590;
+  letter-spacing: -0.03em;
+  color: var(--color-ink);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-db-heading > p {
+  font-size: var(--text-ui);
+  color: var(--color-muted);
+  margin: 17px 0 0;
+  line-height: 1.8;
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.sp-db-viewbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 0 10px;
+}
+.sp-db-view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sp-db-view-tabs button {
+  min-height: 36px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-muted);
+  font-size: var(--text-ui);
+  padding: 8px 10px;
+}
+.sp-db-view-tabs button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--color-ink);
+}
+.sp-db-view-tabs button[aria-pressed="true"] {
+  background: transparent;
+  color: var(--color-ink);
+  font-weight: 550;
+  box-shadow: inset 0 -2px 0 var(--color-ink);
+}
+.sp-db-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sp-db-view-actions button {
+  font-size: var(--text-small);
+}
+.sp-db-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 16px 0;
+}
+.sp-db-tools .sp-search {
+  width: 190px;
+}
+.sp-db-tools .sp-search input {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--text-small);
+}
+.sp-db-filters {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sp-db-filters > label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding-left: 8px;
+  color: var(--color-faint);
+}
+.sp-db-filters > label select {
+  border: 0;
+}
+.sp-db-filters select {
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  max-width: 160px;
+  border-color: var(--color-border);
+}
+.sp-db-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  min-height: 230px;
+  scrollbar-width: thin;
+}
+.sp-db-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: var(--text-small);
+  text-align: left;
+}
+.sp-db-table th {
+  font-weight: 450;
+  color: var(--color-muted);
+  background: var(--color-paper);
+  padding: 0 12px;
+  height: 38px;
+  border-right: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.sp-db-table th button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  min-height: 30px;
+  font-size: var(--text-meta);
+  font-weight: 400;
+  color: inherit;
+  gap: 7px;
+}
+.sp-db-table th button > svg:last-child {
+  color: var(--color-faint);
+}
+.sp-db-property-symbol {
+  color: var(--color-faint);
+  display: inline-block;
+  font-size: var(--text-meta);
+  margin-right: 8px;
+  font-weight: 400;
+}
+.sp-db-table .sp-db-name-column {
+  position: sticky;
+  left: 42px;
+  z-index: 1;
+  min-width: 205px;
+}
+.sp-db-table th.sp-db-name-column {
+  z-index: 2;
+}
+.sp-db-table td {
+  height: 53px;
+  padding: 0 11px;
+  border-right: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  min-width: 145px;
+  max-width: 250px;
+}
+.sp-db-table td:last-child,
+.sp-db-table th:last-child {
+  border-right: 0;
+  min-width: 110px;
+}
+.sp-db-table tbody tr:hover td {
+  background: var(--color-panel);
+}
+.sp-db-table tbody tr.is-selected td {
+  background: var(--color-selection);
+}
+.sp-db-table th > button:hover:not(:disabled),
+.sp-db-table tbody .sp-db-record-name:hover:not(:disabled),
+.sp-db-table tbody .sp-db-editable-cell > button:hover:not(:disabled),
+.sp-db-table tbody .sp-db-row-actions > button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--color-text);
+}
+.sp-db-record-name {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  gap: 9px;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+}
+.sp-db-record-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-record-name > svg {
+  flex-shrink: 0;
+  color: var(--color-faint);
+  margin-left: auto;
+  opacity: 0;
+}
+.sp-db-record-name:hover > svg,
+.sp-db-record-name:focus-visible > svg {
+  opacity: 1;
+}
+.sp-db-record-initial {
+  width: 25px;
+  height: 25px;
+  border-radius: 5px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-faint);
+  font-size: var(--text-meta);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.sp-db-editable-cell {
+  min-width: 0;
+  position: relative;
+}
+.sp-db-editable-cell > button {
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  min-height: 34px;
+  width: 100%;
+  display: block;
+  text-align: left;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-db-editable-cell > button:hover {
+  background: transparent;
+  color: var(--color-text);
+}
+.sp-db-editable-cell > button.is-empty {
+  color: var(--color-faint);
+}
+.sp-db-option {
+  color: var(--color-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: var(--text-meta);
+  line-height: 1.1;
+}
+.sp-db-option i {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.sp-db-editable-cell input,
+.sp-db-editable-cell select {
+  width: 100%;
+  min-width: 110px;
+  font-size: var(--text-small);
+  padding: 6px;
+}
+.sp-db-cell-error {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  font-size: var(--text-meta);
+  z-index: 3;
+  padding: 8px;
+  border: 1px solid #edd3e0;
+  background: #fff5f8;
+  color: #aa657e;
+  width: 190px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 10px #58416110;
+}
+.sp-db-add-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  padding: 15px 13px;
+  min-width: 190px;
+  font-size: var(--text-small);
+  color: var(--color-faint);
+  background: transparent;
+  position: sticky;
+  left: 0;
+}
+.sp-db-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-top: 19px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-db-status > span:last-child {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--color-muted);
+}
+.sp-db-no-results {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  align-items: center;
+  margin: 28px 0;
+  font-size: var(--text-ui);
+  color: var(--color-muted);
+}
+.sp-db-create-modal {
+  width: min(660px, calc(100vw - 32px));
+}
+.sp-db-dialog-intro h2 {
+  font-size: 1.5625rem;
+  font-weight: 530;
+  margin: 19px 0 7px;
+  color: var(--color-text);
+}
+.sp-db-dialog-intro p {
+  font-size: var(--text-ui);
+  color: var(--color-muted);
+  margin: 0 0 25px;
+  line-height: 1.8;
+}
+.sp-db-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 25px;
+}
+.sp-db-template {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  white-space: normal;
+  gap: 10px;
+  border-radius: 8px;
+}
+.sp-db-template.selected {
+  background: var(--color-selection);
+  border-color: var(--color-selection-border);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-shadow) 18.8%, transparent);
+}
+.sp-db-template strong {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-ui);
+  color: var(--color-muted);
+  font-weight: 500;
+}
+.sp-db-template small {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  line-height: 1.7;
+}
+.sp-db-template-sketch {
+  display: flex;
+  flex-direction: column;
+  height: 54px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.sp-db-template-sketch > i {
+  flex: 1;
+  border-bottom: 1px solid var(--color-rule);
+  background-image: linear-gradient(
+    to right,
+    transparent 37%,
+    color-mix(in srgb, var(--color-panel) 50.2%, transparent) 37%,
+    color-mix(in srgb, var(--color-panel) 50.2%, transparent) 38%,
+    transparent 38%,
+    transparent 70%,
+    color-mix(in srgb, var(--color-panel) 50.2%, transparent) 70%,
+    color-mix(in srgb, var(--color-panel) 50.2%, transparent) 71%,
+    transparent 71%
+  );
+}
+.sp-db-template-sketch > i:first-child {
+  background-color: var(--color-panel);
+}
+.sp-db-template-sketch.clients > i:not(:first-child):after {
+  content: "";
+  display: block;
+  margin: 5px 0 0 43%;
+  width: 26%;
+  height: 5px;
+  border-radius: 3px;
+  background: #bbceec;
+}
+.sp-db-template-sketch.clients > i:last-child:after {
+  background: var(--color-selection);
+}
+/* A checkbox per row, the last one ticked. */
+.sp-db-template-sketch.tasks > i:not(:first-child):after {
+  content: "";
+  display: block;
+  margin: 4px 0 0 8%;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--color-muted);
+  border-radius: 2px;
+}
+.sp-db-template-sketch.tasks > i:last-child:after {
+  background: var(--color-muted);
+}
+.sp-db-optional {
+  color: var(--color-faint);
+  font-size: var(--text-meta);
+}
+.sp-db-create-modal .sp-field {
+  gap: 7px;
+  color: var(--color-text);
+}
+.sp-db-create-modal .sp-field input {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  font-size: var(--text-ui);
+}
+.sp-db-create-modal .sp-modal-footer {
+  font-size: var(--text-meta);
+}
+.sp-db-form-note {
+  font-size: var(--text-meta);
+  line-height: 1.8;
+  color: var(--color-muted);
+}
+.sp-db-record-modal {
+  width: min(730px, calc(100vw - 32px));
+}
+.sp-db-record-modal .sp-modal-content {
+  padding: 26px 32px;
+}
+.sp-db-record-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-faint);
+  font-size: var(--text-meta);
+  margin-bottom: 14px;
+}
+.sp-db-record-title {
+  width: 100%;
+  padding: 8px 0 18px;
+  border: 0;
+  font-size: 2.125rem;
+  font-weight: 550;
+  color: var(--color-ink);
+  letter-spacing: -0.025em;
+}
+.sp-db-record-title::placeholder {
+  color: var(--color-faint);
+}
+.sp-db-record-properties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+  margin-top: 8px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 9px;
+}
+.sp-db-record-properties .sp-field {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+.sp-db-record-properties .sp-field input,
+.sp-db-record-properties .sp-field select {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  font-size: var(--text-ui);
+}
+.sp-db-record-properties input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-focus);
+}
+.sp-db-record-notes {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+.sp-db-record-notes textarea {
+  min-height: 115px;
+  font-size: var(--text-ui);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.sp-db-record-modal .sp-modal-footer {
+  gap: 10px;
+}
+.sp-db-record-modal .sp-modal-footer .sp-muted {
+  color: var(--color-muted);
+}
+.sp-compact .sp-db-table td {
+  height: 42px;
+}
+@media (max-width: 1200px) {
+  .sp-db-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sp-db-tools {
+    flex-wrap: wrap;
+  }
+  .sp-db-filters {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .sp-db-library {
+    padding: 30px 22px;
+  }
+  .sp-db-library-heading h1 {
+    font-size: 1.875rem;
+  }
+  .sp-db-library-grid {
+    grid-template-columns: 1fr;
+  }
+  .sp-db-add-card {
+    min-height: 150px;
+  }
+  .sp-db-topbar-private {
+    display: none;
+  }
+  .sp-db-workspace {
+    padding: 28px 18px;
+  }
+  .sp-db-heading {
+    padding: 0 0 24px;
+  }
+  .sp-db-title-row h1 {
+    font-size: 2.125rem;
+  }
+  .sp-db-title-row .sp-db-large-icon {
+    width: 37px;
+    height: 37px;
+  }
+  .sp-db-heading > p {
+    font-size: var(--text-small);
+  }
+  .sp-db-viewbar {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .sp-db-view-tabs button {
+    padding: 6px 9px;
+    font-size: var(--text-meta);
+  }
+  .sp-db-view-actions {
+    gap: 4px;
+  }
+  .sp-db-view-actions button {
+    font-size: var(--text-meta);
+    padding: 6px 8px;
+  }
+  .sp-db-tools .sp-search {
+    width: 100%;
+  }
+  .sp-db-filters {
+    width: 100%;
+    gap: 7px;
+  }
+  .sp-db-filters select {
+    font-size: var(--text-caption);
+    padding: 6px 4px;
+    max-width: 135px;
+  }
+  .sp-db-table .sp-db-name-column {
+    min-width: 170px;
+    max-width: 180px;
+  }
+  .sp-db-table td {
+    min-width: 140px;
+  }
+  .sp-db-record-name {
+    font-size: var(--text-meta);
+    white-space: normal;
+  }
+  .sp-db-table-wrap {
+    max-width: 100%;
+  }
+  .sp-db-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.7;
+  }
+  .sp-db-create-modal .sp-modal-content {
+    padding: 20px;
+  }
+  .sp-db-dialog-intro h2 {
+    font-size: 1.5rem;
+  }
+  .sp-db-template-grid {
+    gap: 8px;
+  }
+  .sp-db-template {
+    padding: 10px;
+  }
+  .sp-db-template strong {
+    font-size: var(--text-small);
+  }
+  .sp-db-create-modal .sp-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 13px;
+  }
+  .sp-db-record-modal .sp-modal-content {
+    padding: 22px;
+  }
+  .sp-db-record-properties {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-db-record-modal .sp-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sp-db-record-modal .sp-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .sp-doc-new-database {
+    padding: 6px;
+  }
+  .sp-doc-new-database > span {
+    display: none;
+  }
+}

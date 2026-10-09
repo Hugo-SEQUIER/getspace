@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!src/
+!src/**
+!migrations/
+!migrations/**
+src/**/__pycache__/
+src/**/*.pyc
+migrations/**/__pycache__/

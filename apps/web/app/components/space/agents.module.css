@@ -1,0 +1,277 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agentForm .profile {
+  margin: 0 0 20px;
+}
+.agentForm input,
+.agentForm select {
+  width: 100%;
+  min-width: 0;
+}
+.formHint {
+  margin: 16px 0 0;
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.agentForm .formFooter {
+  justify-content: flex-end;
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile > div {
+  flex: 1;
+  min-width: 0;
+}
+.profile p {
+  margin: 3px 0;
+  color: var(--sp-muted, var(--color-text));
+  font-size: 13px;
+}
+.identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 24px 0;
+}
+.identity label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.identity code,
+.connection code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.identity button {
+  justify-self: start;
+}
+.identity p,
+.configuration p,
+.assign p {
+  font-size: 13px;
+  color: var(--sp-muted, var(--color-text));
+  line-height: 1.6;
+}
+.configuration {
+  padding: 14px 0;
+  margin-bottom: 24px;
+  border-block: 1px solid var(--sp-border, var(--color-rule));
+}
+.configuration summary,
+.connection summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.configuration pre {
+  overflow: auto;
+  padding: 12px;
+  background: var(--sp-bg-subtle, var(--color-panel));
+  border-radius: 8px;
+  font-size: 12px;
+}
+.connection {
+  border: 1px solid var(--sp-border, var(--color-rule));
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.connection > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.connection > div span,
+.connection p {
+  color: var(--sp-muted, var(--color-text));
+  font-size: 12px;
+}
+.connection details {
+  margin: 12px 0;
+}
+.connection code {
+  display: block;
+  margin-top: 8px;
+}
+.assign label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 8px;
+  font-size: 13px;
+  margin: 16px 0;
+}
+.assign select {
+  width: 100%;
+  min-width: 0;
+}
+.connectionAgent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.connectionAgent select {
+  min-width: 0;
+  width: 100%;
+}
+.error {
+  color: #b42318;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.memorySetup {
+  margin-bottom: 24px;
+  min-width: 0;
+}
+.setupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.setupHeader p {
+  margin: 0;
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+
+.signInOption {
+  min-width: 0;
+  margin: 0 0 20px;
+  padding: 14px;
+  border: 1px solid var(--sp-border, var(--color-rule));
+  border-radius: 12px;
+}
+.signInOption h3 {
+  margin: 0 0 6px;
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+.signInOption p {
+  margin: 0 0 10px;
+  color: var(--sp-muted, var(--color-text));
+  font-size: 13px;
+  line-height: 1.6;
+}
+.connectorAddress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.connectorAddress code {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--sp-bg-subtle, var(--color-panel));
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.connectorAddress button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.formIntro {
+  margin: 0 0 18px;
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.writeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.writeOption input,
+.agentForm .writeOption input {
+  flex: none;
+  width: auto;
+  margin-top: 3px;
+}
+.writeOption span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.writeOption small {
+  color: var(--sp-muted, var(--color-text));
+  font-size: 12px;
+}
+.tokenResult {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tokenResult h3 {
+  margin: 0 0 8px;
+}
+.tokenResult h3 + p {
+  margin: 0 0 16px;
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.tokenResult .actions + h3 {
+  margin-top: 26px;
+}
+.tokenField {
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+}
+.setupSnippet {
+  margin: 14px 0;
+  min-width: 0;
+}
+.setupSnippet h4 {
+  margin: 0 0 4px;
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+.setupSnippet p {
+  margin: 0 0 8px;
+  color: var(--sp-muted, var(--color-text));
+  font-size: 13px;
+}
+.setupSnippet pre {
+  margin: 0 0 8px;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--sp-bg-subtle, var(--color-panel));
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tokenResult .formFooter {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+.tokenResult .formFooter :global(.sp-help-link) {
+  margin: 0;
+}

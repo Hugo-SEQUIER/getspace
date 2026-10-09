@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.19"
+      - name: Install
+        run: uv sync --directory backend --locked --group dev
+      - name: Lint
+        run: |
+          uv run --directory backend --locked ruff check src tests migrations scripts
+          uv run --directory backend --locked ruff format --check src tests migrations scripts
+      - name: Unit tests
+        run: uv run --directory backend --locked pytest
+      - name: Database tests
+        run: |
+          docker pull --quiet pgvector/pgvector:pg17
+          SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        run: npm --prefix apps/web ci
+      - name: Unit tests
+        run: npm --prefix apps/web test
+      - name: Type check
+        run: npm --prefix apps/web run typecheck
+      - name: Build
+        run: npm --prefix apps/web run build
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the backend image
+        run: docker build --tag getspace/backend:ci backend
+      - name: Build the website image
+        run: docker build --tag getspace/web:ci --file apps/web/Dockerfile .

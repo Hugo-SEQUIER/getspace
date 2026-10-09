@@ -1,0 +1,160 @@
+# Space, self-hosted on one machine. Run `scripts/setup.sh` once to write `.env`, then
+# `docker compose up -d --build`. See docs/SELF_HOSTING.md.
+name: space
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend-image: &backend-image
+  image: getspace/backend:local
+  build:
+    context: ./backend
+
+# Every backend process reaches PostgreSQL over the private compose network.
+x-database: &database
+  SPACE_DATABASE_URL: postgresql://space_app:${SPACE_APP_DB_PASSWORD:?run scripts/setup.sh first}@db:5432/space
+  SPACE_DATABASE_SSLMODE: disable
+  SPACE_DATABASE_WORKER_PROCESSES: "1"
+  SPACE_DATABASE_WEBHOOK_PROCESSES: "1"
+
+x-runtime: &runtime
+  SPACE_ENVIRONMENT: production
+  SPACE_ACCESS_MODE: ${SPACE_ACCESS_MODE:-key}
+  SPACE_ACCESS_KEY: ${SPACE_ACCESS_KEY:-}
+  SPACE_WEB_URL: ${SPACE_PUBLIC_URL:?set SPACE_PUBLIC_URL in .env}
+  SPACE_MCP_RESOURCE_URL: ${SPACE_PUBLIC_URL}/mcp/
+  SPACE_ALLOWED_HOSTS: ${SPACE_ALLOWED_HOSTS:?set SPACE_ALLOWED_HOSTS in .env}
+  SPACE_MEMORY_PROVIDER: ${SPACE_MEMORY_PROVIDER:-disabled}
+  SPACE_MEMORY_PROVIDER_URL: ${SPACE_MEMORY_PROVIDER_URL:-}
+  SPACE_MEMORY_API_KEY: ${SPACE_MEMORY_API_KEY:-}
+  SPACE_MEMORY_TEXT_MODEL: ${SPACE_MEMORY_TEXT_MODEL:-}
+  SPACE_MEMORY_RELEVANCE_MODEL: ${SPACE_MEMORY_RELEVANCE_MODEL:-}
+  SPACE_MEMORY_EMBEDDING_MODEL: ${SPACE_MEMORY_EMBEDDING_MODEL:-}
+  SPACE_MEMORY_EMBEDDING_URL: ${SPACE_MEMORY_EMBEDDING_URL:-}
+  SPACE_MEMORY_EMBEDDING_API_KEY: ${SPACE_MEMORY_EMBEDDING_API_KEY:-}
+  SPACE_MEMORY_REASONING_EFFORT: ${SPACE_MEMORY_REASONING_EFFORT:-}
+  SPACE_MEMORY_RELEVANCE_REASONING_EFFORT: ${SPACE_MEMORY_RELEVANCE_REASONING_EFFORT:-}
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.2-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: space
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/setup.sh first}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d space"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
+  # Creates the restricted logins, applies migrations and exits. Safe on every start.
+  migrate:
+    <<: *backend-image
+    command: ["python", "-m", "space.install"]
+    environment:
+      <<: *database
+      SPACE_MIGRATION_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/space
+      SPACE_JOB_DATABASE_URL: postgresql://space_worker:${SPACE_WORKER_DB_PASSWORD:?run scripts/setup.sh first}@db:5432/space
+      SPACE_WEBHOOK_DATABASE_URL: postgresql://space_webhook:${SPACE_WEBHOOK_DB_PASSWORD:?run scripts/setup.sh first}@db:5432/space
+      SPACE_MEMORY_EMBEDDING_DIMENSIONS: ${SPACE_MEMORY_EMBEDDING_DIMENSIONS:-1536}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *logging
+
+  api:
+    <<: *backend-image
+    restart: unless-stopped
+    environment:
+      <<: [*database, *runtime]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+    logging: *logging
+
+  # Memory extraction jobs. Idle, it checks the queue every few seconds.
+  worker:
+    <<: *backend-image
+    command: ["python", "-m", "space.job_worker"]
+    restart: unless-stopped
+    environment:
+      <<: [*database, *runtime]
+      SPACE_JOB_DATABASE_URL: postgresql://space_worker:${SPACE_WORKER_DB_PASSWORD}@db:5432/space
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    logging: *logging
+
+  # Signed database webhooks. Idle, it checks the delivery queue every few seconds.
+  webhooks:
+    <<: *backend-image
+    command: ["python", "-m", "space.webhook_worker", "--loop"]
+    restart: unless-stopped
+    environment:
+      <<: [*database, *runtime]
+      SPACE_WEBHOOK_DATABASE_URL: postgresql://space_webhook:${SPACE_WEBHOOK_DB_PASSWORD}@db:5432/space
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    logging: *logging
+
+  web:
+    image: getspace/web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      SPACE_ACCESS_MODE: ${SPACE_ACCESS_MODE:-key}
+      SPACE_ACCESS_KEY: ${SPACE_ACCESS_KEY:-}
+      SPACE_API_URL: http://api:8000
+      SPACE_WEB_URL: ${SPACE_PUBLIC_URL}
+      SPACE_OWNER_NAME: ${SPACE_OWNER_NAME:-Owner}
+      HOST: 0.0.0.0
+      PORT: "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+
+  # The only published service. With a domain name it obtains HTTPS certificates itself.
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:?set CADDY_SITE_ADDRESS in .env}
+    ports:
+      - "${SPACE_BIND_ADDRESS:-0.0.0.0}:${SPACE_HTTP_PORT:-80}:80"
+      - "${SPACE_BIND_ADDRESS:-0.0.0.0}:${SPACE_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - api
+    logging: *logging
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

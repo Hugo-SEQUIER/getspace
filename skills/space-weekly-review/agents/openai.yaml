@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Weekly Review"
+  short_description: "Review a week's recorded work"
+  default_prompt: "Use $space-weekly-review to review what moved forward last week."

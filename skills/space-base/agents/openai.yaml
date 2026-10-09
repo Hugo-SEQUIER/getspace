@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Base"
+  short_description: "Maintain custom databases and records"
+  default_prompt: "Use $space-base to create or update a database, its fields and its records."

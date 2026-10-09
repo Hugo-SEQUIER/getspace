@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Import"
+  short_description: "Import existing notes in approved batches"
+  default_prompt: "Use $space-import to preview these notes as source documents and reusable claims, then import only the batch I approve."

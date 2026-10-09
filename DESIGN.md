@@ -1,0 +1,102 @@
+# DESIGN.md
+
+## Product context
+
+- Product: Space, a self-hosted workspace for documents, tasks, projects, and agent memory, shared between one owner and their AI agents.
+- Audience: People managing their own work and connecting authorized AI agents to saved context.
+- Primary job: Find, maintain, and resume useful context in the workspace.
+- Brand personality: Quiet, clear, dependable, minimal. The workspace takes its cues from Notion's density and Apple's typographic restraint, in Space's light sage and forest-green palette.
+
+## Design principles
+
+- Make context easy to scan: give page titles, actions, navigation, and content distinct hierarchy without adding decorative cards or invented data.
+- Navigation shows stored relationships: the Documents tree is section → folder → document, with folders outside sections and Unfiled documents visible at the root. Folders are saved workspace items, not Projects. A document can have one folder and an independent optional project link. Nested pages are not part of this model.
+- Reading remains primary: document text, context, and version history keep their own surfaces; the tree stays to the left on wide screens and becomes a disclosure above content on narrow screens.
+- Keep organization explicit: section and folder creation use saved workspace items; creating a folder never creates a Project. Creating a document in a folder preselects only that folder unless an optional project filter is active. Removing a section or folder never archives or deletes its documents; they stay in All documents, and documents with no active folder appear in Unfiled.
+- Keep one identity across every page: use the shared sage-and-green palette, wordmark, icons, and controls; allow the workspace to be denser than reading views.
+- Keep important details legible: do not make privacy copy, state labels, or interactive hints faint or tiny simply to create visual quiet.
+- Let meaningful states show: empty, loading, error, read/edit, selected, disabled, and focus states must remain understandable without relying on color alone.
+
+## Visual identity and tokens
+
+- Signature element: A near-white page with a sage sidebar, a forest-green `S` tile, and large tight page titles over open space, rather than gradients or ornamental dashboard widgets.
+- Style direction: Sage surfaces, hairline borders, one green primary action per view, and compact utility controls. Green marks brand moments: primary actions, active navigation, checked states, progress, and selected options.
+- Avoid unrelated accent colors, nested decorative containers, washed-out copy on dark panels, and inconsistent page footers or navigation labels.
+
+| Token | Value | Usage |
+|---|---|---|
+| `--color-paper` / `--color-surface` | `#fcfdfc` / `#ffffff` | Page background; controls and cards |
+| `--color-panel` | `#f2f5f2` | Sidebar, board columns, and quiet surfaces |
+| `--color-hover` / `--color-selection` | `#edf2ee` / `#e6ede7` | Hovered rows; selected navigation, rows, and icon tiles |
+| `--color-ink` | `#202522` | Headings and primary text |
+| `--color-accent` / `--color-accent-hover` | `#42644c` / `#304d39` | Primary actions, active navigation, checked states, progress, links, and focus |
+| `--color-text` / `--color-muted` | `#515b56` / `#68716b` | Body and secondary text on light surfaces |
+| `--color-border` / `--color-rule` / `--color-selection-border` | `#e2e7e3` / `#edf0ed` / `#b8cabb` | Control and card borders; dividers; hovered or selected card borders |
+| `--color-inverse-muted` | `#d4e0d7` | Secondary text and essential icons on charcoal insets; never reuse light-surface faint text there |
+| `--radius-sm` / `--radius-md` / `--radius-lg` | `6px` / `8px` / `12px` | Controls; menus and dialogs' inner items; cards and dialogs |
+| `--shadow-card` / `--shadow-pop` | hairline / soft layered | Resting cards; menus, dialogs, and toasts |
+| Type / UI | System sans (`-apple-system`, BlinkMacSystemFont, SF Pro Text, Inter, Segoe UI, sans-serif) | Navigation, controls and headings |
+| Type / workspace scale | 14px controls and navigation, 15px body, 30px/700 page titles with -0.6px tracking, 14px/600 section labels | Workspace (`.sp-app`) only; never below 12px |
+| Type / reading | `--text-reading` (workspace `1rem`) | Documents |
+| Space / rhythm | 8px control gaps; 48px page gutters on desktop, 16px on mobile; 40px between Home sections | Start from existing component layout, not one-off page offsets |
+
+Color, radius, and shadow tokens live in `apps/web/app/theme.css`; the workspace type scale and chrome (sidebar, top bar, buttons, segments, dialogs, command palette) live in `apps/web/app/refined-workspace.css`, which loads last in the workspace layout. Shared type sizes are in `apps/web/app/typography.css` and `apps/web/app/globals.css`. These values describe the light theme; a dark theme is not implemented.
+
+## Components and layout
+
+- Reuse `Icon`, `PageIcon`, `Modal`, `ResourceForm`, and existing workspace controls instead of introducing another component kit.
+- Wordmarks and icons use the same mark and icon vocabulary on every page (`apps/web/app/components/space/brand.tsx`, `ui-icon.tsx`).
+- One icon set (`apps/web/app/components/space/ui-icon.tsx`), 24px grid, 1.6px rounded stroke. Core concepts are glyphs with a closed shape and detail strokes, and each concept has exactly one glyph everywhere it appears: Home (house), Tasks (checkbox), Documents (folded page), Memory (stacked layers), Databases (table), Overview (framed bar chart), Projects (folder), Agents (robot), Getting started and decorative highlights (sparkle), Settings (gear), Help (question mark). In navigation the glyph's shape fills with the current color at 18% when its page is active and 7% on hover, so the active state is not carried by color alone. The space switcher uses a person, people, or lock icon so it never repeats the Home glyph.
+- Action icons have one meaning each: `···` (more) opens actions or options for one item (sections, folders, pages, databases, rows); sliders open display options for a view (Card properties, graph Display); the gear means settings only; the funnel means filtering only; the pencil and trash appear only inside an open item, never as a pair on tree rows. Sections and folders both use `···` to open an edit dialog that holds rename, move, and delete.
+- Icon sizes follow context, enforced in `refined-workspace.css`: 16px inside buttons, toolbars, tabs, and dialog footers; 14px for compact row actions in the Documents tree and sidebar; 18px in navigation.
+- Buttons are 32px tall (40px on touch widths). Primary actions use forest green with white text; secondary actions use a white surface with a hairline border; icon and text buttons are borderless until hovered. Use one primary action per view. Keep visible keyboard focus (`apps/web/app/space.css`).
+- Cards share one surface (`refined-workspace.css`, Cards section): white, a hairline `--color-border`, `--radius-lg`, and `--shadow-card`. Hover deepens the border to `--color-selection-border` and adds `--sp-card-hover-shadow`; cards never move or resize. Anatomy, top to bottom: a 32px green-on-sage icon tile (the page's own icon where one exists), a 15px/600 title clamped to two lines, a 13px muted excerpt clamped to two lines, and a 12px muted footer above a hairline rule. Secondary affordances (open arrows, drag grips) appear on hover or focus on pointer devices. Document excerpts skip Markdown heading lines. Home's Jump back in cards add a 40px sage cover band behind the icon tile. Metric tiles (Overview) use the same surface with a 30px/650 value. Board task cards use the same border and hover with `--radius-md`.
+- The workspace top bar is a single 48px row: breadcrumb, a sage search field with its shortcut, and a create button. Pages own their title. A top row that only holds a label renders as a compact muted toolbar so the page title remains the main heading.
+- Reuse modal and empty-state semantics, close/focus behavior, and honest copy (`apps/web/app/components/space/ui.tsx`).
+- The workspace sidebar is 240px (220px from 761px to 1100px) on the panel color with 30px navigation rows, 18px icons, and muted group labels without dividers. Above 760px, it can collapse to a 56px rail with the Space logo linking to Home, a visible expand control, and icon-only navigation, Settings, and Help links. Keep each icon link labeled for assistive technology and hover. Workspace navigation stays available even if its expanded-sidebar group was closed. Save the sidebar choice with the browser-local preferences for each account and workspace; mobile navigation keeps its existing drawer behavior.
+- In Documents, reserve a 300px tree rail on wider screens and 280px from 1001px to 1200px so section and folder names remain readable beside their actions. At 1000px and below, expose it through a labeled Browse disclosure; do not cover the reader or trap focus in a non-modal surface.
+- Show active page and filter state with text and a selection surface. Ellipsize long names in the rail with full names available as titles; keep document titles readable in the main pane.
+- Keep the all-documents table, search, recent pages, reader outline, context, and history. The tree is navigation, not a replacement for search or full metadata.
+- Embedded document images share the reader and preview surfaces. Keep images within their content column, provide an editable text description, and show short editor-only references rather than encoded bytes in the writing field. Image-only imports show an image preview instead of a base64-filled textarea. Project-detail document creation reuses `ResourceForm`, preselects the project, and leaves the folder independent.
+- The workspace uses a flexible main region, with home content capped near 1180px; the rail changes to mobile navigation at 760px (`apps/web/app/space.css`, `sidebar.css`, `workspace-polish.css`).
+- Keep content within its column, allow text to wrap, and preserve a visible route to all essential content at small widths.
+
+## Page structure
+
+- Every top-level page opens with the same heading block (`.sp-work-heading`): the title is exactly the sidebar label (Tasks, Documents, Databases, Overview, Projects, Agents, Settings, Memory), a one-line muted description, and actions on the right that wrap below on narrow widths. Title 30px/700 with -0.6px tracking, description 15px. No taglines as titles and no duplicate label strip above the title; a top strip is used only for breadcrumbs inside an item (a database, a document).
+- View switches (Board/List, Table/Board, Vectors/List) are underline tabs with a green selected state. Segmented pills are for value choices such as Overview's 7/30/90 days.
+
+## Dialogs
+
+- Every dialog uses `Modal` (`apps/web/app/components/space/ui.tsx`) and the dialog system in `apps/web/app/modals.css`. Sizes: `small` (440px) for confirmations, default (520px) for forms, `wide` (760px) for editors, imports, and long content; the document editor and onboarding keep their own widths.
+- Anatomy: a 17px/650 title with a 32px close button and no divider, a body with 24px side padding (18px on phones), then a footer above a hairline rule. The footer holds an optional note or a quiet secondary action on the far left, and on the right Cancel followed by exactly one primary action. Footer buttons are text only (no arrows), 36px tall (40px on phones) with 8px corners.
+- Primary labels name the result (Create project, Save changes, Import document, Delete task). Use Done only for dialogs that apply changes immediately (Card properties, Customize page). Never put the primary action first or on the left.
+- Destructive actions: confirmations use `ConfirmModal`, which pairs Cancel with a red action and cannot be dismissed while busy. Inside edit dialogs, Delete is a quiet red text button on the far left (Delete section, Delete folder, Move to trash) that opens the confirmation; a filled red button appears only in the confirmation itself.
+- Never use the browser's `window.confirm`. Ask through `useConfirm()` (provided by `ConfirmProvider` in the workspace layout), which renders the same `ConfirmModal`; this covers discarding unsaved changes, deleting records, moving items to trash, and removing members.
+
+## Home and first run
+
+- Home opens with the date, a time-of-day greeting with the person's first name, and quick actions (New page, New task, Search). Below it: Jump back in (up to four recent pages as small cards), then Tasks and Agents as plain ruled lists (`apps/web/app/components/space/home-view.tsx`, `onboarding.css`).
+- The Get started checklist (write a page, add a task, connect an agent) derives each step from saved resources and active agent connections, never from a local flag (`gettingStartedSteps` in `apps/web/lib/space/onboarding.ts`). It hides itself when every step is done, can be hidden per account and Space in browser storage, and offers the tour.
+- The setup dialog is 480px wide and fits a 720px-tall screen: a three-segment progress bar, centered title and one-line description, one footer row (Skip for now or Back, step count, Continue), and a final screen that offers Open page, Connect an agent, and Done. Progress persistence and auto-offer rules are unchanged.
+
+## Interaction and accessibility
+
+- Use nested lists, links for navigation, and separate buttons with `aria-expanded` and `aria-controls` for disclosure. Keep keyboard focus visible and avoid motion that needs a reduced-motion fallback.
+- Cover empty sections, empty folders, Unfiled pages, search with no matches, view-only access, creation failures, and narrow screens. Section and folder disclosure state persists in browser-local, account/Space-scoped preferences. Search reveals matching branches without replacing those saved choices.
+- Documents can be dragged from the tree, library rows, or recent cards to an active folder or Unfiled. Use the grip with Space, up/down arrows, and Space to move by keyboard; Escape cancels. During a drag, reveal destination sections without changing saved disclosure preferences. Moving changes only the folder, preserves content and the independent project link, and saves a new revision. Keep Unfiled available even when empty, show save failures without removing the source, and disable moves for view-only access or historical revisions. The editor’s Folder control remains a non-drag alternative.
+- Database Board/Table switches and board group moves update immediately while their saves remain visible. Click a board card to open it, whatever the click's length, and move the pointer to drag it, without a separate grip button; holding still never starts a drag. On touch, hold briefly (250ms) to drag so swipes keep scrolling. Enter opens a focused card; Space, left/right arrows, and Space move it, and Escape cancels. This applies to the Tasks and database boards alike. Keep an ungrouped destination. Board cards do not repeat the column status with a selector; record panels and task details retain status editing as the non-drag alternative. Failed saves restore the confirmed value without discarding later changes. Database boards use the Tasks board’s column surfaces (8px padding, no border), muted count, white cards (`--radius-md`, 10px × 12px padding, 14px/500 title), and quiet bottom add controls; a column's + appears on hover or focus on pointer devices. Database board cards show only their two-line title by default; selected properties appear as plain values, one per line, with their names kept for screen readers and tooltips. Like Notion, each column renders its first 25 cards and a Load more control reveals 25 more; search, filter, and sort changes reset it, and cards moved or created in a column stay visible past the limit. Card properties lets each person select extra fields, saved in this browser per account, Space, and database; the grouping property stays in column headings. Keep search, grouping, filters, sorting, and card properties together in one horizontally scrollable board toolbar row. Selected metadata stays single-line, and all properties remain available in the record panel.
+- Long lists (database tables, the Memory list) page 50 rows at a time with one pager below the list: the visible range and total, then previous and next chevron buttons joined as a pair (`list-page.tsx`, `list-page.css`). Boards never use this pager.
+- New database records are typed inline, never in a form (`database-inline-draft.tsx`). In Table view, New record (toolbar or the row below the table) opens a draft row in the table footer with the cursor in Name; Enter saves and opens the next draft, Tab saves and starts editing the record's first property, Escape or leaving an empty draft cancels. In Board view, a column's New record or + opens a draft card at the bottom of that column and the record gets that column's value; the toolbar button uses the column matching the active stage filter, else the ungrouped column. A record created under an active stage filter keeps that value so it stays visible. A failed save keeps the typed name with an inline error and retries with the same record ID; repeated Enter while saving writes once. The record panel is for opening and editing existing records. It reads like a Notion side peek, `clamp(420px, 36vw, 560px)` wide: the database name as a muted crumb with Expand and close buttons, a 28px/700 borderless title that wraps instead of scrolling (Enter saves; pasted line breaks become spaces), a muted Created · Edited line, then one row per property (a 148px column with the muted type symbol and name, 116px on phones, beside a borderless value that tints sage on hover and focus), a select shown as its colored option chip (pastel option-color background, option-colored text and dot) while staying a native select, an always-visible Record notes body, and a sticky footer with the save state, Delete, Close, and Save. Rows align to the top: text properties grow to show their whole value (Enter saves, Shift+Enter adds a line), and empty values read "Empty" in muted text. The record notes body grows with its text and is named apart from any Notes property a database has. Expand (pressed state on the button) hides the database on wide screens and centers the record in a 760px column like a page; the choice stays while the database is open, and narrow screens always stack the record above the database. The peek has no borders or internal dividers; it floats on a soft left shadow.
+- Interactive elements need an obvious hover/selected state and keyboard focus. Workspace buttons, links, and other actions use an offset keyboard-focus outline without changing their size or drawing an inset border across rounded corners. Text fields and composite search controls retain the underline-like focus indicator in `apps/web/app/focus.css`, with one indicator per composite field. Use outlines in forced-colors mode where shadows are suppressed.
+- Keep short (about 120–150ms) color transitions for controls, but do not shrink action buttons on press. Disable nonessential movement for `prefers-reduced-motion: reduce`; do not add motion just for decoration.
+- Meet WCAG AA contrast: at least 4.5:1 for normal text and 3:1 for large text and essential non-text UI. Check foreground against the surface actually behind it, including dark insets.
+- Keep semantic links, buttons, input labels, skip links, dialog focus and return behavior, and visible keyboard focus. Do not replace essential labels with tiny captions.
+
+## Page overrides
+
+- Workspace (`/app`): compact controls and persistent rail.
+
+## Maintenance notes
+
+Last updated: 2026-10-09. Earlier entries recorded the database record panel (2026-10-08), the alignment of database boards with the Tasks board and the shared list pager (2026-10-04), and the minimal redesign of the workspace, cards, Home and first-run setup (2026-10-03). Update this document when a reusable token, component, layout rule, accessibility pattern, persisted hierarchy, or reusable document-navigation behavior changes. Keep page-specific experiments in the affected component until accepted. Do not treat the OneNote reference as authorization to copy its brand or to claim nested pages are stored.

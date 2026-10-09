@@ -1,0 +1,69 @@
+/* One compact pager for long lists: the visible range, then previous and next as a joined pair. */
+.sp-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 0 4px;
+  color: var(--color-ink);
+  font-size: var(--text-meta, 0.8125rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-pager-total {
+  color: var(--color-muted);
+}
+
+.sp-pager-buttons {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.sp-app .sp-pager-buttons > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.sp-app .sp-pager-buttons > button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.sp-app .sp-pager-buttons > button:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+.sp-app .sp-pager-buttons > button:disabled {
+  color: var(--color-muted);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.sp-app .sp-pager-buttons > button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+@media (max-width: 760px) {
+  .sp-app .sp-pager-buttons > button {
+    width: 40px;
+    height: 36px;
+  }
+}

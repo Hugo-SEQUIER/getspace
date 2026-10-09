@@ -1,0 +1,118 @@
+.sp-doc-drag-handle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.sp-doc-drag-handle svg {
+  stroke-width: 2.5;
+}
+.sp-doc-drag-handle:active {
+  cursor: grabbing;
+}
+.sp-doc-drag-handle:hover {
+  background: var(--color-panel);
+  color: var(--color-ink);
+}
+.sp-doc-drag-handle:disabled {
+  cursor: default;
+}
+.sp-doc-title-cell,
+.sp-doc-tree-page-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.sp-doc-title-cell .sp-document-link {
+  min-width: 0;
+}
+.sp-doc-tree-page-row {
+  margin-left: 32px;
+  border-radius: 5px;
+}
+.sp-doc-tree-page-row .sp-doc-tree-page {
+  flex: 1;
+  margin-left: 0;
+}
+.sp-doc-tree-page-row.selected {
+  background: var(--color-selection);
+}
+.sp-doc-card-wrap {
+  position: relative;
+  min-width: 0;
+}
+.sp-doc-card-wrap .sp-doc-card {
+  display: block;
+  height: 100%;
+}
+.sp-doc-card-wrap > .sp-doc-drag-handle {
+  position: absolute;
+  top: 24px;
+  right: 14px;
+}
+.sp-doc-card-wrap.has-drag-handle .sp-doc-card-top > span:last-child {
+  margin-right: 28px;
+}
+.sp-doc-tree-page-row.is-dragging,
+.sp-doc-card-wrap.is-dragging,
+.sp-doc-table tr.is-dragging {
+  opacity: 0.5;
+}
+.sp-doc-drop-folder {
+  outline: 1px dashed var(--color-muted);
+  outline-offset: -1px;
+}
+.sp-doc-tree-row.is-drop-target,
+.sp-doc-tree-row.is-drop-target:hover {
+  background: var(--color-selection);
+  outline: 2px solid var(--color-ink);
+  outline-offset: -2px;
+}
+.sp-doc-drop-label {
+  flex-shrink: 0;
+  padding: 0 4px;
+  font-size: var(--text-caption);
+  color: var(--color-ink);
+}
+.sp-doc-drop-folder .sp-doc-tree-add {
+  display: none;
+}
+.sp-doc-drag-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-ink);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--sp-shadow-hover);
+  pointer-events: none;
+}
+.sp-doc-drag-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-doc-drag-hint {
+  margin: 0 9px 14px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+@media (max-width: 760px) {
+  .sp-doc-card-wrap {
+    flex: 0 0 255px;
+    scroll-snap-align: start;
+  }
+}

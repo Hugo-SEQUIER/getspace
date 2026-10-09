@@ -1,0 +1,548 @@
+/* Workspace surfaces share the existing palette and compact control scale. */
+.sp-app {
+  --sp-shadow-surface:
+    0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.06),
+    0 2px 4px oklch(0 0 0 / 0.04);
+  --sp-shadow-hover:
+    0 0 0 1px oklch(0 0 0 / 0.08), 0 1px 2px -1px oklch(0 0 0 / 0.08),
+    0 2px 4px oklch(0 0 0 / 0.06);
+  --sp-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html:has(.sp-app) {
+  scrollbar-gutter: stable;
+}
+
+body:has(.sp-app dialog[open]) {
+  overflow: hidden;
+}
+
+.sp-app .sp-skip-link {
+  position: fixed;
+  inset: 12px auto auto 12px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--color-surface);
+  transform: translateY(calc(-100% - 20px));
+}
+
+.sp-app .sp-skip-link:focus {
+  transform: none;
+}
+
+.sp-app .sp-main:focus {
+  outline: none;
+}
+
+.sp-app :is(.sp-search, .sp-sidebar-page-search, .sp-command-input) input {
+  background: transparent;
+}
+
+.sp-app
+  :is(.sp-topbar button, .sp-primary, .sp-button, .sp-modal-footer button) {
+  transition: background-color 150ms var(--sp-ease-out), border-color 150ms var(--sp-ease-out);
+}
+
+.sp-app .sp-topbar .sp-primary {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-surface) 14.1%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-shadow) 10.2%, transparent);
+  padding-inline: 10px 12px;
+}
+
+.sp-app .sp-topbar > strong {
+  color: var(--color-text);
+}
+
+.sp-app .sp-sidebar .sp-nav-link.active {
+  background: var(--color-selection);
+  color: var(--color-ink);
+}
+
+.sp-app .sp-sidebar .sp-nav-link.active svg {
+  color: var(--color-ink);
+}
+
+.sp-app .sp-account-menu {
+  border: 0;
+  border-radius: 10px;
+  box-shadow:
+    var(--sp-shadow-surface),
+    0 8px 28px color-mix(in srgb, var(--color-shadow) 7.8%, transparent);
+}
+
+.sp-app .sp-home {
+  max-width: 1180px;
+  padding: 40px 48px 64px;
+}
+
+.sp-app .sp-home-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  column-gap: 28px;
+  margin-bottom: 34px;
+}
+
+.sp-home-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-bottom: 13px;
+  color: var(--color-text);
+  font-size: var(--text-small);
+}
+
+.sp-home-eyebrow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-app .sp-home-heading h1 {
+  grid-column: 1;
+  margin-bottom: 8px;
+  font-size: clamp(1.625rem, 2.5vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.sp-app .sp-home-heading p {
+  grid-column: 1;
+  margin: 0;
+  max-width: 48ch;
+  line-height: 1.65;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.sp-app .sp-home-search {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  align-self: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--sp-shadow-surface);
+  color: var(--color-text);
+  font-size: var(--text-small);
+  white-space: normal;
+  text-align: left;
+}
+
+.sp-home-search kbd {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.sp-app .sp-home-continue > .sp-section-heading {
+  border: 0;
+  padding-bottom: 16px;
+}
+
+.sp-app .sp-home-section {
+  margin-bottom: 32px;
+}
+
+.sp-home-documents {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sp-home-document {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: var(--sp-shadow-surface);
+}
+
+.sp-home-document-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  color: var(--color-muted);
+}
+
+.sp-home-document .sp-file-tile {
+  width: 32px;
+  height: 36px;
+  border-color: var(--color-rule);
+  border-radius: 5px;
+  background: var(--color-paper);
+  color: var(--color-muted);
+}
+
+.sp-home-document > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: 550;
+  color: var(--color-ink);
+}
+
+.sp-home-document > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+  color: var(--color-text);
+  font-size: var(--text-meta);
+}
+
+.sp-home-document-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+}
+
+.sp-home-document-meta > span {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-app .sp-home-grid {
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+}
+
+.sp-app .sp-home .sp-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-ui);
+  font-weight: 550;
+  color: var(--color-ink);
+}
+
+.sp-home-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 5px;
+  border-radius: 6px;
+  background: var(--color-panel);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.sp-app .sp-home-task {
+  padding: 13px 8px;
+  gap: 11px;
+}
+
+.sp-home-task > span:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-app .sp-home-task-state {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-caption);
+}
+
+.sp-app .sp-home-task-in_progress {
+  color: #826a37;
+  background: var(--color-panel);
+}
+
+.sp-app .sp-home-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-self: start;
+  border: 0;
+  padding: 0;
+}
+
+.sp-home-agents {
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: var(--sp-shadow-surface);
+}
+
+.sp-app .sp-home-agents .sp-connected-agent {
+  margin: 16px 0 0;
+}
+
+.sp-app .sp-home-agents .sp-connected-agent small {
+  color: var(--color-text);
+}
+
+.sp-home-agents .sp-connected-agent > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-app .sp-home-note {
+  margin: 0;
+  padding: 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-paper);
+  color: var(--color-muted);
+}
+
+.sp-app .sp-home-note h3 {
+  margin: 10px 0 6px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.sp-app .sp-home-note p {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.65;
+}
+
+.sp-app .sp-home-note a {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.sp-app .sp-home .sp-activity-row {
+  padding: 12px 8px;
+}
+
+.sp-home .sp-activity-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-home-empty {
+  padding: 24px 8px;
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+.sp-home-empty p {
+  margin: 8px 0;
+}
+
+.sp-app .sp-modal {
+  border: 0;
+  box-shadow:
+    var(--sp-shadow-surface),
+    0 24px 80px color-mix(in srgb, var(--color-shadow) 16.1%, transparent);
+  overscroll-behavior: contain;
+}
+
+.sp-app .sp-modal-head h2 {
+  font-weight: 550;
+  color: var(--color-ink);
+}
+
+.sp-app .sp-command-modal {
+  width: min(600px, calc(100vw - 32px));
+  margin: clamp(16px, 5svh, 64px) auto;
+  max-height: calc(100svh - 2 * clamp(16px, 5svh, 64px));
+}
+
+.sp-app .sp-command-input input {
+  min-width: 0;
+}
+
+.sp-app .sp-command-label {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-app .sp-command-result {
+  padding-block: 10px;
+  border-radius: 6px;
+}
+
+.sp-app .sp-command-result > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+
+.sp-app .sp-command-result:focus-visible {
+  outline-offset: -2px;
+  background: var(--color-panel);
+}
+
+.sp-app .sp-command-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 16px;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.sp-command-empty strong {
+  color: var(--color-text);
+  font-size: var(--text-ui);
+  font-weight: 550;
+}
+
+.sp-command-empty p {
+  margin: 0;
+  font-size: var(--text-small);
+}
+
+.sp-app .sp-command footer {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sp-app .sp-home-search:hover,
+  .sp-app .sp-home-document:hover {
+    box-shadow: var(--sp-shadow-hover);
+    background: var(--color-surface);
+  }
+
+  .sp-home-document:hover > strong {
+    color: var(--accent);
+  }
+
+  .sp-app .sp-home-task:hover,
+  .sp-app .sp-home .sp-activity-row:hover {
+    background: var(--color-paper);
+  }
+}
+
+@media (max-width: 1100px) {
+  .sp-app .sp-home {
+    padding-inline: 32px;
+  }
+
+  .sp-app .sp-home-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-app .sp-home-search {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 950px) {
+  .sp-app .sp-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .sp-app .sp-home-aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .sp-home-documents {
+    gap: 10px;
+  }
+
+  .sp-home-document {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 760px) {
+  body:has(.sp-app .sp-sidebar.is-open) {
+    overflow: hidden;
+  }
+
+  .sp-app .sp-home {
+    padding: 28px 20px 40px;
+  }
+
+  .sp-app .sp-home-heading {
+    margin-bottom: 28px;
+  }
+
+  .sp-home-documents {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-home-document {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    column-gap: 12px;
+    padding: 14px;
+  }
+
+  .sp-home-document-top {
+    grid-row: 1 / 4;
+    align-self: center;
+    margin: 0;
+  }
+
+  .sp-home-document-top > svg {
+    display: none;
+  }
+
+  .sp-home-document-meta {
+    grid-column: 2;
+    margin-top: 8px;
+  }
+
+  .sp-app .sp-home-aside {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-app .sp-home-task {
+    padding-inline: 0;
+  }
+
+  .sp-app .sp-sidebar {
+    transition: none;
+  }
+
+  .sp-app .sp-sidebar .sp-nav-link,
+  .sp-app .sp-sidebar-shortcut > a {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-app
+    :is(
+      .sp-topbar button,
+      .sp-primary,
+      .sp-button,
+      .sp-modal-footer button
+    ):active {
+    scale: 1;
+  }
+
+  .sp-app :is(.sp-doc-card, .sp-db-library-card) {
+    transition: none;
+  }
+}

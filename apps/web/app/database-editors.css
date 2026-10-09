@@ -1,0 +1,476 @@
+.sp-db-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.sp-db-context:has(.sp-db-record-panel) {
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 36vw, 560px);
+}
+/* The record side peek reads like a Notion page: a large title, label → value rows, then notes. */
+.sp-db-record-panel {
+  position: sticky;
+  top: 0;
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  min-width: 0;
+  padding: 14px 28px 0;
+  border: 0;
+  background: var(--color-surface);
+  /* No dividing line: the peek floats over the database on a soft shadow. */
+  box-shadow: -18px 0 36px -24px rgb(37 51 42 / 22%);
+}
+.sp-db-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  margin: 0 -8px 20px 0;
+}
+.sp-db-panel-tools {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.sp-app .sp-db-panel-expand[aria-pressed="true"] {
+  background: var(--color-selection);
+  color: var(--color-ink);
+}
+.sp-db-panel-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-db-panel-crumb > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-panel-crumb > svg {
+  flex-shrink: 0;
+}
+.sp-db-panel-fields,
+.sp-db-options-editor {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.sp-app .sp-db-record-panel .sp-db-record-title {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 6px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  /* Long names wrap onto more lines instead of scrolling sideways. */
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+.sp-app .sp-db-record-panel .sp-db-record-title:focus,
+.sp-app .sp-db-record-panel .sp-db-record-title:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.sp-db-record-meta {
+  margin: 0 0 18px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-db-record-panel .sp-db-record-properties {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 8px;
+  border: 0;
+}
+/* Rows align to the top so a wrapped value keeps its label beside its first line. */
+.sp-db-prop-row {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-height: 34px;
+}
+.sp-db-prop-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 6px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.sp-db-prop-label .sp-db-property-symbol {
+  flex: 0 0 16px;
+  margin: 0;
+  color: var(--color-muted);
+  text-align: center;
+}
+.sp-db-prop-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-prop-value {
+  position: relative;
+  min-width: 0;
+}
+.sp-app .sp-db-record-panel .sp-db-prop-value :is(input:not([type="checkbox"]), select) {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  transition: background-color 120ms ease;
+}
+/* Text values wrap: the textarea starts one row high and grows with its content. */
+.sp-app .sp-db-record-panel .sp-db-prop-value textarea {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  line-height: 20px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
+  transition: background-color 120ms ease;
+}
+.sp-app .sp-db-record-panel .sp-db-prop-value :is(input, select, textarea)::placeholder {
+  color: var(--color-muted);
+}
+.sp-app .sp-db-record-panel .sp-db-prop-value.is-empty :is(input, select) {
+  color: var(--color-muted);
+}
+.sp-app .sp-db-record-panel .sp-db-prop-row:hover .sp-db-prop-value :is(input:not([type="checkbox"]), select, textarea):not(:disabled) {
+  background: var(--color-hover);
+}
+.sp-app .sp-db-record-panel .sp-db-prop-value :is(input:not([type="checkbox"]), select, textarea):focus {
+  background: var(--color-hover);
+  box-shadow: none;
+  outline: none;
+}
+.sp-app .sp-db-record-panel .sp-db-prop-value select {
+  cursor: pointer;
+}
+/* A chosen option reads as its colored chip; the native select stays the control. */
+.sp-app .sp-db-record-panel .sp-db-prop-value.has-option select,
+.sp-app .sp-db-record-panel .sp-db-prop-row:hover .sp-db-prop-value.has-option select:not(:disabled),
+.sp-app .sp-db-record-panel .sp-db-prop-value.has-option select:focus {
+  width: auto;
+  max-width: 100%;
+  height: 26px;
+  min-height: 26px;
+  margin: 3px 0;
+  padding: 2px 8px 2px 22px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sp-option-color) 14%, var(--color-surface));
+  color: color-mix(in srgb, var(--sp-option-color) 70%, var(--color-ink));
+  font-weight: 500;
+}
+.sp-app .sp-db-record-panel .sp-db-prop-row:hover .sp-db-prop-value.has-option select:not(:disabled),
+.sp-app .sp-db-record-panel .sp-db-prop-value.has-option select:focus {
+  background: color-mix(in srgb, var(--sp-option-color) 22%, var(--color-surface));
+}
+.sp-db-prop-value.has-option::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 9px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sp-option-color);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.sp-db-prop-value.is-checkbox {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+}
+.sp-db-prop-value input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.sp-db-panel-notes {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0 8px;
+}
+.sp-db-panel-notes > label {
+  padding: 0 6px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.sp-app .sp-db-record-panel .sp-db-panel-notes textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  overflow: hidden;
+  resize: none;
+}
+.sp-app .sp-db-record-panel .sp-db-panel-notes textarea:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+.sp-app .sp-db-record-panel .sp-db-panel-notes textarea:focus {
+  background: var(--color-hover);
+  box-shadow: none;
+  outline: none;
+}
+.sp-db-record-panel > form > .sp-alert {
+  margin: 8px 0;
+}
+:is(.sp-db-context, .sp-db-property-modal, .sp-db-settings-modal) .text-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-ui);
+  line-height: 1.3;
+}
+:is(.sp-db-context, .sp-db-property-modal, .sp-db-settings-modal) .text-button:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+:is(.sp-db-context, .sp-db-settings-modal) .text-button.sp-danger-text,
+:is(.sp-db-context, .sp-db-settings-modal) .text-button.sp-danger-text:hover:not(:disabled) {
+  color: #b1474c;
+}
+:is(.sp-db-context, .sp-db-property-modal, .sp-db-create-modal, .sp-db-settings-modal, .sp-db-topbar) .sp-primary {
+  min-height: 36px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: var(--text-ui);
+  line-height: 1.3;
+}
+:is(.sp-db-property-modal, .sp-db-create-modal, .sp-db-settings-modal) .sp-modal-footer {
+  gap: 16px;
+  padding-top: 24px;
+}
+.sp-db-panel-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px -28px 0;
+  padding: 12px 28px;
+  border: 0;
+  background: var(--color-surface);
+}
+.sp-db-panel-footer > .sp-db-form-note {
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-db-panel-footer .sp-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.sp-db-panel-footer .sp-actions > button {
+  padding-inline: 12px;
+}
+.sp-db-panel-footer .sp-actions > .sp-primary {
+  padding-inline: 18px;
+}
+.sp-db-panel-footer .sp-actions > .sp-danger-text {
+  margin-right: auto;
+}
+.sp-db-readonly-cell {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.sp-db-property-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+.sp-db-conversion-note {
+  margin: 12px 0 20px;
+  padding: 12px;
+  background: var(--color-panel);
+  border-left: 3px solid var(--color-muted);
+  color: var(--color-text);
+  font-size: var(--text-small);
+}
+.sp-db-conversion-note p {
+  margin: 7px 0 0;
+  line-height: 1.6;
+}
+.sp-db-options-editor legend {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 550;
+}
+.sp-db-option-editor {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 100px 30px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sp-db-option-editor > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.sp-db-option-editor input,
+.sp-db-option-editor select {
+  min-width: 0;
+  width: 100%;
+  font-size: var(--text-small);
+}
+.sp-db-options-editor > .sp-db-form-note:last-child {
+  display: block;
+  margin: 8px 0 16px;
+}
+/* Expanded, the record takes the database's place and reads like a page. */
+@media (min-width: 1081px) {
+  .sp-db-context.is-record-expanded {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-db-context.is-record-expanded > .sp-db-workspace {
+    display: none;
+  }
+  .sp-db-record-panel.is-expanded {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 8px 0 0;
+    box-shadow: none;
+  }
+  .sp-db-record-panel.is-expanded > :is(.sp-db-panel-head, form) {
+    width: min(760px, 100%);
+    margin-inline: auto;
+  }
+  .sp-db-record-panel.is-expanded .sp-db-panel-footer {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+  .sp-db-record-panel.is-expanded .sp-db-prop-row {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+@media (max-width: 1080px) {
+  .sp-db-panel-expand {
+    display: none;
+  }
+  .sp-db-context:has(.sp-db-record-panel) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :is(.sp-db-context, .sp-db-property-modal, .sp-db-create-modal, .sp-db-settings-modal) :is(.text-button, .sp-primary) {
+    min-height: 40px;
+  }
+  .sp-db-record-panel {
+    grid-row: 1;
+    position: static;
+    max-height: none;
+    margin-bottom: 16px;
+    border: 0;
+    box-shadow: 0 18px 36px -28px rgb(37 51 42 / 22%);
+  }
+}
+@media (max-width: 560px) {
+  .sp-db-prop-row {
+    grid-template-columns: 116px minmax(0, 1fr);
+  }
+}
+
+.sp-db-task-tracking {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+.sp-db-task-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.sp-db-task-toggle input[type="checkbox"] {
+  margin-top: 3px;
+}
+.sp-db-task-toggle span {
+  display: grid;
+  gap: 2px;
+}
+.sp-db-task-toggle small {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-db-task-fields {
+  display: grid;
+  gap: 14px;
+}
+.sp-db-task-done {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.sp-db-task-done label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+}
+.sp-db-task-tracking .sp-db-task-fields .sp-field {
+  margin: 0;
+}
+.sp-db-task-tracking input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+.sp-db-task-tracking .sp-db-task-done label {
+  min-height: 0;
+}

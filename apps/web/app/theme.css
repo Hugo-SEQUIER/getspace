@@ -1,0 +1,45 @@
+/* Shared app and website palette: light sage surfaces and forest-green accents.
+   Status, category, and third-party brand colors remain semantic. */
+:root {
+  color-scheme: light;
+  --color-paper: #fcfdfc;
+  --color-surface: #ffffff;
+  --color-panel: #f2f5f2;
+  --color-hover: #edf2ee;
+  --color-border: #e2e7e3;
+  --color-rule: #edf0ed;
+  --color-ink: #202522;
+  --color-text: #515b56;
+  --color-muted: #68716b;
+  --color-faint: #6c756f;
+  --color-accent: #42644c;
+  --color-accent-hover: #304d39;
+  --color-on-accent: #ffffff;
+  --color-inverse-muted: #d4e0d7;
+  --color-selection: #e6ede7;
+  --color-selection-border: #b8cabb;
+  --color-focus: #42644c;
+  --color-link: #42644c;
+  --color-shadow: #25332a;
+
+  /* Shape and depth stay quiet: hairline borders, soft popover shadows. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 2px rgb(37 51 42 / 0.04);
+  --shadow-pop: 0 0 0 1px rgb(37 51 42 / 0.05), 0 4px 8px rgb(37 51 42 / 0.06), 0 12px 32px rgb(37 51 42 / 0.12);
+
+  /* Existing component APIs resolve to the same palette. */
+  --surface: var(--color-surface);
+  --sidebar: var(--color-panel);
+  --line: var(--color-rule);
+  --text: var(--color-ink);
+  --muted: var(--color-muted);
+  --accent: var(--color-accent);
+  --hover: var(--color-hover);
+  --sp-border: var(--color-border);
+  --sp-surface: var(--color-surface);
+  --site-ink: var(--color-ink);
+  --site-muted: var(--color-muted);
+  --site-accent: var(--color-accent);
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Audit"
+  short_description: "Inspect a Space and propose repairs"
+  default_prompt: "Use $space-audit to check this Space for drift and propose repairs I approve."

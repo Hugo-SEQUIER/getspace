@@ -1,0 +1,271 @@
+.sp-modal {
+  --modal-padding: 24px;
+  margin: auto;
+  max-width: calc(100% - 32px);
+  max-height: calc(100dvh - 48px);
+  border-radius: 16px;
+  color: var(--color-text);
+  overscroll-behavior: contain;
+  scrollbar-gutter: auto;
+  overflow-wrap: anywhere;
+}
+
+.sp-modal::backdrop {
+  background: color-mix(in srgb, var(--color-ink) 32%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.sp-modal .sp-modal-head {
+  min-height: 68px;
+  padding: 16px var(--modal-padding);
+  gap: 20px;
+}
+
+.sp-modal .sp-modal-head h2 {
+  min-width: 0;
+  font-size: var(--text-body);
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sp-modal .sp-modal-head .sp-icon-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--color-muted);
+}
+
+.sp-modal .sp-modal-head .sp-icon-button:hover {
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+
+.sp-modal > :is(.sp-modal-content, .sp-resource-form, .sp-inspector-body) {
+  padding: var(--modal-padding);
+  overflow-wrap: anywhere;
+}
+
+.sp-modal .sp-field {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 20px 0;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.sp-modal :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sp-modal .sp-properties dd {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.sp-modal fieldset {
+  min-inline-size: 0;
+  max-width: 100%;
+}
+
+.sp-modal .sp-actions {
+  flex-wrap: wrap;
+}
+
+.sp-modal .sp-actions > :is(button, .sp-button) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+}
+
+:where(.sp-modal) .sp-modal-footer {
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  margin-top: 18px;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--color-surface);
+}
+
+.sp-modal > :is(.sp-modal-content, .sp-resource-form:not(.sp-doc-editor)) > .sp-modal-footer {
+  margin: 18px calc(-1 * var(--modal-padding)) calc(-1 * var(--modal-padding));
+  padding: 16px var(--modal-padding);
+  border-top: 1px solid var(--line);
+}
+
+:where(.sp-modal) > .sp-modal-footer,
+.sp-modal > form:not(.sp-modal-content):not(.sp-resource-form) > .sp-modal-footer {
+  margin-top: 0;
+  padding: 16px var(--modal-padding);
+  background: var(--color-surface);
+}
+
+.sp-modal .sp-modal-footer > :is(p, span, small) {
+  margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-modal .sp-modal-footer > .sp-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sp-modal .sp-modal-footer button {
+  min-height: 38px;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 16px;
+  text-align: center;
+  white-space: normal;
+}
+
+.sp-modal .sp-resource-form .sp-editor-title {
+  font-size: 1.65rem;
+  line-height: 1.35;
+}
+
+.sp-modal .sp-form-properties {
+  padding: 16px 0;
+  margin: 0 0 8px;
+  gap: 16px;
+}
+
+.sp-modal .sp-form-properties label {
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sp-modal .sp-form-properties select {
+  min-height: 36px;
+  min-width: 120px;
+}
+
+@media (max-width: 600px) {
+  .sp-modal {
+    --modal-padding: 18px;
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 12px;
+  }
+
+  .sp-modal .sp-modal-head {
+    min-height: 60px;
+    padding-block: 12px;
+  }
+
+  .sp-modal .sp-modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .sp-modal .sp-modal-footer > .sp-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .sp-modal .sp-form-properties label {
+    flex: 1 1 120px;
+  }
+
+  .sp-modal .sp-form-properties select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Dialog system for the workspace. One anatomy for every dialog:
+   title row, body, then a footer with notes or a quiet destructive action on the left
+   and Cancel followed by the single primary action on the right. */
+.sp-app .sp-modal {
+  --modal-padding: 24px;
+  width: min(520px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-pop);
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.sp-app .sp-modal.sp-modal-small { width: min(440px, calc(100vw - 32px)); }
+.sp-app .sp-modal.sp-modal-wide { width: min(760px, calc(100vw - 32px)); }
+.sp-app .sp-modal.sp-sidebar-dialog { --modal-padding: 20px; width: min(440px, calc(100vw - 32px)); }
+.sp-app .sp-modal.sp-refined-command { width: 640px; max-width: calc(100vw - 32px); }
+.sp-app .sp-modal::backdrop { background: rgb(32 37 34 / .32); backdrop-filter: blur(2px); }
+
+.sp-app .sp-modal:not(.sp-refined-command) > .sp-modal-head {
+  min-height: 0;
+  align-items: flex-start;
+  padding: 20px var(--modal-padding) 4px;
+  border: 0;
+  background: var(--color-surface);
+}
+.sp-app .sp-modal:not(.sp-refined-command) > .sp-modal-head h2 {
+  padding-top: 3px;
+  color: var(--color-ink);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -.2px;
+  outline: none;
+}
+.sp-app .sp-modal:not(.sp-refined-command) > .sp-modal-head .sp-icon-button { width: 32px; height: 32px; min-height: 32px; margin: -2px -6px 0 0; border-radius: var(--radius-md); }
+.sp-app .sp-modal > .sp-modal-head + :is(.sp-modal-content, .sp-resource-form, .sp-inspector-body) { padding-top: 12px; }
+.sp-app .sp-modal > form:not(.sp-modal-content, .sp-resource-form) > .sp-modal-footer { margin: 0; padding: 14px var(--modal-padding); }
+
+.sp-app .sp-modal :is(.sp-modal-content, .sp-inspector-body) > p { margin: 0 0 12px; }
+.sp-app .sp-modal .sp-modal-lead { margin: 0 0 16px; color: var(--color-muted); font-size: 14px; }
+.sp-app .sp-modal .sp-modal-hint { margin: 8px 0 0; color: var(--color-muted); font-size: 13px; }
+.sp-app .sp-modal .sp-modal-subject { margin: 0 0 16px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-panel); color: var(--color-ink); font-weight: 500; }
+.sp-app .sp-modal .sp-field { margin: 16px 0; gap: 6px; color: var(--color-ink); font-size: 13px; font-weight: 550; }
+.sp-app .sp-modal .sp-field :is(input, select, textarea) { min-height: 38px; border-radius: var(--radius-md); font-size: 14px; font-weight: 400; }
+
+/* Footer */
+.sp-app .sp-modal .sp-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  font-size: 13px;
+}
+.sp-app .sp-modal > .sp-modal-footer,
+.sp-app .sp-modal > :is(.sp-modal-content, .sp-resource-form:not(.sp-doc-editor)) > .sp-modal-footer {
+  margin: 20px calc(-1 * var(--modal-padding)) calc(-1 * var(--modal-padding));
+  padding: 14px var(--modal-padding);
+}
+.sp-app .sp-modal > .sp-modal-footer { margin: 0; }
+.sp-app .sp-modal .sp-modal-footer > :is(p, span, small, .sp-muted, .sp-danger-text, .sp-text-button):first-child { margin-right: auto; }
+.sp-app .sp-modal .sp-modal-footer > :is(p, span, small, .sp-muted):first-child { color: var(--color-muted); }
+.sp-app .sp-modal .sp-modal-footer > .sp-actions { gap: 8px; justify-content: flex-end; }
+.sp-app .sp-modal .sp-modal-footer :is(button, .sp-button) { min-height: 36px; padding: 0 14px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; }
+.sp-app .sp-modal .sp-modal-footer :is(button, .sp-button) > svg { display: none; }
+.sp-app .sp-modal .sp-modal-footer .sp-text-button { padding: 0 6px; margin-left: -6px; color: var(--color-muted); }
+.sp-app .sp-modal .sp-modal-footer .sp-text-button:hover:not(:disabled) { color: var(--color-ink); }
+.sp-app .sp-modal .sp-modal-footer .sp-danger-text { border: 0; background: transparent; padding: 0 8px; margin-left: -8px; color: #a7393f; }
+.sp-app .sp-modal .sp-modal-footer .sp-danger-text:hover:not(:disabled) { background: #fbeeee; color: #8f2f35; }
+.sp-app .sp-modal .sp-danger { background: #b9454a; border-color: #b9454a; color: #fff; }
+.sp-app .sp-modal .sp-danger:hover:not(:disabled) { background: #9f3a3f; border-color: #9f3a3f; }
+
+/* Confirmations: a short message and the decision, without a divider. */
+.sp-app .sp-confirm-modal .sp-confirm-message p { margin: 0 0 8px; color: var(--color-text); }
+.sp-app .sp-confirm-modal .sp-confirm-message p:last-child { margin-bottom: 0; }
+.sp-app .sp-confirm-modal .sp-modal-content > .sp-modal-footer { margin-top: 20px; padding-top: 0; border-top: 0; }
+
+@media (max-width: 600px) {
+  .sp-app .sp-modal { --modal-padding: 18px; width: calc(100% - 24px); }
+  .sp-app .sp-modal.sp-modal-small, .sp-app .sp-modal.sp-modal-wide { width: calc(100% - 24px); }
+  .sp-app .sp-modal .sp-modal-footer :is(button, .sp-button) { min-height: 40px; }
+}

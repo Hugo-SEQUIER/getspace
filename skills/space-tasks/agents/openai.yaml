@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Tasks"
+  short_description: "Capture and update tasks with context"
+  default_prompt: "Use $space-tasks to capture, find or update a task without losing its context."

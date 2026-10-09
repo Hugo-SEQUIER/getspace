@@ -1,0 +1,28 @@
+# The build context is the repository root (docker build -f apps/web/Dockerfile .), and
+# BuildKit reads this file, named after the Dockerfile, instead of a root .dockerignore.
+# Send only what the website build needs: its sources and the skills it packs.
+**
+!apps/web/**
+!skills/**
+
+# Installed and generated files are rebuilt inside the image.
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.tanstack/
+apps/web/src/routeTree.gen.ts
+apps/web/public/favicon.ico
+apps/web/public/skills/
+apps/web/public/vendor/
+
+# Tests, test output and editor settings play no part in the build.
+apps/web/tests/
+apps/web/.e2e/
+apps/web/.agents/
+apps/web/.claude/
+apps/web/.cursor/
+apps/web/e2e*.config.ts
+
+# Configuration stays out of the image: the container gets it at run time.
+**/.env
+**/.env.*
+**/.DS_Store

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Organize"
+  short_description: "Organize memory with categories and projects"
+  default_prompt: "Use $space-organize to create categories and sections and apply them to stored claims."

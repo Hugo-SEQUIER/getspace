@@ -1,0 +1,493 @@
+.sp-db-table .sp-db-selection-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  padding: 0 12px;
+}
+.sp-db-table th.sp-db-selection-column {
+  z-index: 3;
+}
+.sp-db-selection-column input {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.sp-db-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sp-db-name-cell .sp-db-record-name {
+  flex: 1;
+  min-width: 0;
+}
+.sp-db-row-actions {
+  flex: 0 0 auto;
+}
+.sp-db-row-actions > button {
+  color: var(--color-muted);
+}
+.sp-db-row-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 192px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--sp-shadow-hover);
+}
+.sp-db-row-menu > button {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-ui);
+  padding: 8px 10px;
+}
+.sp-db-row-menu > button:hover:not(:disabled) {
+  background: var(--color-panel);
+}
+.sp-db-row-menu > p {
+  padding: 4px 8px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-db-selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 12px 0;
+  margin: 0 0 12px;
+  border-block: 1px solid var(--color-rule);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+.sp-db-selection-bar > .sp-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sp-db-selection-bar > p {
+  flex-basis: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-db-action-feedback {
+  margin: 0 0 10px;
+  color: var(--color-text);
+  font-size: var(--text-small);
+}
+
+.sp-db-tools.sp-db-board-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 16px 4px;
+  scrollbar-width: thin;
+}
+.sp-db-board-tools .sp-search {
+  flex: 1 0 170px;
+  width: auto;
+  min-width: 170px;
+}
+.sp-db-board-tools .sp-db-filters {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  width: auto;
+}
+.sp-db-board-tools .sp-db-filters > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: var(--text-meta);
+}
+.sp-db-property-count {
+  color: var(--color-muted);
+}
+.sp-db-card-properties-modal {
+  width: min(480px, calc(100vw - 32px));
+}
+.sp-db-card-property-options {
+  display: grid;
+  gap: 4px;
+  max-height: min(45svh, 360px);
+  overflow-y: auto;
+  margin: 16px 0;
+  padding: 4px;
+  border: 0;
+}
+.sp-db-card-property-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sp-db-card-property-options label:hover {
+  background: var(--color-panel);
+}
+.sp-db-card-property-options input {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--color-accent);
+}
+.sp-db-card-property-options span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Database boards share the Tasks board: quiet sage columns, white cards, muted add controls. */
+.sp-db-board {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  align-items: stretch;
+  padding: 2px 2px 16px;
+  scroll-padding-inline: 2px;
+  scrollbar-width: thin;
+}
+.sp-db-board-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 360px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+}
+.sp-db-board-column.is-drop-target {
+  background: var(--color-selection);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.sp-db-board-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+  margin: 0 0 6px;
+  padding: 0 2px 0 6px;
+}
+.sp-db-board-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sp-db-board-heading h2 > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sp-db-board-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-board-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sp-app .sp-db-board-heading .sp-icon-button {
+  flex-shrink: 0;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  color: var(--color-muted);
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+@media (hover: hover) {
+  .sp-db-board-column:not(:hover, :focus-within) .sp-db-board-heading .sp-icon-button {
+    opacity: 0;
+  }
+}
+.sp-db-board-stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+.sp-db-board-card {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.sp-db-board-card:hover {
+  border-color: var(--color-selection-border);
+  box-shadow: var(--sp-card-hover-shadow);
+}
+.sp-db-board-card.is-dragging {
+  opacity: 0.35;
+}
+.sp-db-board-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sp-db-board .sp-db-board-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+}
+.sp-db-board .sp-db-board-card-title:hover {
+  background: transparent;
+  color: var(--color-ink);
+}
+.sp-db-board-card-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.sp-db-board-card.is-dragging .sp-db-board-card-title::after {
+  cursor: grabbing;
+}
+.sp-app .sp-db-board .sp-db-board-card-title:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.sp-db-board-card-title:focus-visible::after {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.sp-db-board-card-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* Selected properties read as plain values, one per line; labels stay for screen readers and tooltips. */
+.sp-db-board-card dl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+.sp-db-board-card dl > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.sp-db-board-card dd {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-db-board-card .sp-db-option {
+  max-width: 100%;
+}
+.sp-db-board-card .sp-db-option > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-app .sp-db-board :is(.sp-db-board-add, .sp-db-board-more) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.sp-app .sp-db-board .sp-db-board-add {
+  margin-top: 6px;
+}
+.sp-app .sp-db-board :is(.sp-db-board-add, .sp-db-board-more):hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+.sp-app .sp-db-board .sp-db-board-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sp-db-board-more-count {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.sp-db-drop-hint {
+  margin: 0;
+  padding: 28px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.sp-db-drag-preview {
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 8px 24px rgb(32 37 34 / 10%);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.sp-db-drag-preview > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .sp-db-board {
+    grid-auto-columns: minmax(min(280px, calc(100vw - 56px)), 1fr);
+    gap: 12px;
+  }
+}
+
+/* Inline record entry: a draft row in the table footer and a draft card in a board column. */
+.sp-db-draft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.sp-db-draft input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+.sp-db-draft input::placeholder {
+  color: var(--color-muted);
+}
+.sp-db-draft-hint {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+.sp-db-draft-error {
+  flex-shrink: 1;
+  min-width: 0;
+  color: #a7393f;
+  font-size: var(--text-caption);
+}
+.sp-db-table tfoot .sp-db-draft-row td {
+  height: 52px;
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-surface);
+}
+.sp-db-table tfoot .sp-db-draft-row td:first-child {
+  color: var(--color-muted);
+  text-align: center;
+}
+.sp-db-table tfoot .sp-db-draft-row:focus-within td {
+  background: color-mix(in srgb, var(--color-selection) 45%, var(--color-surface));
+}
+.sp-db-board-draft {
+  padding: 8px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.sp-db-board-draft .sp-db-draft {
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.sp-db-board-draft .sp-db-draft input {
+  flex-basis: 100%;
+  font-weight: 500;
+}
+.sp-db-table tfoot .sp-db-draft-hint-cell {
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+.sp-db-table tfoot .sp-db-draft-row .sp-db-name-column .sp-db-draft {
+  padding-left: 4px;
+}
+@media (hover: none) {
+  .sp-db-draft-hint {
+    display: none;
+  }
+}

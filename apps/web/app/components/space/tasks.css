@@ -1,0 +1,48 @@
+.sp-board.sp-draggable-board {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  align-items: stretch;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.sp-draggable-board .sp-task-group { min-width: 0; }
+.sp-task-dialog-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px 0; }
+.sp-task-dialog-actions { justify-content: flex-end; flex-shrink: 0; }
+.sp-task-dialog .sp-inspector-body { overflow-wrap: anywhere; padding: 14px 24px 20px; }
+.sp-task-dialog .sp-inspector-body h1 { margin: 0 0 18px; }
+.sp-task-dialog .sp-with-status { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.sp-task-dialog .sp-properties {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 18px;
+  margin: 18px 0;
+  padding: 9px 0;
+  border-block: 1px solid var(--color-rule);
+}
+.sp-task-dialog .sp-properties > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 0;
+}
+.sp-task-dialog .sp-properties dt { color: var(--color-muted); white-space: nowrap; }
+.sp-task-dialog .sp-properties dd { min-width: 0; }
+.sp-task-dialog .sp-properties select { max-width: 100%; }
+.sp-task-dialog .sp-inspector-body h3 { margin: 20px 0 8px; }
+.sp-task-column-form { display: grid; gap: 12px; }
+.sp-task-column-form label { color: var(--color-ink); font-weight: 500; }
+.sp-task-column-form input { width: 100%; min-width: 0; }
+.sp-task-column-form .sp-muted { margin: 0; }
+.sp-task-save-state { color: var(--color-muted); font-size: 0.8125rem; line-height: 1.4; }
+.sp-board-task .sp-task-save-state { margin: 10px 0 0; }
+.sp-task-row .sp-task-save-state { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .sp-board.sp-draggable-board { grid-auto-columns: minmax(250px, 85vw); }
+  .sp-task-dialog-toolbar { padding-inline: 18px; }
+  .sp-task-dialog .sp-inspector-body { padding: 14px 18px 18px; }
+  .sp-task-dialog .sp-properties { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+  .sp-task-dialog .sp-properties > div { grid-template-columns: 1fr; align-items: start; gap: 3px; }
+}

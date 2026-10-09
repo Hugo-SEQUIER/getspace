@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Journal"
+  short_description: "Record or recap a day"
+  default_prompt: "Use $space-journal to record today or recap a specific day."

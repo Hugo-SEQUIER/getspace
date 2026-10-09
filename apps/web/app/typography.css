@@ -1,0 +1,123 @@
+/* Shared readable type sizes. Rem units follow the reader's browser settings. */
+:root {
+  --text-caption: 0.75rem;
+  --text-meta: 0.8125rem;
+  --text-small: 0.875rem;
+  --text-ui: 0.9375rem;
+  --text-body: 1rem;
+  --text-reading: 1.0625rem;
+  --text-lead: 1.125rem;
+  --text-title: 1.25rem;
+}
+
+body {
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+/* Controls and narrow toolbars need room for the larger type. */
+button,
+.sp-button {
+  min-height: 36px;
+}
+.sp-topbar > .sp-actions,
+.sp-modal-footer,
+.sp-form-properties,
+.sp-doc-library-toolbar {
+  flex-wrap: wrap;
+}
+.sp-topbar > .sp-actions {
+  justify-content: flex-end;
+}
+.sp-search {
+  min-height: 36px;
+}
+.sp-search input {
+  min-width: 0;
+}
+.sp-nav-link {
+  min-height: 39px;
+}
+.sp-nav-link svg {
+  width: 18px;
+  height: 18px;
+}
+.sp-board-task-heading a,
+.sp-task-name,
+.sp-db-record-name {
+  font-size: var(--text-ui);
+}
+.sp-doc-card > p,
+.sp-db-library-card p {
+  height: auto;
+  min-height: 3.3em;
+}
+.sp-document-prose,
+.source-reader {
+  font-size: var(--text-reading);
+}
+.sp-document-prose {
+  line-height: 1.8;
+}
+.sp-import-document-text {
+  font-size: var(--text-body);
+}
+.sp-memory-search-tools .sp-search,
+.sp-memory-filters .sp-search {
+  height: auto;
+  min-height: 36px;
+}
+.sp-graph-display > button,
+.sp-graph-display .sp-segment button {
+  height: auto;
+  min-height: 34px;
+}
+
+@media (max-width: 760px) {
+  .sp-topbar > .sp-actions {
+    gap: 6px;
+  }
+  /* Keep text entry legible while the device keyboard is open. */
+  input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select,
+  .sp-search input,
+  .sp-memory-filters select,
+  .sp-memory-search-tools select,
+  .sp-db-editable-cell input,
+  .sp-db-editable-cell select,
+  .sp-import-table th select {
+    font-size: max(1rem, 16px);
+  }
+  .sp-memory-filters select {
+    max-width: none;
+    min-width: 0;
+  }
+  .sp-canvas-toolbar {
+    right: 15px;
+  }
+  .sp-memory-search-tools {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
+  }
+  .sp-memory-search-tools .sp-search {
+    width: calc(100% - 42px);
+  }
+  .sp-memory-search-tools select {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+  }
+  .sp-memory-search-tools > button {
+    height: 36px;
+    width: 34px;
+  }
+  .sp-filter-panel {
+    top: 103px;
+  }
+  .sp-local-graph-bar {
+    top: 103px;
+  }
+  .sp-document-prose {
+    font-size: var(--text-reading);
+  }
+}

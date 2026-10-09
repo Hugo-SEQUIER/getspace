@@ -1,36 +1,34 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
 .DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
 .env
-
-# vercel
-.vercel
-
-# typescript
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+.next/
+out/
 *.tsbuildinfo
-next-env.d.ts
+.local/
+coverage/
+
+# Database backups made by scripts/backup.sh hold every workspace's content.
+backups/
+
+
+# Generated from the installed PDF.js version by predev/prebuild/postinstall.
+apps/web/public/vendor/pdfjs/
+
+# Generated from the checked-in Space skill catalog.
+apps/web/public/skills/
+
+# Generated frontend build assets and TanStack route tree.
+apps/web/dist/
+apps/web/.tanstack/
+apps/web/src/routeTree.gen.ts
+apps/web/public/favicon.ico
+apps/web/public/vendor/avatars/

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Write-up"
+  short_description: "Write a sourced document from records"
+  default_prompt: "Use $space-writeup to write a sourced report from what is recorded in Space."

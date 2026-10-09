@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Remember"
+  short_description: "Save durable facts, decisions and lessons"
+  default_prompt: "Use $space-remember to save or correct reusable knowledge in Space."

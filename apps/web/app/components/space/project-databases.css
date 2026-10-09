@@ -1,0 +1,19 @@
+/* Databases linked to a project, on the project page. */
+.sp-project-databases-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.sp-project-databases-heading select { max-width: 100%; }
+.sp-project-database > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.sp-project-database > .sp-muted { margin-left: auto; font-size: var(--text-meta); white-space: nowrap; }

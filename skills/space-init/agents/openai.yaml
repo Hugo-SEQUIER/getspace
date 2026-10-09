@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Setup"
+  short_description: "Interview the user and seed a new Space"
+  default_prompt: "Use $space-init to set up this Space: interview me, propose categories and projects, and store only what I confirm."

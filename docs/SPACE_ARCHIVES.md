@@ -1,0 +1,20 @@
+# Search, export and merge restore
+
+Projects and custom databases are stored by the backend with revision checks, like documents and tasks. Moving a project or database to the trash preserves its saved revisions and contents; restore it from the trash section on its index page.
+
+Whole-Space search reads complete current content from the server through bounded pages, including document text and custom database record values. It reports progress and fails visibly if the Space changes during a search. It does not silently limit results to the browser's cache.
+
+## Export
+
+In Settings → Data, choose the complete Space export. It includes every retained resource, project and database revision, the trash, named agent identities and the current memory index. Agent connections and credentials are excluded. The downloaded JSON contains readable private content; keep it in a location you control. The supported browser export limit is 100 MiB; an oversized export reports an error instead of presenting a partial file as complete. Personal API keys can page through the same export with `POST /v1/spaces/{space_id}/export`.
+
+## Merge restore
+
+1. Select a supported Space archive in Settings → Data. The website uploads it in staging chunks and validates the complete archive before showing the merge review.
+2. Review each existing item. **Keep existing** leaves it unchanged. **Restore separate copy** creates a separate item with remapped project and source references. **Use archive as latest** appends the archive's retained revisions after the existing history and makes its archived head current.
+3. Resolve the source and type issues listed by the review. An imported memory cannot quietly reference different source evidence under the same ID. Existing memory edits and forget markers remain authoritative; incompatible memory providers or models require keeping or rebuilding the memory before merging.
+4. Apply the reviewed merge. If another session changed the Space after the review, review again. All visible database changes publish in one transaction. A timeout can be recovered through the staged restore's status and retry controls.
+
+Uploads are limited to 100 MiB and 10,000 archived revisions and expire after 24 hours. Before decoding, a restore also limits the JSON to 32 nested containers, 100,000 objects or arrays and 1,000,000 structural separators (commas and colons outside strings). Archives must use UTF-8 and contain only supported envelope fields. Each API process handles one archive review or publication at a time; concurrent requests receive a retryable busy response. Existing agent identities are reused where possible. Restoring an archive never reconnects an agent or restores revoked permissions: reconnect agents on the Agents page when needed.
+
+This merge works inside one Space and keeps its history. It differs from restoring a database backup with `scripts/restore.sh`, which replaces the whole installation; see [Self-hosting](SELF_HOSTING.md#restoring).

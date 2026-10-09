@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Projects"
+  short_description: "Create, update and archive projects"
+  default_prompt: "Use $space-projects to create, update or archive a project and attach work to it."

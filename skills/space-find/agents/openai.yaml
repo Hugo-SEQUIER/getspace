@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Find"
+  short_description: "Locate anything stored in the Space"
+  default_prompt: "Use $space-find to locate a document, task, project, database row or stored claim."

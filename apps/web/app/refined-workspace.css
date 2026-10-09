@@ -1,0 +1,333 @@
+/* Private workspace design system: neutral, quiet, and dense like a good notebook.
+   Tokens come from theme.css; this layer sets the workspace type scale and chrome. */
+.sp-app {
+  --text-caption: .75rem;
+  --text-meta: .8125rem;
+  --text-small: .875rem;
+  --text-ui: .875rem;
+  --text-body: .9375rem;
+  --text-reading: 1rem;
+  --text-lead: 1.0625rem;
+  --text-title: 1.25rem;
+  --sp-shadow-surface: var(--shadow-card);
+  --sp-shadow-hover: 0 0 0 1px rgb(15 15 15 / .04), 0 2px 6px rgb(15 15 15 / .06);
+  --sp-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+  grid-template-columns: 240px minmax(0, 1fr);
+  font-family: var(--sp-font);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+}
+.sp-app :is(h1, h2, h3) { color: var(--color-ink); }
+
+/* Controls: 32px default, hairline borders, ink primary. */
+.sp-app :where(button, input, select, textarea) { font-family: inherit; font-size: 14px; }
+.sp-app :where(button, .sp-button, input, select, textarea) { border-radius: var(--radius-sm); }
+.sp-app :where(button, .sp-button, input:not([type="checkbox"]):not([type="radio"]), select) { min-height: 32px; }
+.sp-app :where(button, .sp-button) { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+.sp-app :where(input, select, textarea) { border: 1px solid var(--color-border); color: var(--color-ink); }
+.sp-app :where(input, textarea)::placeholder { color: var(--color-muted); opacity: 1; }
+.sp-app .sp-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); box-shadow: none; padding-inline: 12px; font-weight: 500; }
+.sp-app .sp-primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.sp-app .sp-icon-button { border: 0; background: transparent; min-width: 28px; min-height: 28px; border-radius: var(--radius-sm); color: var(--color-muted); }
+.sp-app .sp-icon-button:hover:not(:disabled) { background: var(--color-hover); color: var(--color-ink); }
+/* Quiet text buttons share one shape with icon buttons: compact height, side padding and a hover fill. */
+.sp-app :is(.text-button, .sp-text-button) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-muted); line-height: 1.3; }
+.sp-app :is(.text-button, .sp-text-button):hover:not(:disabled) { color: var(--color-ink); background: var(--color-hover); }
+.sp-app :is(.text-button, .sp-text-button).sp-danger-text { color: #b1474c; }
+.sp-app .sp-main { background: var(--color-paper); }
+
+/* Icon sizes by context: 16px in buttons and toolbars, 14px in compact row actions, 18px in navigation. */
+.sp-app .sp-main :is(.sp-primary, .sp-button, .sp-icon-button, .sp-work-heading button, .sp-actions > button, .sp-doc-library-actions > button, .sp-modal-footer button, .sp-segment button, .sp-tabs button) > svg:not(.sp-mark),
+.sp-app .sp-workspace-bar :is(button, a) > svg {
+  width: 16px;
+  height: 16px;
+}
+.sp-app :is(.sp-doc-tree-add, .sp-sidebar-action) > svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Brand: a small ink tile; no gradients or glows. */
+.sp-app .sp-mark { color: #fff; background: var(--color-accent); border-radius: 6px; padding: 3px; box-shadow: none; }
+.sp-app .sp-mark-frame { display: none; }
+
+/* Sidebar */
+.sp-app .sp-sidebar {
+  background: var(--color-panel);
+  border-right: 1px solid var(--color-rule);
+  padding: 12px 8px 8px;
+  height: 100dvh;
+}
+.sp-app .sp-sidebar-brand { padding: 0 6px; min-height: 32px; gap: 8px; }
+.sp-app .sp-sidebar .sp-wordmark { gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -.2px; color: var(--color-ink); }
+.sp-app .sp-sidebar .sp-mark { width: 22px; height: 22px; }
+.sp-app .sp-sidebar .sp-sidebar-toggle { color: var(--color-muted); opacity: .7; }
+.sp-app .sp-sidebar .sp-sidebar-toggle:hover, .sp-app .sp-sidebar .sp-sidebar-toggle:focus-visible { opacity: 1; }
+.sp-app .sp-sidebar .sp-space-picker { width: 100%; min-height: 30px; border-color: transparent; margin: 8px 0 10px; padding: 4px 8px; border-radius: var(--radius-sm); background: transparent; box-shadow: none; font-size: 14px; font-weight: 500; color: var(--color-text); }
+.sp-app .sp-sidebar .sp-space-picker:hover { background: var(--color-hover); }
+.sp-app .sp-sidebar .sp-space-picker small { display: none; }
+.sp-app .sp-sidebar .sp-space-picker > svg:first-child { width: 15px; height: 15px; color: var(--color-muted); }
+.sp-app .sp-sidebar .sp-nav-link { min-height: 30px; margin: 1px 0; padding: 4px 8px; gap: 9px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 450; line-height: 20px; align-items: center; justify-content: flex-start; color: var(--color-text); }
+.sp-app .sp-sidebar .sp-nav-link.active { color: var(--color-accent-hover); background: var(--color-selection); font-weight: 600; }
+.sp-app .sp-sidebar .sp-nav-link.active svg { color: var(--color-accent); }
+.sp-app .sp-sidebar .sp-nav-link:hover:not(.active) { background: var(--color-hover); }
+.sp-app .sp-sidebar .sp-nav-link svg { display: block; flex: 0 0 18px; color: var(--color-muted); width: 18px; height: 18px; }
+.sp-app .sp-glyph-shape { fill: currentColor; fill-opacity: 0; transition: fill-opacity 150ms ease; }
+.sp-app .sp-nav-link:hover .sp-glyph-shape { fill-opacity: .07; }
+.sp-app .sp-glyph.is-active .sp-glyph-shape { fill-opacity: .18; }
+.sp-app .sp-sidebar-group { margin-top: 18px; padding-top: 0; border-top: 0; }
+.sp-app .sp-sidebar-group-head { padding: 0 2px 2px; }
+.sp-app .sp-sidebar-group-toggle { font-size: 12px; font-weight: 550; letter-spacing: 0; color: var(--color-muted); min-height: 24px; }
+.sp-app .sp-sidebar-shortcut { min-height: 30px; border-radius: var(--radius-sm); margin: 1px 0; }
+.sp-app .sp-sidebar-shortcut > a { padding: 4px 8px; gap: 9px; font-size: 14px; }
+.sp-app .sp-sidebar-shortcut:hover, .sp-app .sp-sidebar-shortcut:focus-within { background: var(--color-hover); }
+.sp-app .sp-sidebar-bottom { padding-top: 6px; border-top: 0; }
+.sp-app .sp-sidebar-bottom .sp-nav-link { min-height: 30px; font-size: 14px; }
+.sp-app .sp-account-wrap { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-rule); }
+.sp-app .sp-sidebar .sp-account-button { min-height: 40px; gap: 9px; border: 0; background: transparent; box-shadow: none; padding: 4px 8px; width: 100%; border-radius: var(--radius-sm); }
+.sp-app .sp-sidebar .sp-account-button:hover { background: var(--color-hover); }
+.sp-app .sp-account-button > span:not(.sp-avatar) { display: block; text-align: left; font-size: 13px; font-weight: 500; line-height: 1.35; min-width: 0; color: var(--color-ink); }
+.sp-app .sp-account-button small { display: block; color: var(--color-muted); font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-app .sp-account-button > svg { margin-left: auto; color: var(--color-muted); }
+.sp-app .sp-account-button .sp-avatar { height: 26px; width: 26px; }
+.sp-app .sp-account-menu { border: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-pop); background: var(--color-surface); }
+
+/* Top bar: one quiet 48px row; the page owns the title. */
+.sp-app .sp-workspace-bar { height: 48px; flex-shrink: 0; padding: 0 16px 0 24px; display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 360px) minmax(48px, 1fr); align-items: center; gap: 16px; color: var(--color-muted); border-bottom: 0; background: var(--color-paper); }
+.sp-app .sp-workspace-location { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; white-space: nowrap; }
+.sp-app .sp-workspace-location > a { color: var(--color-muted); border-radius: 4px; padding: 2px 4px; margin-left: -4px; }
+.sp-app .sp-workspace-location > a:hover { color: var(--color-ink); background: var(--color-hover); }
+.sp-app .sp-workspace-location > span:last-child { color: var(--color-ink); text-overflow: ellipsis; overflow: hidden; }
+.sp-app .sp-workspace-location > span[aria-hidden] { color: var(--color-selection-border); }
+.sp-app .sp-workspace-search { display: flex; align-items: center; justify-content: flex-start; min-width: 0; width: 100%; height: 32px; min-height: 32px; padding: 0 10px; gap: 8px; background: var(--color-panel); border: 1px solid transparent; box-shadow: none; color: var(--color-muted); font-size: 13px; border-radius: var(--radius-md); }
+.sp-app .sp-workspace-search:hover:not(:disabled) { background: var(--color-hover); border-color: var(--color-border); }
+.sp-app .sp-workspace-search > span { flex: 1; text-align: left; }
+.sp-app .sp-workspace-search kbd { padding: 1px 6px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-muted); font: 500 12px/18px var(--sp-font); box-shadow: none; }
+.sp-app .sp-workspace-create { justify-self: end; color: var(--color-muted); }
+
+/* Page headings: large, tight, Apple-like titles over generous space. */
+.sp-app .sp-topbar { min-height: 0; border-bottom: 0; padding: 32px 48px 20px; background: transparent; }
+.sp-app .sp-topbar h1.sp-topbar-title { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; color: var(--color-ink); }
+.sp-app .sp-topbar:has(> strong) { min-height: 48px; padding-block: 8px 0; }
+.sp-app .sp-topbar > strong { color: var(--color-muted); font-size: 14px; font-weight: 500; }
+.sp-app .sp-page { padding: 24px 48px 64px; }
+.sp-app .sp-page-heading { margin-bottom: 24px; }
+.sp-app .sp-page-heading h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.6px; font-weight: 700; }
+.sp-app .sp-page-heading p { font-size: 15px; line-height: 1.55; color: var(--color-muted); }
+
+/* One page heading everywhere: title (the menu label), one-line description, actions on the right. */
+.sp-app .sp-main :is(.sp-work-heading, .sp-page-heading, .sp-doc-library-heading):not(.sp-project-heading) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+  height: auto;
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.sp-app .sp-main :is(.sp-work-heading, .sp-page-heading, .sp-doc-library-heading):not(.sp-project-heading) h1 {
+  margin: 0 0 6px;
+  color: var(--color-ink);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.6px;
+}
+.sp-app .sp-main :is(.sp-work-heading, .sp-page-heading, .sp-doc-library-heading):not(.sp-project-heading) p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.sp-app .sp-main :is(.sp-work-heading, .sp-page-heading, .sp-doc-library-heading) > :is(.sp-actions, button, .sp-doc-library-actions) { flex-wrap: wrap; }
+
+/* Memory keeps its full-height canvas but shares the page title position and the underline view tabs. */
+.sp-app .sp-main .sp-memory-topbar { min-height: 0; padding: 24px 48px 12px; }
+.sp-app .sp-main .sp-memory-topbar .sp-topbar-title { margin: 0 12px 0 0; }
+.sp-app .sp-main .sp-memory-topbar .sp-segment { gap: 16px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.sp-app .sp-main .sp-memory-topbar .sp-segment button { position: relative; min-height: 32px; padding: 0 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--color-text); font-size: 15px; }
+.sp-app .sp-main .sp-memory-topbar .sp-segment button.selected { background: transparent; box-shadow: none; color: var(--color-accent); font-weight: 600; }
+.sp-app .sp-main .sp-memory-topbar .sp-segment button.selected::after { content: ""; position: absolute; inset: auto 0 -4px; height: 2px; border-radius: 2px; background: var(--color-accent); }
+@media (max-width: 760px) {
+  .sp-app .sp-main .sp-memory-topbar { padding: 16px 16px 8px; }
+}
+
+/* Filters and switches */
+.sp-app .sp-search { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-sm); min-height: 32px; }
+.sp-app .sp-search input { font-size: 14px; }
+.sp-app .sp-segment { border: 0; background: var(--color-hover); border-radius: var(--radius-md); padding: 2px; }
+.sp-app .sp-segment button { font-size: 13px; border-radius: var(--radius-sm); min-height: 28px; box-shadow: none; color: var(--color-muted); }
+.sp-app .sp-segment button.selected { background: var(--color-surface); color: var(--color-accent-hover); box-shadow: 0 1px 2px rgb(15 15 15 / .08), 0 0 0 1px rgb(15 15 15 / .04); }
+.sp-app .sp-empty { border-radius: var(--radius-lg); background: var(--color-panel); }
+.sp-app .sp-empty h2 { font-weight: 600; letter-spacing: -.2px; }
+
+/* Cards: one surface for documents, databases, tasks, and metrics.
+   White, hairline sage border, 12px corners; hover deepens the border and shadow without moving. */
+.sp-app {
+  --sp-card-hover-shadow: 0 1px 2px rgb(37 51 42 / .04), 0 6px 16px rgb(37 51 42 / .08);
+}
+.sp-app .sp-main :is(.sp-doc-card, .sp-db-library-card) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-ink);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.sp-app .sp-main :is(.sp-doc-card, .sp-db-library-card):hover {
+  background: var(--color-surface);
+  border-color: var(--color-selection-border);
+  box-shadow: var(--sp-card-hover-shadow);
+}
+.sp-app .sp-main :is(.sp-doc-card-top, .sp-db-card-top) { display: flex; align-items: center; justify-content: space-between; min-height: 32px; margin: 0 0 14px; color: var(--color-muted); }
+.sp-app .sp-main :is(.sp-doc-file, .sp-db-card-top .sp-db-large-icon) {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-selection);
+  color: var(--color-accent);
+}
+.sp-app .sp-main .sp-db-card-top > svg { opacity: 0; color: var(--color-accent); transition: opacity 150ms ease; }
+.sp-app .sp-main .sp-db-library-card:is(:hover, :focus-visible) .sp-db-card-top > svg { opacity: 1; }
+.sp-app .sp-main :is(.sp-doc-card h3, .sp-db-library-card h3) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0 0 6px;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -.1px;
+  overflow-wrap: anywhere;
+}
+.sp-app .sp-main :is(.sp-doc-card > p, .sp-db-library-card p) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: auto;
+  min-height: 0;
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sp-app .sp-main :is(.sp-doc-card-footer, .sp-db-card-footer) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.sp-app .sp-main .sp-doc-card-footer > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-app .sp-main .sp-doc-card-footer > span:last-child { flex-shrink: 0; }
+.sp-app .sp-main .sp-db-card-columns { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; overflow: hidden; max-height: 52px; border: 0; background: transparent; }
+.sp-app .sp-main .sp-db-card-columns span { padding: 2px 8px; border: 0; border-radius: 999px; background: var(--color-panel); color: var(--color-text); font-size: 12px; }
+.sp-app .sp-main .sp-db-library-grid { gap: 12px; }
+.sp-app .sp-main .sp-db-add-card { min-height: 100%; padding: 16px; border: 1px dashed var(--color-selection-border); border-radius: var(--radius-lg); background: transparent; box-shadow: none; color: var(--color-muted); }
+.sp-app .sp-main .sp-db-add-card:hover:not(:disabled) { background: var(--color-panel); border-color: var(--color-accent); color: var(--color-accent-hover); }
+.sp-app .sp-main .sp-db-add-card > span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--color-selection); color: var(--color-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .sp-app .sp-main .sp-doc-card-wrap > .sp-doc-drag-handle { opacity: 0; transition: opacity 150ms ease; }
+  .sp-app .sp-main .sp-doc-card-wrap:is(:hover, :focus-within) > .sp-doc-drag-handle { opacity: 1; }
+}
+.sp-app .sp-main .sp-doc-card-wrap > .sp-doc-drag-handle { top: 16px; right: 12px; }
+
+/* Dialogs: the dialog system lives in modals.css. */
+.sp-app .sp-toast { border: 0; border-radius: var(--radius-md); background: var(--color-ink); color: #fff; box-shadow: var(--shadow-pop); }
+.sp-app .sp-toast .sp-icon-button { color: var(--color-inverse-muted); }
+.sp-app .sp-toast .sp-icon-button:hover { background: rgb(255 255 255 / .12); color: #fff; }
+
+/* Command palette */
+.sp-app .sp-refined-command { width: 640px; max-width: calc(100vw - 32px); }
+.sp-app .sp-refined-command .sp-modal-head { position: absolute; right: 12px; top: 12px; padding: 0; border: 0; background: transparent; z-index: 1; }
+.sp-app .sp-refined-command .sp-modal-head h2 { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sp-app .sp-refined-command .sp-command { padding: 0; }
+.sp-app .sp-refined-command .sp-command-input { margin: 0; padding: 0 48px 0 18px; height: 56px; min-height: 56px; background: transparent; border: 0; border-bottom: 1px solid var(--color-rule); border-radius: 0; box-shadow: none; }
+.sp-app .sp-refined-command .sp-command-input input { font-size: 16px; min-width: 0; padding: 0; border: 0; }
+.sp-app .sp-command-filters { display: flex; gap: 4px; padding: 10px 14px 6px; overflow-x: auto; scrollbar-width: thin; }
+.sp-app .sp-command-filters button { min-height: 28px; flex-shrink: 0; border: 0; border-radius: 999px; background: transparent; box-shadow: none; padding: 4px 10px; font-size: 13px; color: var(--color-muted); }
+.sp-app .sp-command-filters button:hover { background: var(--color-hover); color: var(--color-ink); }
+.sp-app .sp-command-filters button[aria-pressed=true] { background: var(--color-accent); color: #fff; }
+.sp-app .sp-command-results { padding: 0 8px 8px; max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.sp-app .sp-refined-command .sp-command-label { margin: 10px 10px 4px; padding: 0; color: var(--color-muted); font-size: 12px; font-weight: 550; text-transform: none; letter-spacing: 0; display: flex; justify-content: space-between; }
+.sp-app .sp-refined-command .sp-command-result { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); margin: 0; box-shadow: none; }
+.sp-app .sp-refined-command .sp-command-result:hover, .sp-app .sp-refined-command .sp-command-result:focus-visible { background: var(--color-hover); }
+.sp-app .sp-command-result > svg:last-child { margin-left: auto; color: var(--color-muted); opacity: 0; }
+.sp-app .sp-command-result:hover > svg:last-child, .sp-app .sp-command-result:focus-visible > svg:last-child { opacity: 1; }
+.sp-app .sp-command-type-icon { height: 28px; width: 28px; display: grid; place-items: center; flex: 0 0 auto; border-radius: var(--radius-sm); background: var(--color-panel); color: var(--color-muted); border: 1px solid var(--color-rule); }
+.sp-app .sp-command-type-icon.is-document,
+.sp-app .sp-command-type-icon.is-project,
+.sp-app .sp-command-type-icon.is-memory { background: var(--color-panel); color: var(--color-muted); }
+.sp-app .sp-command-result-copy { min-width: 0; display: grid; gap: 0; }
+.sp-app .sp-command-result-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--color-ink); }
+.sp-app .sp-command-result-copy small { font-size: 12px; color: var(--color-muted); }
+.sp-app .sp-command-quick { padding: 6px 8px 8px; border-top: 1px solid var(--color-rule); }
+.sp-app .sp-command-quick-action { display: flex; width: 100%; min-height: 34px; align-items: center; text-align: left; gap: 10px; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; box-shadow: none; font-size: 14px; color: var(--color-text); }
+.sp-app .sp-command-quick-action:hover { background: var(--color-hover); }
+.sp-app .sp-command-quick-action > svg { color: var(--color-muted); }
+.sp-app .sp-command-quick-action > svg:last-child { margin-left: auto; }
+.sp-app .sp-refined-command .sp-command-all { margin: 0 18px 10px; font-size: 13px; color: var(--color-link); }
+.sp-app .sp-refined-command footer { display: flex; gap: 18px; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--color-rule); background: var(--color-panel); color: var(--color-muted); font-size: 12px; }
+.sp-app .sp-refined-command footer kbd { border: 0; background: transparent; box-shadow: none; font-size: 12px; }
+
+@media (min-width: 761px) {
+  .sp-app.sp-sidebar-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
+  .sp-app.sp-sidebar-collapsed .sp-sidebar { padding: 12px 8px 8px; }
+  .sp-app.sp-sidebar-collapsed .sp-sidebar-brand { padding: 0; }
+  .sp-app.sp-sidebar-collapsed .sp-sidebar-group { padding-top: 0; margin-top: 8px; border: 0; }
+  .sp-app.sp-sidebar-collapsed .sp-sidebar .sp-nav-link { padding: 6px; justify-content: center; gap: 0; }
+  .sp-app.sp-sidebar-collapsed .sp-sidebar .sp-wordmark { gap: 0; }
+}
+@media (max-width: 1100px) and (min-width: 761px) {
+  .sp-app:not(.sp-sidebar-collapsed) { grid-template-columns: 220px minmax(0, 1fr); }
+  .sp-app .sp-workspace-bar { grid-template-columns: minmax(110px, 1fr) minmax(180px, 300px) 32px; padding-inline: 20px 12px; gap: 12px; }
+  .sp-app .sp-page, .sp-app .sp-topbar { padding-inline: 32px; }
+}
+@media (max-width: 760px) {
+  .sp-app { display: block; }
+  .sp-app .sp-sidebar { padding: 14px 10px 10px; height: 100dvh; width: 264px; }
+  .sp-app .sp-mobile-bar { background: rgb(255 255 255 / .92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--color-rule); height: 52px; padding-inline: 12px; }
+  .sp-app .sp-mobile-bar .sp-wordmark { font-size: 16px; font-weight: 600; gap: 8px; }
+  .sp-app .sp-mobile-bar .sp-mark { width: 22px; height: 22px; }
+  .sp-app .sp-mobile-bar .sp-icon-button { min-width: 40px; min-height: 40px; }
+  .sp-app .sp-primary { min-height: 40px; }
+  .sp-app .sp-sidebar .sp-nav-link { min-height: 40px; }
+  .sp-app .sp-workspace-bar { height: 40px; padding: 0 16px; display: flex; justify-content: space-between; }
+  .sp-app .sp-workspace-location { font-size: 13px; gap: 6px; }
+  .sp-app .sp-workspace-search { display: none; }
+  .sp-app .sp-workspace-create { min-height: 32px; width: 32px; }
+  .sp-app .sp-topbar { padding: 16px 16px 12px; gap: 12px; flex-wrap: wrap; }
+  .sp-app .sp-topbar h1.sp-topbar-title, .sp-app .sp-page-heading h1 { font-size: 26px; letter-spacing: -.5px; }
+  .sp-app .sp-page { padding: 16px 16px 40px; }
+  .sp-app .sp-page-heading { align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+  .sp-app .sp-page-heading p { font-size: 14px; }
+  .sp-app .sp-modal { max-width: calc(100vw - 24px); border-radius: var(--radius-lg); max-height: calc(100dvh - 24px); }
+  .sp-app .sp-refined-command .sp-modal-head { right: 6px; top: 10px; }
+  .sp-app .sp-command-filters { padding-inline: 10px; }
+  .sp-app .sp-command-results { padding-inline: 6px; }
+  .sp-app .sp-command-quick { padding-inline: 6px; }
+  .sp-app .sp-refined-command footer { gap: 12px; padding-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-app *, .sp-app *::before, .sp-app *::after { scroll-behavior: auto; animation-duration: .01ms; transition-duration: .01ms; }
+}

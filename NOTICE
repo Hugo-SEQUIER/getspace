@@ -1,0 +1,24 @@
+Space
+Copyright (c) 2026 Hugo SEQUIER
+
+Space is free software: you can redistribute it and/or modify it under the terms of
+the GNU Affero General Public License, version 3, as published by the Free Software
+Foundation. The full terms are in LICENSE. If you run a modified version for other
+people over a network, the license requires you to offer them its source code.
+
+This repository also contains third-party components under their own licenses.
+See THIRD-PARTY.md for the dependency inventory and the asset attributions.
+
+Vendored component
+
+  Memora text inference runtime
+  Source: https://github.com/microsoft/Memora
+  Pinned commit: dec3f8f2444eace7004fc084abe1be9f3d88270e
+  Copyright (c) 2025 Microsoft
+  Licensed under the MIT License.
+
+  The complete MIT text is retained at
+  backend/src/space/_vendor/memora/LICENSE. The MIT terms require that the
+  copyright notice and the permission notice be included in all copies or
+  substantial portions of that software. Keep that file with any distribution
+  that includes the vendored runtime. The vendored runtime stays under MIT.

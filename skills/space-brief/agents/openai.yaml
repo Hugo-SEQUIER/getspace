@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Brief"
+  short_description: "Brief a project's current state"
+  default_prompt: "Use $space-brief to brief me on where this project stands."

@@ -1,0 +1,283 @@
+/* Board-only surfaces keep the shared task list and its controls unchanged. */
+.sp-task-board {
+  min-width: 0;
+  color: var(--color-text);
+}
+
+.sp-task-board .sp-draggable-board {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  padding: 2px 2px 16px;
+  overflow-x: auto;
+  scroll-padding-inline: 2px;
+}
+
+.sp-task-board .sp-board .sp-task-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 360px;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+}
+
+.sp-task-board .sp-task-group > h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  margin: 0 0 6px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sp-task-board .sp-task-column-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-task-board .sp-task-group h2 .sp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.sp-task-board .sp-board-task-stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-task-board .sp-board-task {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.sp-task-board .sp-board-task {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.sp-task-board .sp-board-task:hover {
+  border-color: var(--color-selection-border);
+  background: var(--color-surface);
+  box-shadow: var(--sp-card-hover-shadow);
+}
+
+.sp-task-board .sp-board-task.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.sp-task-board .sp-board-task.is-dragging {
+  opacity: 0.35;
+}
+
+.sp-task-board .sp-board-task-link {
+  display: block;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: inherit;
+  color: inherit;
+  text-decoration: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  touch-action: auto;
+}
+
+.sp-task-board .sp-board-task-heading {
+  display: block;
+  min-width: 0;
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.sp-task-board .sp-board-task-link:hover .sp-board-task-heading {
+  color: var(--color-ink);
+}
+
+.sp-task-board .sp-board-task.is-dragging .sp-board-task-link {
+  cursor: grabbing;
+}
+
+.sp-task-board .sp-task-save-state {
+  display: block;
+}
+
+.sp-task-board .sp-board-task .sp-task-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-hover);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.sp-task-board .sp-task-project svg {
+  flex-shrink: 0;
+}
+
+.sp-task-board .sp-task-project > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-task-board .sp-board-task-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sp-task-board .sp-board-task .sp-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.sp-task-board .sp-priority svg {
+  color: var(--color-muted);
+  fill: currentColor;
+  fill-opacity: 0.14;
+}
+
+.sp-task-board .sp-priority[data-priority="high"] svg {
+  color: #b65043;
+}
+
+.sp-task-board .sp-priority[data-priority="medium"] svg {
+  color: #a77b26;
+}
+
+.sp-task-board .sp-status-dot {
+  border-color: #a9b1ab;
+}
+
+.sp-task-board .sp-status-in_progress {
+  border-color: #bc942e;
+}
+
+.sp-task-board .sp-status-in_progress::after {
+  background: #e6bd53;
+}
+
+.sp-task-board .sp-status-needs_you {
+  border-color: #b65043;
+}
+
+.sp-task-board .sp-status-needs_you::after {
+  background: #c9655a;
+}
+
+.sp-task-board .sp-status-done {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.sp-task-board .sp-task-drop-hint {
+  padding: 28px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.sp-task-board .sp-task-group.is-drop-target {
+  border-color: var(--color-accent);
+  background: var(--color-selection);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.sp-task-board .sp-add-task {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.sp-task-board .sp-add-task:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+.sp-task-board button:disabled {
+  color: var(--color-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.sp-task-board :is(button, a):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.sp-task-board .sp-task-drag-preview {
+  padding: 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 8px 24px rgb(32 37 34 / 10%);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .sp-task-board .sp-draggable-board {
+    grid-auto-columns: minmax(min(280px, calc(100vw - 56px)), 1fr);
+    gap: 12px;
+  }
+}

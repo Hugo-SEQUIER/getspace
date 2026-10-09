@@ -1,0 +1,370 @@
+/* Suppress viewport bounce without trapping wheel gestures in document content. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+:where(.sp-modal, .sp-memory-inspector, .sp-memory-list) {
+  overscroll-behavior: contain;
+}
+
+.sp-import-start {
+  display: flex;
+  width: 100%;
+  gap: 14px;
+  margin: 0 0 24px;
+  padding: 16px;
+  text-align: left;
+  white-space: normal;
+  background: var(--color-paper);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+}
+.sp-import-start > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 5px;
+}
+.sp-import-start strong {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 500;
+}
+.sp-import-start small {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+.sp-import-start:hover {
+  border-color: var(--color-selection-border);
+  background: var(--color-paper);
+}
+.sp-import-modal {
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+}
+.sp-import-intro {
+  font-size: var(--text-body);
+  color: var(--color-text);
+  line-height: 1.7;
+  margin: 0 0 22px;
+}
+.sp-import-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 9px;
+  padding: 28px 18px;
+  margin: 0 0 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: var(--color-paper);
+  cursor: pointer;
+}
+.sp-import-dropzone:hover,
+.sp-import-dropzone.is-over {
+  background: var(--color-panel);
+  border-color: var(--color-selection-border);
+}
+@media (forced-colors: active) {
+  .sp-import-dropzone:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+.sp-import-dropzone input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.sp-import-dropzone.is-busy {
+  opacity: 0.65;
+  cursor: progress;
+}
+.sp-import-file-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  margin-bottom: 5px;
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-shadow) 1.6%, transparent);
+}
+.sp-import-dropzone strong {
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.sp-import-dropzone > span:not(.sp-import-file-icon) {
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  letter-spacing: 0.025em;
+}
+.sp-import-dropzone small {
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+}
+.sp-import-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+.sp-import-settings select,
+.sp-import-settings input {
+  min-width: 0;
+  width: 100%;
+}
+.sp-import-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 12px;
+  font-size: var(--text-small);
+}
+.sp-import-preview-heading strong {
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.sp-import-preview-heading span {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-import-table-scroll {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  max-height: 310px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+}
+.sp-import-table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-small);
+  text-align: left;
+}
+.sp-import-table th {
+  min-width: 155px;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px;
+  font-weight: 500;
+  vertical-align: top;
+}
+.sp-import-table th > span {
+  display: block;
+  max-width: 216px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.sp-import-table th small {
+  display: block;
+  padding: 5px 0;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.sp-import-table th select {
+  font-size: var(--text-meta);
+  width: 100%;
+  padding: 4px 7px;
+}
+.sp-import-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-rule);
+  color: var(--color-text);
+  max-width: 240px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sp-import-table tr:last-child td {
+  border-bottom: 0;
+}
+.sp-import-note {
+  font-size: var(--text-small);
+  line-height: 1.7;
+  color: var(--color-muted);
+  margin: 12px 0 20px;
+}
+.sp-import-document-text {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  min-height: 230px;
+  max-height: 45dvh;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font: var(--text-body)/1.8 var(--font-sans, sans-serif);
+  color: var(--color-text);
+}
+.sp-import-image-preview {
+  max-height: 45dvh;
+  overflow: auto;
+}
+.sp-import-modal .sp-modal-footer {
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.sp-draggable-board {
+  position: relative;
+  align-items: stretch;
+  padding: 3px 3px 18px;
+}
+.sp-draggable-board .sp-task-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-paper);
+  border-radius: 9px;
+  padding: 10px;
+}
+.sp-draggable-board .sp-task-group.is-drop-target {
+  border-color: var(--color-selection-border);
+  background: var(--color-panel);
+  outline: 2px solid var(--color-rule);
+}
+.sp-board-task-stack {
+  flex: 1;
+}
+.sp-board-task {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 13px 11px 10px;
+  margin: 0 0 9px;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-shadow) 1.2%, transparent);
+  cursor: grab;
+}
+.sp-board-task:hover {
+  border-color: var(--color-border);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--color-shadow) 2.4%, transparent);
+}
+.sp-board-task.selected {
+  border-color: var(--color-selection-border);
+}
+.sp-board-task.is-dragging {
+  opacity: 0.28;
+}
+.sp-board-task-heading {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.sp-board-task-heading a {
+  font-size: var(--text-small);
+  font-weight: 500;
+  line-height: 1.6;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.sp-board-task .sp-task-drag-handle {
+  flex-shrink: 0;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  border-radius: 3px;
+  color: var(--color-faint);
+  cursor: grab;
+  touch-action: none;
+}
+.sp-board-task .sp-task-drag-handle:hover {
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+.sp-task-drag-handle:active {
+  cursor: grabbing;
+}
+.sp-board-task .sp-task-project {
+  margin: 0 0 12px;
+  color: var(--color-muted);
+}
+.sp-board-task-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--color-rule);
+}
+.sp-board-task-footer .sp-priority {
+  margin: 0;
+  width: auto;
+  font-size: var(--text-caption);
+}
+.sp-task-drop-hint {
+  padding: 28px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 7px;
+  color: var(--color-faint);
+  text-align: center;
+  font-size: var(--text-small);
+}
+.is-drop-target .sp-task-drop-hint {
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+.sp-task-drag-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 15px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-selection-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-shadow) 11%, transparent);
+  color: var(--color-ink);
+  font-size: var(--text-small);
+  line-height: 1.6;
+  cursor: grabbing;
+}
+@media (max-width: 700px) {
+  .sp-doc-topbar:has(.sp-doc-upload) {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .sp-doc-upload span {
+    display: none;
+  }
+  .sp-doc-upload {
+    padding: 7px;
+  }
+  .sp-import-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-import-modal {
+    max-height: calc(100dvh - 28px);
+  }
+  .sp-import-modal .sp-modal-content {
+    padding: 18px;
+  }
+  .sp-import-modal .sp-modal-footer > .sp-actions {
+    margin-left: auto;
+  }
+  .sp-import-preview-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sp-draggable-board {
+    grid-template-columns: repeat(3, 260px);
+  }
+  .sp-board-task .sp-task-drag-handle {
+    padding: 7px;
+    margin: -5px;
+  }
+}

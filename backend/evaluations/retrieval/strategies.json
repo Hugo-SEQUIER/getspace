@@ -1,0 +1,16 @@
+{
+  "strategies": {
+    "ef_search_100": {
+      "description": "Halfway between the shipped candidate list and the staging experiment.",
+      "config": {"ef_search": 100}
+    },
+    "iterative_strict_ef200": {
+      "description": "Both levers together: a wider candidate list and a strict iterative scan.",
+      "config": {"ef_search": 200, "iterative_scan": "strict_order"}
+    },
+    "expansion_overlap": {
+      "description": "Cue expansion ranked by how many cues a claim shares.",
+      "config": {"expansion_order": "overlap"}
+    }
+  }
+}

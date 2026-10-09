@@ -1,0 +1,22 @@
+# One origin for everything. The API serves MCP, the REST API, agent connection codes
+# and the OAuth sign-in that apps such as claude.ai use; the website serves the rest,
+# including the consent page. CADDY_SITE_ADDRESS is a domain name (Caddy obtains and
+# renews its HTTPS certificate) or ":80" for plain HTTP on a private network.
+{$CADDY_SITE_ADDRESS} {
+	encode zstd gzip
+
+	@api path /mcp /mcp/* /v1/* /health/* /oauth/* /.well-known/oauth-authorization-server* /.well-known/oauth-protected-resource*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		-Server
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Content-Type-Options nosniff
+	}
+}
