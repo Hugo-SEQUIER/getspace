@@ -55,6 +55,11 @@ export const spaceSkills = [
     "description": "Review a week's recorded work"
   },
   {
+    "name": "space-morning",
+    "title": "Space Morning",
+    "description": "Start the day from Space"
+  },
+  {
     "name": "space-audit",
     "title": "Space Audit",
     "description": "Inspect a Space and propose repairs"

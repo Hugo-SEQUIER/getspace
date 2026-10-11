@@ -53,6 +53,14 @@ jobs:
       - name: Build
         run: npm --prefix apps/web run build
 
+  skills:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: skills/ matches space-skills
+        run: scripts/sync-skills.sh --check
+
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

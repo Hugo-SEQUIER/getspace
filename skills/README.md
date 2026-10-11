@@ -159,4 +159,4 @@ Run the skill-creator validator for new or changed skills. Schema and prose chec
 | Import documents with memory unavailable | Documents-only work proceeds only if approved; unsaved memory is reported honestly |
 | A write conflicts or its response is lost | The latest version is reconciled on conflict; unchanged retries reuse the command ID and payload |
 
-The pack contains sixteen skills. Schema, packaging and documentation checks are separate from live client behavior. The import skill uses existing document and prepared-claim APIs; its approval and batch rules are agent instructions, not new server enforcement. No private workspace records are created to validate these documentation changes.
+The pack contains seventeen skills. Schema, packaging and documentation checks are separate from live client behavior. The import skill uses existing document and prepared-claim APIs; its approval and batch rules are agent instructions, not new server enforcement. No private workspace records are created to validate these documentation changes.
