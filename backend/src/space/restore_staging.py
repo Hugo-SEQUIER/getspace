@@ -10,7 +10,12 @@ from uuid import UUID
 from pydantic import Field
 
 from space.admission import AdmissionError
-from space.archive_schema import MAX_ARCHIVE_BYTES, decode_archive, validate_archive
+from space.archive_schema import (
+    MAX_ARCHIVE_BYTES,
+    decode_archive,
+    upgrade_archive,
+    validate_archive,
+)
 from space.memory import Input
 from space.workspace import CommandError
 
@@ -21,7 +26,7 @@ class Start(Input):
     id: UUID
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     bytes: int = Field(ge=1, le=MAX_ARCHIVE_BYTES, strict=True)
-    parts: int = Field(ge=1, le=1024, strict=True)
+    parts: int = Field(ge=1, le=2048, strict=True)
 
 
 class Chunk(Input):
@@ -157,10 +162,13 @@ def _load(workspace, identity, space_id, restore_id):
         raise CommandError("Archive checksum does not match. Upload the original file again.", 422)
     try:
         archive = decode_archive(raw)
+        upgrade_archive(archive)
         groups = validate_archive(archive)
-    except (ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+    except (ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError) as e:
+        # Plain ValueErrors carry a readable reason; other errors only say where parsing failed.
+        reason = f" {e}." if type(e) is ValueError else ""
         raise CommandError(
-            "Archive is invalid, incomplete, or exceeds supported limits.", 422
+            "Archive is invalid, incomplete, or exceeds supported limits." + reason, 422
         ) from None
     workspace._recheck(identity, space_id)
     return scope, key, row, archive, groups

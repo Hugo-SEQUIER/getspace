@@ -14,11 +14,13 @@ from space.memory import RecallMetadata
 from space.workspace import SaveResource
 from space.workspace_archive import FORMAT
 
-MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
+MAX_ARCHIVE_BYTES = 200 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 10000
 MAX_ARCHIVE_DEPTH = 32
-MAX_ARCHIVE_CONTAINERS = 100_000
-MAX_ARCHIVE_SEPARATORS = 1_000_000
+# Databases dominate large archives, at about 2,000 containers and 21,000 separators per
+# MiB: every retained database revision holds all of its records.
+MAX_ARCHIVE_CONTAINERS = 500_000
+MAX_ARCHIVE_SEPARATORS = 5_000_000
 # pgvector's widest vector; archived recall vectors of any width up to it are accepted.
 MAX_EMBEDDING_DIM = 16000
 _STRUCTURE = re.compile(rb'["{}\[\],:]')
@@ -46,7 +48,7 @@ def decode_archive(raw: bytes):
     Escaped quotes/brackets inside strings cannot hide actual JSON structure.
     """
     if len(raw) > MAX_ARCHIVE_BYTES:
-        raise ValueError("Archive exceeds the 100 MiB limit")
+        raise ValueError("Archive exceeds the 200 MiB limit")
     position = depth = containers = separators = 0
     while match := _STRUCTURE.search(raw, position):
         token = match[0]
@@ -79,6 +81,46 @@ def decode_archive(raw: bytes):
     archive = from_json(raw, allow_inf_nan=False, cache_strings=False, allow_partial=False)
     _finite_numbers(archive)
     return archive
+
+
+def upgrade_archive(archive):
+    """Accept archives written by the hosted edition or before a permanent deletion.
+
+    Parameters: one decoded archive, which this changes in place before validation.
+    What it does: renames the hosted edition's "decision" classification method to its
+    equivalent here, "typesafe", and drops source references to resources that are
+    absent from the archive because they were permanently deleted before the export.
+    Output: the number of dropped source references.
+    """
+    entries = archive.get("entries") if isinstance(archive, dict) else None
+    if not isinstance(entries, list):
+        return 0
+    resources = [
+        entry["value"]
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("entity") == "resource"
+        and isinstance(entry.get("value"), dict)
+    ]
+    present = {value.get("id") for value in resources}
+    dropped = 0
+    for value in resources:
+        recall = value.get("recall")
+        if isinstance(recall, dict) and isinstance(recall.get("sources"), list):
+            kept = [
+                source
+                for source in recall["sources"]
+                if not isinstance(source, dict) or source.get("resource_id") in present
+            ]
+            dropped += len(recall["sources"]) - len(kept)
+            recall["sources"] = kept
+        memory = value.get("_memory")
+        claims = memory.get("claims") if isinstance(memory, dict) else None
+        for claim in claims if isinstance(claims, list) else []:
+            classification = claim.get("classification") if isinstance(claim, dict) else None
+            if isinstance(classification, dict) and classification.get("method") == "decision":
+                classification["method"] = "typesafe"
+    return dropped
 
 
 def _id(value):

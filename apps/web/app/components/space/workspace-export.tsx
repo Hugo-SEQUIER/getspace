@@ -62,9 +62,9 @@ export function WorkspaceExport() {
               bytes += new TextEncoder().encode(
                 JSON.stringify(page.entries),
               ).length;
-              if (bytes > 100 * 1024 * 1024)
+              if (bytes > 200 * 1024 * 1024)
                 throw new Error(
-                  "This archive exceeds the browser's 100 MiB limit. Contact the installation operator for a full export.",
+                  "This archive exceeds the browser's 200 MiB limit. Contact the installation operator for a full export.",
                 );
               entries.push(...page.entries);
               setCount(entries.length);

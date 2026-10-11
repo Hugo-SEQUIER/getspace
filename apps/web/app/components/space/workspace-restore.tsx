@@ -120,8 +120,14 @@ export function WorkspaceRestore() {
     setId(selectedId);
     setReceipt(result);
     if (result.state === "committed") {
+      // Reloading the Space below replaces this page and its state, so the app-wide
+      // notice carries the confirmation.
       if (receipt?.id !== result.id || receipt.state !== "committed")
-        setNotice("Archive restored.");
+        data.setNotice(
+          result.result
+            ? `Archive restored: ${result.result.resources} documents or memories, ${result.result.items} projects, databases or other items, ${result.result.agents} agent identities and ${result.result.revisions} archived revisions.`
+            : "Archive restored.",
+        );
       setReview(null);
       setError("");
       upload.current = null;
@@ -157,8 +163,8 @@ export function WorkspaceRestore() {
             setReview(null);
             setReceipt(null);
             try {
-              if (file.size > 100 * 1024 * 1024)
-                throw new Error("Choose an archive of at most 100 MiB.");
+              if (file.size > 200 * 1024 * 1024)
+                throw new Error("Choose an archive of at most 200 MiB.");
               const text = await file.text();
               if (JSON.parse(text).format !== "space.archive.v1")
                 throw new Error(
@@ -406,7 +412,7 @@ export function WorkspaceRestore() {
         </details>
       )}
       <p className="sp-muted">
-        Uploads are encrypted and expire after 24 hours. Up to 100 MiB and
+        Uploads are encrypted and expire after 24 hours. Up to 200 MiB and
         10,000 retained revisions per archive.
       </p>
     </section>
