@@ -11,6 +11,7 @@ from pydantic import Field
 
 from space import agents, brain, memory_pipeline, restore_staging, workspace_items
 from space.memory import Input
+from space.model_provider import ModelError
 from space.workspace import CommandError, encode
 from space.workspace_search import require_snapshot
 
@@ -454,6 +455,48 @@ def _restore_links(
             relationships["links"] = kept
 
 
+def _reindex(workspace, identity, space_id, groups, decisions, snapshot):
+    """Embed restored memories again when their vectors have another width.
+
+    The memory index has one fixed width, so an archive from an installation whose
+    embedding model has another size cannot keep its vectors. This installation's model
+    embeds those claims instead. Embedding runs outside every transaction, before
+    publication, so a failed model call changes nothing.
+    """
+    values = [
+        versions[-1]["value"]
+        for (entity, id_), versions in groups.items()
+        if entity == "resource"
+        and decisions["resource:" + id_]["action"] != "keep"
+        and any(
+            len(row["vector"]) != brain.EMBEDDING_DIM
+            for row in versions[-1]["value"].get("memory_index", [])
+        )
+    ]
+    if not values:
+        return
+    if not workspace.memory_models.enabled:
+        raise CommandError(
+            "This archive's memories were indexed by an embedding model of another size. "
+            "Configure a memory model provider, then restore again so Space can index them "
+            "with it.",
+            409,
+        )
+    rows = [memory_pipeline.index_rows(value["_memory"]) for value in values]
+    session = workspace._model_session(
+        identity, space_id, lambda: require_snapshot(workspace, identity, space_id, snapshot)
+    )
+    try:
+        vectors = iter(session.embed([row["text"] for claims in rows for row in claims]))
+    except ModelError as error:
+        raise CommandError(str(error), 503) from None
+    model = workspace.memory_models.embedding_model
+    for value, claims in zip(values, rows, strict=True):
+        value["memory_index"] = [
+            {"id": row["id"], "model": model, "vector": next(vectors)} for row in claims
+        ]
+
+
 def commit(workspace, identity, space_id, restore_id, request: Commit):
     fingerprint = hashlib.sha256(encode(request.model_dump(mode="json"))).hexdigest()
     receipt = status(workspace, identity, space_id, restore_id)
@@ -469,6 +512,7 @@ def commit(workspace, identity, space_id, restore_id, request: Commit):
         if reviewed["issues"]:
             raise CommandError("Resolve the listed source or type conflicts before restoring.", 409)
         decisions = {item["key"]: item for item in reviewed["items"]}
+        _reindex(workspace, identity, space_id, groups, decisions, request.snapshot)
         prepared = _transform(workspace, identity, space_id, restore_id, groups, decisions)
         from space.restore_publish import publish
 

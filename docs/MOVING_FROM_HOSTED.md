@@ -33,7 +33,7 @@ Every memory carries recall vectors: numbers that an embedding model computed fr
 - **Same embedding model (recommended).** Set the model provider in `.env` with `SPACE_MEMORY_EMBEDDING_MODEL=text-embedding-3-small`, served by OpenAI (`SPACE_MEMORY_PROVIDER_URL=https://api.openai.com/v1`, or `SPACE_MEMORY_EMBEDDING_URL` if your chat models come from another service), and keep the default `SPACE_MEMORY_EMBEDDING_DIMENSIONS=1536`. Imported memories then work exactly as before, with no extra cost.
 - **No model provider.** The import works. Memories stay readable, editable and found by word search and `resume`, but meaning-based recall and tools such as `remember` need a provider.
 - **Another embedding model with 1,536 numbers.** The import works. Imported memories are found by word search, but meaning-based search skips them until each one is written again, which re-embeds it. `memory_info` reports how many claims still use another model.
-- **An embedding model of another size**, such as `nomic-embed-text` (768) with Ollama. The installation refuses the archive, because its memory index has a fixed size that differs from the export's. Import with the default size of 1,536 instead.
+- **An embedding model of another size**, such as `nomic-embed-text` (768) with Ollama. The import works: your memory index has a fixed size that differs from the export's, so Space computes the vectors again with your own model while restoring. Your provider must be set up before you import; otherwise the restore stops without changing anything.
 
 See [memory](MEMORY.md) for the provider settings.
 
