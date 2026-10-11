@@ -1,5 +1,5 @@
 .PHONY: setup backend web memory-worker webhook-worker install check check-database api-reference \
-	check-memory-models benchmark-memory evaluate-retrieval up down logs backup
+	check-memory-models benchmark-memory evaluate-retrieval up up-source down logs backup upgrade
 
 BACKEND_PORT ?= 8000
 BACKEND_WORKERS ?= 1
@@ -13,6 +13,10 @@ export SPACE_WEB_URL
 # --- Self-hosting (Docker) -------------------------------------------------------
 
 up:
+	docker compose up -d
+
+# Build the images from this checkout instead of downloading the released ones.
+up-source:
 	docker compose up -d --build
 
 down:
@@ -23,6 +27,9 @@ logs:
 
 backup:
 	scripts/backup.sh
+
+upgrade:
+	scripts/upgrade.sh
 
 # --- Development ----------------------------------------------------------------
 

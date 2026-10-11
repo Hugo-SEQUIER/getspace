@@ -4,17 +4,37 @@ Space runs as one Docker Compose stack on a machine you control. This guide cove
 
 ## Requirements
 
-- A Linux server with Docker Engine 24 or newer and the Compose plugin (`docker compose version`). macOS and Windows with Docker Desktop work for trying it out.
-- At least 2 GB of memory and 10 GB of disk. Building the images is the most demanding step; afterwards the stack idles well below 1 GB.
+- A Linux server with Docker Engine 24 or newer and the Compose plugin (`docker compose version`); the installer adds them if they are missing. macOS and Windows with Docker Desktop work for trying it out.
+- At least 1 GB of memory and 10 GB of disk. The running stack uses about 300 MB. Building the images from source instead of downloading them needs 2 GB.
 - For key mode: a domain or subdomain whose DNS `A` (or `AAAA`) record points at the server, and ports 80 and 443 open to the internet. Caddy uses port 80 to obtain the HTTPS certificate from Let's Encrypt.
 
 ## Install
 
+### With the installer
+
+On a fresh Linux server, as root or with `sudo`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Hugo-SEQUIER/getspace/main/scripts/install.sh | sudo bash
+```
+
+It installs git and Docker if they are missing, downloads the latest release into `/opt/space`, runs `scripts/setup.sh` (described below), downloads the images, starts Space and prints its address and, in key mode, the access key. It changes no firewall rules: in key mode, open ports 80 and 443 yourself if the server has a firewall. To answer the setup questions on the command line, pass the options of `scripts/setup.sh` after `bash -s --`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Hugo-SEQUIER/getspace/main/scripts/install.sh \
+  | sudo bash -s -- --mode key --domain space.example.com --owner "Ada"
+```
+
+`SPACE_DIR=/srv/space` installs somewhere else, and `SPACE_VERSION=v0.4.0` installs a release other than the latest. Run against a folder that already holds an installation, the installer changes nothing and points to `scripts/upgrade.sh`.
+
+### By hand
+
 ```sh
 git clone https://github.com/Hugo-SEQUIER/getspace.git
 cd getspace
+git checkout "$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
 scripts/setup.sh
-docker compose up -d --build
+docker compose up -d
 ```
 
 `scripts/setup.sh` asks two questions, the access mode and the address, and writes `.env` with freshly generated passwords and, in key mode, the access key. It never overwrites an existing `.env` unless you pass `--force`, which discards its secrets. You can also answer on the command line:
@@ -25,7 +45,7 @@ scripts/setup.sh --mode private --url http://127.0.0.1:8080
 scripts/setup.sh --mode private --url http://100.101.102.103:8080 --bind 100.101.102.103
 ```
 
-The first `docker compose up` builds two images, which takes a few minutes. The `migrate` service then creates the database logins and schema and exits, the API creates your Private Space, and the website becomes available. Check with `docker compose ps`: every service except `migrate` should be running, and `migrate` should have exited with code 0.
+`docker compose up -d` downloads the two released images named by `SPACE_VERSION` (written by `scripts/setup.sh`: the release you checked out, or `latest`). To build them from your checkout instead, for example after changing the code, run `docker compose up -d --build`; that takes a few minutes. The `migrate` service then creates the database logins and schema and exits, the API creates your Private Space, and the website becomes available. Check with `docker compose ps`: every service except `migrate` should be running, and `migrate` should have exited with code 0.
 
 ## Access modes
 
@@ -69,6 +89,7 @@ All settings live in `.env` next to `compose.yaml`. After changing one, apply it
 | `SPACE_BIND_ADDRESS` | Interface the published ports listen on: `0.0.0.0` for all, `127.0.0.1` for the server only, or a VPN address. |
 | `SPACE_HTTP_PORT`, `SPACE_HTTPS_PORT` | Published ports for HTTP and HTTPS. |
 | `SPACE_OWNER_NAME` | The name the website shows for you. |
+| `SPACE_VERSION` | The released images to run: a release tag such as `v0.4.0`, or `latest`. `scripts/upgrade.sh` changes it. |
 | `POSTGRES_PASSWORD` | The database superuser password, used only by the `migrate` service. |
 | `SPACE_APP_DB_PASSWORD`, `SPACE_WORKER_DB_PASSWORD`, `SPACE_WEBHOOK_DB_PASSWORD` | Passwords of the three restricted database logins used by the API and the two workers. The installer applies them on every start, so you can change them in `.env`. |
 | `SPACE_MEMORY_PROVIDER` | `disabled` (default), `openai_compatible` or `ollama`. |
@@ -106,12 +127,13 @@ Logs contain request statuses and error categories, never document content or cr
 ### Upgrades
 
 ```sh
-scripts/backup.sh
-git pull
-docker compose up -d --build
+scripts/upgrade.sh            # the latest release
+scripts/upgrade.sh v0.4.0     # or a specific one
 ```
 
-The `migrate` service applies new database migrations before the API starts. Migrations only move forward; to go back to an older version, restore a backup taken with that version.
+The script downloads the release's images, takes a backup with `scripts/backup.sh`, switches the folder to the release, sets `SPACE_VERSION` in `.env` and restarts Space. If the images cannot be downloaded, it stops before changing anything. `scripts/upgrade.sh --build` builds the images on the server instead, which needs 2 GB of memory. The `migrate` service applies new database migrations before the API starts. Migrations only move forward, so the script refuses an older release; to go back, restore a backup taken with that version. [Releases](https://github.com/Hugo-SEQUIER/getspace/releases) lists what each version changes.
+
+The script refuses to run if files of the checkout were changed locally, since switching releases would overwrite them. Put your own additions, such as an Ollama service, in `compose.override.yaml` next to `compose.yaml`: Docker Compose reads it automatically and upgrades leave it alone.
 
 ### Backups
 
@@ -119,7 +141,7 @@ The `migrate` service applies new database migrations before the API starts. Mig
 scripts/backup.sh
 ```
 
-This writes `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation: every document, task, database, memory, agent connection and setting. There is nothing else to back up besides `.env`. Copy both somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /srv/getspace && scripts/backup.sh` takes a nightly backup; prune old files yourself.
+This writes `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation: every document, task, database, memory, agent connection and setting. There is nothing else to back up besides `.env`. Copy both somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /opt/space && scripts/backup.sh` takes a nightly backup; prune old files yourself.
 
 ### Restoring
 
