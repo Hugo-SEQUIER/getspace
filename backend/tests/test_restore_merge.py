@@ -12,8 +12,8 @@ from test_workspace import commands as commands_fixture
 from test_workspace_archive import read_archive
 from test_workspace_items import database_data, project
 
+from space import brain, workspace_items
 from space import restore_merge as merge
-from space import workspace_items
 from space.workspace import CommandError
 
 database = database_fixture
@@ -148,3 +148,44 @@ def test_copy_remaps_project_links_and_all_source_revisions(commands):
     copied = service.get_resource(owner, space, UUID(mappings[memory["id"]]))
     assert copied["recall"]["sources"] == [{"resource_id": mappings[ref["id"]], "revision": 1}]
     assert service.get_resource(owner, space, UUID(mappings[ref["id"]]))["body"] == ref["body"]
+
+
+def narrow_archive(service, owner, space, build):
+    """An archive whose memory vectors come from a model of another size, as from Ollama."""
+    memory = service.build_memory(owner, space, build)
+    archive = read_archive(service, owner, space)
+    for entry in archive["entries"]:
+        for row in entry["value"].get("memory_index", []):
+            row["model"], row["vector"] = "nomic-embed-text", row["vector"][:768]
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    upload = stage(service, target, target_space, archive)
+    review = merge.review(service, target, target_space, upload.id, merge.Review())
+    return memory, target, target_space, upload, merge.Commit(snapshot=review["snapshot"])
+
+
+def test_restore_indexes_vectors_of_another_width_with_this_installations_model(commands):
+    service, owner, space, _, build = memory_setup(commands)
+    memory, target, target_space, upload, request = narrow_archive(service, owner, space, build)
+    merge.commit(service, target, target_space, upload.id, request)
+    with service.db.transaction(target) as connection:
+        service._scope(connection, target, target_space)
+        rows = connection.execute(
+            "SELECT claim_id,embedding_model,vector_dims(embedding) AS width "
+            "FROM space.memory_claims WHERE memory_id=%s",
+            (memory["id"],),
+        ).fetchall()
+    assert {str(row["claim_id"]) for row in rows} == {c["id"] for c in memory["memory"]["claims"]}
+    assert {(row["embedding_model"], row["width"]) for row in rows} == {
+        (service.memory_models.embedding_model, brain.EMBEDDING_DIM)
+    }
+
+
+def test_restore_of_another_width_without_a_provider_changes_nothing(commands):
+    service, owner, space, _, build = memory_setup(commands)
+    memory, target, target_space, upload, request = narrow_archive(service, owner, space, build)
+    service.memory_models.enabled = False
+    with pytest.raises(CommandError, match="another size"):
+        merge.commit(service, target, target_space, upload.id, request)
+    with pytest.raises(CommandError):
+        service.get_resource(target, target_space, UUID(memory["id"]))

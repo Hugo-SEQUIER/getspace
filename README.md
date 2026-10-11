@@ -29,21 +29,30 @@ Content is stored as readable JSON in PostgreSQL. There is no application-level 
 
 ## Install
 
-You need a Linux server with Docker and the Compose plugin, at least 2 GB of memory, and, for public access, a domain name.
+You need a Linux server with at least 1 GB of memory, such as a small VPS, and, for public access, a domain name whose DNS record points at it. On the server, run:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Hugo-SEQUIER/getspace/main/scripts/install.sh | sudo bash
+```
+
+The installer installs Docker if it is missing, downloads the latest release into `/opt/space`, asks for the access mode, your domain and your name, starts Space and prints its address and access key. To do the same steps by hand:
 
 ```sh
 git clone https://github.com/Hugo-SEQUIER/getspace.git
 cd getspace
+git checkout "$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"   # latest release
 scripts/setup.sh                 # asks for the access mode and your domain, writes .env
-docker compose up -d --build     # builds the images and starts everything
+docker compose up -d             # downloads the released images and starts everything
 ```
 
-`scripts/setup.sh` offers two access modes:
+Both offer two access modes:
 
 - **Key mode** (default): Space is reachable from the internet at `https://your-domain`. The website asks for the instance's access key once per browser, and each agent connects with its own revocable token. Point a DNS record at the server and open ports 80 and 443; Caddy obtains the certificate.
 - **Private mode**: no access check at all. Space listens on `127.0.0.1:8080` and you reach it through an SSH tunnel or a VPN such as Tailscale. Never expose this mode publicly.
 
 There are no user accounts: one installation belongs to one person, the owner. [Self-hosting](docs/SELF_HOSTING.md) covers both modes, every setting, upgrades, backups and troubleshooting.
+
+Moving from the hosted Space? Export your Space there and import it here: [Moving from the hosted Space](docs/MOVING_FROM_HOSTED.md).
 
 ## Connect an agent
 
@@ -66,7 +75,7 @@ Documents, tasks, databases, handoffs and word search work without any model. Au
 
 ```sh
 scripts/backup.sh                                  # writes backups/space-<time>.dump
-git pull && docker compose up -d --build           # upgrade; migrations run on start
+scripts/upgrade.sh                                 # backs up, then moves to the latest release
 scripts/restore.sh backups/space-<time>.dump       # replace this installation's data
 ```
 
@@ -77,6 +86,7 @@ Copy backups off the server: a backup on the same disk is not a backup.
 | Document | What it covers |
 |---|---|
 | [Self-hosting](docs/SELF_HOSTING.md) | Install, access modes, configuration, upgrades, backups, security and troubleshooting. |
+| [Moving from the hosted Space](docs/MOVING_FROM_HOSTED.md) | Exporting a hosted Space and importing it into your own installation. |
 | [Connecting agents](docs/CONNECTING_AGENTS.md) | Tokens, client setups, agent identities and the device-code flow. |
 | [Architecture](docs/ARCHITECTURE.md) | Processes, storage, access control and background work. |
 | [Development](docs/DEVELOPMENT.md) | Running from source, tests and checks. |

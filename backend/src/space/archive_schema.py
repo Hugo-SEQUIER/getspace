@@ -19,6 +19,8 @@ MAX_ARCHIVE_ENTRIES = 10000
 MAX_ARCHIVE_DEPTH = 32
 MAX_ARCHIVE_CONTAINERS = 100_000
 MAX_ARCHIVE_SEPARATORS = 1_000_000
+# pgvector's widest vector; archived recall vectors of any width up to it are accepted.
+MAX_EMBEDDING_DIM = 16000
 _STRUCTURE = re.compile(rb'["{}\[\],:]')
 _STRING_END = re.compile(rb'["\\]')
 
@@ -244,10 +246,14 @@ def validate_archive(raw):
                         or len({row["model"] for row in index}) > 1
                     ):
                         raise ValueError("Invalid memory index")
+                    # Another installation may use an embedding model of another size;
+                    # restore indexes such memories again with this installation's model.
+                    if len({len(row["vector"]) for row in index}) > 1:
+                        raise ValueError("Invalid memory index")
                     for row in index:
                         if not isinstance(row["model"], str) or not 1 <= len(row["model"]) <= 200:
                             raise ValueError("Invalid embedding model")
-                        if len(row["vector"]) != brain.EMBEDDING_DIM or any(
+                        if not 1 <= len(row["vector"]) <= MAX_EMBEDDING_DIM or any(
                             type(n) not in (int, float) or not math.isfinite(n) or abs(n) > 1e30
                             for n in row["vector"]
                         ):

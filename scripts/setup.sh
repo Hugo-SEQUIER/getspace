@@ -116,6 +116,10 @@ if [ -z "$owner" ]; then
 fi
 owner="$(printf '%s' "$owner" | tr -d '\r\n"')"
 
+# The released images to run: this checkout's version tag, or the latest release.
+version="${SPACE_VERSION:-$(git describe --tags --exact-match 2>/dev/null || true)}"
+version="${version:-latest}"
+
 umask 077
 cat >"$output" <<ENV
 # Written by scripts/setup.sh on $(date -u +%Y-%m-%d). Keep this file private: it holds every
@@ -136,6 +140,10 @@ SPACE_HTTP_PORT=$http_port
 SPACE_HTTPS_PORT=$https_port
 SPACE_OWNER_NAME="$owner"
 
+# The released version to run. scripts/upgrade.sh changes it; "latest" follows new releases
+# whenever the images are pulled again.
+SPACE_VERSION=$version
+
 # Database passwords. The installer applies them on every start.
 POSTGRES_PASSWORD=$(secret)
 SPACE_APP_DB_PASSWORD=$(secret)
@@ -150,7 +158,7 @@ SPACE_WEBHOOK_DB_PASSWORD=$(secret)
 #   SPACE_MEMORY_API_KEY=sk-...
 #   SPACE_MEMORY_TEXT_MODEL=gpt-5-mini
 #   SPACE_MEMORY_EMBEDDING_MODEL=text-embedding-3-small
-# Local Ollama example (add an ollama service to compose.yaml or run it on the host):
+# Local Ollama example (add an ollama service in compose.override.yaml or run it on the host):
 #   SPACE_MEMORY_PROVIDER=ollama
 #   SPACE_MEMORY_PROVIDER_URL=http://ollama:11434
 #   SPACE_MEMORY_TEXT_MODEL=qwen3:8b
@@ -166,12 +174,16 @@ SPACE_MEMORY_EMBEDDING_DIMENSIONS=1536
 ENV
 
 echo "Wrote $output (readable by you only)."
+# scripts/install.sh starts Space itself and prints its own summary.
+if [ -n "${SPACE_SETUP_QUIET:-}" ]; then
+  exit 0
+fi
 echo
 if [ "$mode" = key ] && [ -n "$domain" ]; then
   cat <<NEXT
 Next:
   1. Point a DNS A (or AAAA) record for $domain at this server and open ports 80 and 443.
-  2. Start Space:  docker compose up -d --build
+  2. Start Space:  docker compose up -d
   3. Open $public_url and unlock it with this access key (also in .env):
 
        $access_key
@@ -181,7 +193,7 @@ NEXT
 elif [ "$mode" = key ]; then
   cat <<NEXT
 Next:
-  1. Start Space:  docker compose up -d --build
+  1. Start Space:  docker compose up -d
   2. Open $public_url and unlock it with this access key (also in .env):
 
        $access_key
@@ -191,7 +203,7 @@ NEXT
 else
   cat <<NEXT
 Next:
-  1. Start Space:  docker compose up -d --build
+  1. Start Space:  docker compose up -d
   2. Open $public_url
      From another computer, tunnel to it first:  ssh -L $http_port:$bind_address:$http_port you@this-server
 

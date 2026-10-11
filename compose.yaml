@@ -1,5 +1,7 @@
 # Space, self-hosted on one machine. Run `scripts/setup.sh` once to write `.env`, then
-# `docker compose up -d --build`. See docs/SELF_HOSTING.md.
+# `docker compose up -d`, which downloads the released images named by SPACE_VERSION.
+# `docker compose up -d --build` builds them from this checkout instead. See
+# docs/SELF_HOSTING.md.
 name: space
 
 x-logging: &logging
@@ -9,7 +11,7 @@ x-logging: &logging
     max-file: "3"
 
 x-backend-image: &backend-image
-  image: getspace/backend:local
+  image: ghcr.io/hugo-sequier/getspace-backend:${SPACE_VERSION:-latest}
   build:
     context: ./backend
 
@@ -118,7 +120,7 @@ services:
     logging: *logging
 
   web:
-    image: getspace/web:local
+    image: ghcr.io/hugo-sequier/getspace-web:${SPACE_VERSION:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile

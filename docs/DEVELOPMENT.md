@@ -127,6 +127,24 @@ The browser tests use the [e2e](https://e2e.tester.army/docs) runner. `test:e2e`
 | `make benchmark-memory` | Times lexical ranking on synthetic data in process, with no provider or database. |
 | `make evaluate-retrieval` | Measures retrieval strategies on the synthetic corpus in `backend/evaluations/retrieval/`, in a disposable database. The first run embeds the corpus with the configured provider and caches the vectors in `backend/evaluations/retrieval/embeddings.json`. |
 
+## Releases
+
+Self-hosted installations run released images rather than building them, and `scripts/upgrade.sh` moves them from one release tag to the next. To publish a release:
+
+1. Make sure `main` passes CI, and note anything an operator must do in the release notes, such as a new setting.
+2. Tag the commit and push the tag:
+
+   ```sh
+   git tag -a v0.4.0 -m "v0.4.0"
+   git push origin v0.4.0
+   ```
+
+The `Release` workflow (`.github/workflows/release.yml`) then builds the backend and website images for `linux/amd64` and `linux/arm64`, pushes them to `ghcr.io/hugo-sequier/getspace-backend` and `ghcr.io/hugo-sequier/getspace-web` as `v0.4.0`, `v0.4` and `latest`, and publishes a GitHub release with generated notes. A tag with a suffix, such as `v0.4.0-rc.1`, is published as a prerelease without moving `latest`, and the installer and `scripts/upgrade.sh` skip it unless asked for it by name.
+
+The first time each image is published, GitHub makes the package private. Open it under the repository's **Packages**, then **Package settings → Change visibility → Public**, or installations cannot download it.
+
+Releases only move forward: migrations are applied on start and never undone, so a release must be able to upgrade every earlier release's database.
+
 ## Concurrency and timeouts
 
 REST and MCP share two admission lanes in each API process. Recall (`get_context` and `POST /v1/spaces/{space_id}/context`) runs 12 requests at a time with 128 waiting. Synchronous memory writes (`remember`, `remember_claims`, `build_memory`, `change_memory`, memory links and creator corrections) share a second lane with 2 running and 32 waiting, so a slow extraction never occupies recall's slots. A request waits at most 5 seconds for a slot; a full queue or an expired wait returns 503 with `Retry-After: 1` over REST, or a busy error over MCP. Waiting requests hold no thread.
