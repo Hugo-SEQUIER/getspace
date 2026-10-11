@@ -24,6 +24,12 @@ One export holds one Space. If you have several Spaces on the hosted service, ex
 5. **Reconnect your agents** from the **Agents** page, using your own server's address, and remove the hosted Space connector from your agents and apps. Each agent keeps its name and history: when you choose that identity while connecting it, or when it identifies itself with the same name and harness, it reuses the imported identity.
 6. **Recreate** any personal API keys and webhooks you used.
 
+A few details change on the way:
+
+- Each version records that you saved it on your own server. The agent that wrote it stays attributed by name.
+- A document that points to one you deleted for good before the export loses that pointer, since the export cannot contain the deleted document.
+- A link between two memories that points to an outdated version of a memory you edited later is dropped.
+
 When everything looks right on your own server, you can delete the Space on the hosted service.
 
 ## Memories
@@ -39,4 +45,14 @@ See [memory](MEMORY.md) for the provider settings.
 
 ## Limits
 
-The import accepts files up to 100 MiB and 10,000 archived revisions, and an upload expires after 24 hours. [Search, export and merge restore](SPACE_ARCHIVES.md) describes the merge review in full.
+The import accepts files up to 200 MiB and 10,000 archived revisions, and an upload expires after 24 hours. Databases take most of the space, because every saved version of a database holds all of its records.
+
+A large import needs memory for a minute: a 100 MB export takes about 700 MB in the server while it is checked and saved. On a server with 1 GB of memory, add a temporary swap file before importing, and remove it afterwards:
+
+```sh
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+# import, then:
+sudo swapoff /swapfile && sudo rm /swapfile
+```
+
+[Search, export and merge restore](SPACE_ARCHIVES.md) describes the merge review in full.

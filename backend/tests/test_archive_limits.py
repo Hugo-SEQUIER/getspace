@@ -25,11 +25,11 @@ def archive(**changes):
 @pytest.mark.parametrize(
     "raw",
     [
-        b'{"padding":[' + b"[]," * 100_000 + b"[]]}",
-        b'{"padding":[' + b"0," * 1_000_000 + b"0]}",
+        b'{"padding":[' + b"[]," * schema.MAX_ARCHIVE_CONTAINERS + b"[]]}",
+        b'{"padding":[' + b"0," * schema.MAX_ARCHIVE_SEPARATORS + b"0]}",
         b"[" * 33 + b"]" * 33,
         # Duplicate keys still allocate while decoding, even though only one survives.
-        b"{" + b'"x":[],' * 100_000 + b'"x":[]}',
+        b"{" + b'"x":[],' * schema.MAX_ARCHIVE_CONTAINERS + b'"x":[]}',
     ],
 )
 def test_complexity_is_rejected_before_json_allocates(raw, monkeypatch):
@@ -42,7 +42,7 @@ def test_complexity_is_rejected_before_json_allocates(raw, monkeypatch):
 
 
 def test_object_fanout_has_bounded_preflight_memory():
-    raw = b'{"padding":[' + b"[]," * 100_000 + b"[]]}"
+    raw = b'{"padding":[' + b"[]," * schema.MAX_ARCHIVE_CONTAINERS + b"[]]}"
     tracemalloc.start()
     try:
         with pytest.raises(ValueError, match="structural limits"):
@@ -100,7 +100,7 @@ def test_unknown_envelope_fields_are_rejected_and_valid_input_is_not_mutated():
 
 def test_byte_limit_is_checked_before_decoding(monkeypatch):
     monkeypatch.setattr(schema, "MAX_ARCHIVE_BYTES", 10)
-    with pytest.raises(ValueError, match="100 MiB"):
+    with pytest.raises(ValueError, match="200 MiB"):
         schema.decode_archive(b" " * 11)
 
 
@@ -170,3 +170,35 @@ def test_admission_is_released_after_validation_or_consumer_failure(monkeypatch,
     monkeypatch.setattr(restore_staging, "_load", lambda *a: ())
     with restore_staging.load(None, None, None, None) as result:
         assert result == ()
+
+
+def test_hosted_archives_are_upgraded_before_validation():
+    kept, gone = str(uuid4()), str(uuid4())
+
+    def resource(id_, sources, method="manual"):
+        return {
+            "entity": "resource",
+            "current": True,
+            "value": {
+                "id": id_,
+                "recall": {"sources": [{"resource_id": s, "revision": 1} for s in sources]},
+                "_memory": {"claims": [{"classification": {"method": method}}]},
+            },
+        }
+
+    value = archive(
+        entries=[resource(kept, []), resource(str(uuid4()), [kept, gone], method="decision")]
+    )
+    # A source deleted for good before the export is dropped; one in the archive is kept.
+    assert schema.upgrade_archive(value) == 1
+    upgraded = value["entries"][1]["value"]
+    assert upgraded["recall"]["sources"] == [{"resource_id": kept, "revision": 1}]
+    assert upgraded["_memory"]["claims"][0]["classification"]["method"] == "typesafe"
+    assert value["entries"][0]["value"]["_memory"]["claims"][0]["classification"] == {
+        "method": "manual"
+    }
+
+
+@pytest.mark.parametrize("value", [None, [], {"entries": None}, {"entries": [1, {"value": 2}]}])
+def test_upgrade_ignores_malformed_archives_for_validation_to_reject(value):
+    assert schema.upgrade_archive(value) == 0

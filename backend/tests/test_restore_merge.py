@@ -189,3 +189,22 @@ def test_restore_of_another_width_without_a_provider_changes_nothing(commands):
         merge.commit(service, target, target_space, upload.id, request)
     with pytest.raises(CommandError):
         service.get_resource(target, target_space, UUID(memory["id"]))
+
+
+def test_restore_drops_sources_deleted_before_the_export(commands):
+    service, owner, space, ref, build = memory_setup(commands)
+    memory = service.build_memory(owner, space, build)
+    archive = read_archive(service, owner, space)
+    deleted = str(uuid4())
+    for entry in archive["entries"]:
+        if entry["value"]["id"] == memory["id"]:
+            entry["value"]["recall"]["sources"].append({"resource_id": deleted, "revision": 1})
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    upload = stage(service, target, target_space, archive)
+    review = merge.review(service, target, target_space, upload.id, merge.Review())
+    merge.commit(
+        service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
+    )
+    restored = service.get_resource(target, target_space, UUID(memory["id"]))
+    assert restored["recall"]["sources"] == [{"resource_id": ref["id"], "revision": 1}]
