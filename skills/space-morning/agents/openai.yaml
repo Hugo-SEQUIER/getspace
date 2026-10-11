@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Morning"
+  short_description: "Start the day from Space"
+  default_prompt: "Use $space-morning to catch me up and propose what to do today."

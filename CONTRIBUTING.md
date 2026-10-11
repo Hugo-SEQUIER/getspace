@@ -27,6 +27,10 @@ Use the project's own environment rather than installing dependencies yourself: 
 - Documentation updated when behaviour, interfaces or configuration change.
 - No credentials, personal data or installation identifiers in code, tests, fixtures or documentation. Use environment variables and example values.
 
+## Agent skills
+
+The skills in `skills/` are maintained in [space-skills](https://github.com/Hugo-SEQUIER/space-skills). Open skill changes there; CI fails when `skills/` here differs from the commit recorded in `skills/.source`.
+
 ## Reporting a problem
 
 Open an issue with the steps to reproduce, the observed result and the expected result. Report security problems privately through GitHub's "Report a vulnerability" form on the repository's Security tab, not in a public issue.

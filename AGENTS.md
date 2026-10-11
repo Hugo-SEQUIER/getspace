@@ -16,3 +16,7 @@ Several agents and the operator can work in this checkout at the same time, so t
 - Commit only files you authored in this task, and confirm afterwards with `git show --stat`.
 - Never revert, reformat, or stage another agent's in-progress work. Report it instead.
 - When one file holds both your change and someone else's, ask before rewriting it.
+
+## Agent skills
+
+`skills/` is a copy of [space-skills](https://github.com/Hugo-SEQUIER/space-skills), and `skills/.source` records the commit it came from. Edit the skills in space-skills, then run `scripts/sync-skills.sh` here and commit the result. Never edit `skills/` directly: `scripts/sync-skills.sh --check` fails on any difference.

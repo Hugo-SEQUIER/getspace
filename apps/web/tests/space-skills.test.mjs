@@ -30,14 +30,14 @@ test("downloads are deterministic exact-file archives with no extra content", as
   try {
     await writeFile(join(output, "stale.zip"), "stale");
     const generated = await prepareSkills(undefined, output);
-    assert.equal(generated.length, 17);
+    assert.equal(generated.length, spaceSkills.length + 1);
     assert.deepEqual((await readdir(output)).sort(), generated.sort());
     const first = new Map();
     for (const archive of generated) first.set(archive, await readFile(join(output, archive)));
     await prepareSkills(undefined, output);
     for (const archive of generated) assert.deepEqual(await readFile(join(output, archive)), first.get(archive));
     const bundle = unzipSync(first.get("space-skills.zip"));
-    assert.equal(Object.keys(bundle).length, 32);
+    assert.equal(Object.keys(bundle).length, spaceSkills.length * 2);
     for (const { name } of spaceSkills) {
       const files = unzipSync(first.get(`${name}.zip`));
       assert.deepEqual(Object.keys(files).sort(), [`${name}/SKILL.md`, `${name}/agents/openai.yaml`]);
