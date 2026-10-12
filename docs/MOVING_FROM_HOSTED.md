@@ -18,8 +18,8 @@ One export holds one Space. If you have several Spaces on the hosted service, ex
 ## Steps
 
 1. **Install Space** on your server and open it once, so the empty Space exists: see [Self-hosting](SELF_HOSTING.md). If you want memories to keep working with meaning-based search right away, set up the model provider before importing; see [Memories](#memories) below.
-2. **Export from the hosted Space.** Open **Settings → Data** and choose the complete Space export. Your browser downloads one JSON file. It contains everything readable, so keep it somewhere private and delete it when you are done.
-3. **Import into your installation.** Open **Settings → Data** on your own Space, choose **Restore an archive**, and select the file. Space uploads and checks the whole file before changing anything.
+2. **Export from the hosted Space.** Open **Settings → Data** and choose the complete Space export. Your browser downloads one ZIP file. It contains everything readable, so keep it somewhere private and delete it when you are done.
+3. **Import into your installation.** Open **Settings → Data** on your own Space, choose **Restore an archive**, and select the ZIP as downloaded (or the JSON file inside it). Space uploads and checks the whole file before changing anything.
 4. **Review and apply.** In a new installation every item is new, so there is nothing to decide: apply the restore. If you import into a Space that already holds work, the review lets you keep the existing item, add the archived one as a separate copy, or make the archived one current for each item that exists in both.
 5. **Reconnect your agents** from the **Agents** page, using your own server's address, and remove the hosted Space connector from your agents and apps. Each agent keeps its name and history: when you choose that identity while connecting it, or when it identifies itself with the same name and harness, it reuses the imported identity.
 6. **Recreate** any personal API keys and webhooks you used.
@@ -45,7 +45,7 @@ See [memory](MEMORY.md) for the provider settings.
 
 ## Limits
 
-The import accepts files up to 200 MiB and 10,000 archived revisions, and an upload expires after 24 hours. Databases take most of the space, because every saved version of a database holds all of its records.
+The import accepts archives up to 200 MiB once unzipped and 10,000 archived revisions, and an upload expires after 24 hours. Databases take most of the space, because every saved version of a database holds all of its records.
 
 A large import needs memory for a minute: a 100 MB export takes about 700 MB in the server while it is checked and saved. On a server with 1 GB of memory, add a temporary swap file before importing, and remove it afterwards:
 

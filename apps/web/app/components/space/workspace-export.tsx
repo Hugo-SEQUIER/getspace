@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useFeedback } from "@web/app/components/notifications";
 import { api, message } from "../../../lib/client";
+import { archiveZip } from "../../../lib/space/archive-zip";
 import { useSpace } from "./provider";
 import { Icon } from "./ui-icon";
 import type { TaskColumn } from "../../../lib/space/types";
@@ -35,8 +36,8 @@ export function WorkspaceExport() {
       <p className="sp-muted">
         Download all documents, tasks, memory, projects, databases, categories and agent
         identities, including retained content revisions and trash. Connection
-        credentials are excluded. The downloaded JSON contains your readable
-        content.
+        credentials are excluded. The download is a ZIP holding one JSON file
+        with your readable content.
       </p>
       <button
         disabled={busy || !data.space}
@@ -47,47 +48,42 @@ export function WorkspaceExport() {
           setError("");
           setNotice("");
           try {
+            const name = `space-${new Date().toISOString().slice(0, 10)}`;
+            const zip = await archiveZip(`${name}.json`);
+            let total = 0;
+            // Writes the same JSON as one archive object, an entry at a time.
             let after: string | null = null;
             let snapshot: number | undefined;
-            const entries: unknown[] = [];
-            let bytes = 0;
-            let first: Page | undefined;
             do {
               const page: Page = await api(
                 `spaces/${data.space.id}/export`,
                 "POST",
                 { after, snapshot },
               );
-              first ??= page;
-              bytes += new TextEncoder().encode(
-                JSON.stringify(page.entries),
-              ).length;
-              if (bytes > 200 * 1024 * 1024)
-                throw new Error(
-                  "This archive exceeds the browser's 200 MiB limit. Contact the installation operator for a full export.",
-                );
-              entries.push(...page.entries);
-              setCount(entries.length);
+              if (snapshot === undefined) {
+                const head = JSON.stringify({
+                  format: page.format,
+                  source_space: page.source_space,
+                  snapshot: page.snapshot,
+                  exported_at: page.exported_at,
+                  ...(page.task_columns ? { task_columns: page.task_columns } : {}),
+                });
+                zip.write(`${head.slice(0, -1)},"entries":[`);
+              }
+              for (const entry of page.entries)
+                zip.write((total++ ? "," : "") + JSON.stringify(entry));
+              setCount(total);
               after = page.next_cursor;
               snapshot = page.snapshot;
             } while (after);
-            const archive: Omit<Page, "next_cursor"> = {
-              format: first.format,
-              source_space: first.source_space,
-              snapshot: first.snapshot,
-              exported_at: first.exported_at,
-              ...(first.task_columns ? { task_columns: first.task_columns } : {}),
-              entries,
-            };
-            const url = URL.createObjectURL(
-              new Blob([JSON.stringify(archive)], { type: "application/json" }),
-            );
+            zip.write("]}");
+            const url = URL.createObjectURL(zip.finish());
             const link = document.createElement("a");
             link.href = url;
-            link.download = `space-${new Date().toISOString().slice(0, 10)}.json`;
+            link.download = `${name}.zip`;
             link.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
-            setNotice(`Export ready. Download started with ${archive.entries.length} entries.`);
+            setNotice(`Export ready. Download started with ${total} entries.`);
           } catch (e) {
             setError(message(e));
           } finally {

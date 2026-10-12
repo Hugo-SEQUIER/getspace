@@ -100,6 +100,9 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** Task IDs whose next delete fails with 409. */
     failDelete: new Set<string>(),
     failCreate: false,
+    exportRequests: [] as { after: string | null; snapshot?: number }[],
+    /** The last archive upload: its manifest and the text of each part. */
+    restore: null as { manifest: { id: string; sha256: string; bytes: number; parts: number }; parts: string[] } | null,
     unexpected: [] as string[],
     /** Requests the app sent that the website's /api proxy would answer with 404. */
     unproxied: [] as string[],
@@ -250,11 +253,32 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
         .map(resource => ({ id: resource.id, kind: resource.kind, title: resource.title, description: resource.body, status: resource.status, updated_at: resource.updated_at }));
       return send({ items, next_cursor: null, snapshot: 1, scanned: items.length });
     }
-    if (path.endsWith('/export'))
+    if (path.endsWith('/export')) {
+      // One task per page, like a large Space: later pages carry the cursor and the snapshot.
+      state.exportRequests.push(body);
+      const start = body?.after ? Number(body.after) : 0;
       return send({ format: 'space.archive.v1', source_space: spaceId, snapshot: 1, exported_at: '2026-09-23T00:00:00Z',
-        task_columns: state.columns.columns, entries: state.tasks.map(value => ({ entity: 'resource', value })), next_cursor: null });
+        ...(start ? {} : { task_columns: state.columns.columns }),
+        entries: state.tasks.slice(start, start + 1).map(value => ({ entity: 'resource', current: true, value })),
+        next_cursor: start + 1 < state.tasks.length ? String(start + 1) : null });
+    }
     if (path.endsWith('/usage'))
       return send({ retained_bytes: 1000, storage_limit_bytes: null, items: 2, item_limit: null, model_requests: 0, model_request_limit: null, plan: null });
+    if (path.endsWith('/restores') && method === 'POST') {
+      state.restore = { manifest: body, parts: [] };
+      return send({ id: body.id, state: 'uploading' });
+    }
+    const restorePart = path.match(/\/restores\/[^/]+\/parts\/(\d+)$/);
+    if (restorePart && method === 'POST') {
+      state.restore!.parts[Number(restorePart[1])] = body.text;
+      return send({ received: true });
+    }
+    if (/\/restores\/[^/]+\/review$/.test(path) && method === 'POST') {
+      const archive = JSON.parse(state.restore!.parts.join(''));
+      return send({ snapshot: archive.snapshot, issues: [], items: archive.entries.map((entry: { value: Task }) => ({
+        key: entry.value.id, title: entry.value.title, entity: 'resource', action: 'add', conflict: false, incoming_revisions: 1, existing_revision: null,
+      })) });
+    }
     if (path.endsWith('/restores')) return send({ items: [] });
     if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: { enabled: false } });
     if (path === 'agent-identities' && method === 'POST') {

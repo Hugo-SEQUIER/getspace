@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { strFromU8, unzipSync } from 'fflate';
 import { beforeEach, type Browser } from '@e2e-dev/web';
 import { expect, type Screen } from 'e2e';
 import {
@@ -307,25 +312,62 @@ test('task details are centred on desktop and fit a phone', async ({ app, screen
   await expect(dialog).toBeHidden();
 });
 
-test('the Space archive keeps custom task columns', async ({ app, screen, browser, space }) => {
-  space.columns = { columns: [...defaultColumns, { value: 'column_backlog', label: 'Backlog' }], revision: 2 };
-  // The engine saves downloads under the attempt's artifacts, so read the bytes the app hands to the download.
+/** Records the bytes of every Blob the app hands to a download, as base64. */
+async function captureDownloads(browser: Browser) {
   await browser.addInitScript(() => {
     const create = URL.createObjectURL.bind(URL);
     const saved: string[] = [];
     Object.assign(window, { e2eDownloads: saved });
     URL.createObjectURL = (object: Blob | MediaSource) => {
-      if (object instanceof Blob) void object.text().then(text => saved.push(text));
+      if (object instanceof Blob)
+        void object.arrayBuffer().then(buffer => {
+          let binary = '';
+          for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+          saved.push(btoa(binary));
+        });
       return create(object);
     };
   });
-  await app.open('/app/settings/data');
+}
+
+/** Exports the Space and returns the downloaded ZIP and the archive JSON inside it. */
+async function exportArchive(screen: Screen, browser: Browser) {
+  // The engine saves downloads under the attempt's artifacts, so read the bytes the app hands to the download.
   const download = await browser.waitForDownload(() => screen.getByRole('button', 'Export complete Space').tap());
-  expect(download.suggestedFilename).toMatch(/\.json$/);
+  expect(download.suggestedFilename).toMatch(/^space-\d{4}-\d{2}-\d{2}\.zip$/);
   await expect.poll(() => browser.evaluate(() => (window as unknown as { e2eDownloads: string[] }).e2eDownloads.length)).toBe(1);
-  const archive = JSON.parse(await browser.evaluate(() => (window as unknown as { e2eDownloads: string[] }).e2eDownloads[0]));
+  const zip = Buffer.from(await browser.evaluate(() => (window as unknown as { e2eDownloads: string[] }).e2eDownloads[0]), 'base64');
+  const files = unzipSync(new Uint8Array(zip));
+  expect(Object.keys(files)).toEqual([download.suggestedFilename.replace(/\.zip$/, '.json')]);
+  return { zip, text: strFromU8(Object.values(files)[0]) };
+}
+
+test('the Space archive downloads as a ZIP and keeps custom task columns', async ({ app, screen, browser, space }) => {
+  space.columns = { columns: [...defaultColumns, { value: 'column_backlog', label: 'Backlog' }], revision: 2 };
+  await captureDownloads(browser);
+  await app.open('/app/settings/data');
+  const { text } = await exportArchive(screen, browser);
+  const archive = JSON.parse(text);
+  expect(archive.format).toBe('space.archive.v1');
   expect(archive.task_columns).toEqual(space.columns.columns);
-  expect(archive.entries).toHaveLength(space.tasks.length);
+  expect(archive.entries.map((entry: { value: { id: string } }) => entry.value.id)).toEqual(space.tasks.map(task => task.id));
+  // One page per task: every later page continues from the cursor with the first page's snapshot.
+  expect(space.exportRequests).toEqual([{ after: null }, { after: '1', snapshot: 1 }]);
+  await expect(screen.getByText(`Export ready. Download started with ${space.tasks.length} entries.`)).toBeVisible();
+});
+
+test('a downloaded Space ZIP uploads for restore as its archive JSON', async ({ app, screen, browser, space }) => {
+  await captureDownloads(browser);
+  await app.open('/app/settings/data');
+  const { zip, text } = await exportArchive(screen, browser);
+  const file = join(await mkdtemp(join(tmpdir(), 'space-restore-')), 'space-export.zip');
+  await writeFile(file, zip);
+  await screen.getByLabel('Space archive').setInputFiles(file);
+  await expect(screen.getByRole('heading', 'Review merge')).toBeVisible();
+  for (const task of space.tasks) await expect(screen.getByRole('cell', `${task.title}resource`)).toBeVisible();
+  expect(space.restore!.parts.join('')).toBe(text);
+  expect(space.restore!.manifest.bytes).toBe(Buffer.byteLength(text));
+  expect(space.restore!.manifest.sha256).toBe(createHash('sha256').update(text).digest('hex'));
 });
 
 test('task creation shows progress, keeps the draft on failure, and retries with the same command', async ({ app, screen, browser, space }) => {

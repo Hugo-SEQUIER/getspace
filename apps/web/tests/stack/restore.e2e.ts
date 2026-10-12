@@ -1,15 +1,17 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import { randomUUID } from 'node:crypto';
+import { strToU8, zipSync } from 'fflate';
 import { rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openHome, spaceId, unique } from './support/stack.ts';
 
 // Moving from the hosted Space means restoring one large export. Archives over 100 MiB are
-// common once databases keep their history, so this restores one of about 107 MiB through
-// the real screen: read in the browser, uploaded in parts, reviewed and applied.
-test('an archive larger than 100 MiB is uploaded, reviewed and restored', { session: 'owner', timeout: 300_000 }, async ({ app, screen, browser }) => {
+// common once databases keep their history, so this restores one of about 107 MiB, zipped
+// the way the export downloads it, through the real screen: unzipped and read in the
+// browser, uploaded in parts, reviewed and applied.
+test('a zipped archive larger than 100 MiB is uploaded, reviewed and restored', { session: 'owner', timeout: 300_000 }, async ({ app, screen, browser }) => {
   await openHome(app, screen);
   const space = await spaceId(browser);
   const seed = await browser.evaluate(async (space: string) => {
@@ -45,8 +47,8 @@ test('an archive larger than 100 MiB is uploaded, reviewed and restored', { sess
     current: index === revisions - 1,
     value: { ...template, id, title, body, revision: index + 1 },
   }));
-  const file = join(tmpdir(), `space-large-archive-${id}.json`);
-  writeFileSync(file, JSON.stringify({ ...seed.envelope, entries }));
+  const file = join(tmpdir(), `space-large-archive-${id}.zip`);
+  writeFileSync(file, zipSync({ 'space-archive.json': strToU8(JSON.stringify({ ...seed.envelope, entries })) }));
   try {
     await app.open('/app/settings/data');
     await expect(screen.getByRole('heading', 'Restore an archive')).toBeVisible();

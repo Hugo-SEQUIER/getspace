@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFeedback } from "@web/app/components/notifications";
 import { api, message } from "../../../lib/client";
+import { readArchive } from "../../../lib/space/archive-zip";
 import { useSpace } from "./provider";
 
 type Choices = Record<string, "keep" | "copy" | "replace">;
@@ -150,7 +151,7 @@ export function WorkspaceRestore() {
         Space archive
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".zip,.json,application/zip,application/json"
           disabled={busy}
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -163,9 +164,7 @@ export function WorkspaceRestore() {
             setReview(null);
             setReceipt(null);
             try {
-              if (file.size > 200 * 1024 * 1024)
-                throw new Error("Choose an archive of at most 200 MiB.");
-              const text = await file.text();
+              const text = await readArchive(file, 200 * 1024 * 1024);
               if (JSON.parse(text).format !== "space.archive.v1")
                 throw new Error(
                   "Choose a complete Space archive. Sample exports and document imports use different formats.",
