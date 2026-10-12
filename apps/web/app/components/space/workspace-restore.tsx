@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFeedback } from "@web/app/components/notifications";
 import { api, message } from "../../../lib/client";
+import { readArchive } from "../../../lib/space/archive-zip";
 import { useSpace } from "./provider";
 
 type Choices = Record<string, "keep" | "copy" | "replace">;
@@ -120,8 +121,14 @@ export function WorkspaceRestore() {
     setId(selectedId);
     setReceipt(result);
     if (result.state === "committed") {
+      // Reloading the Space below replaces this page and its state, so the app-wide
+      // notice carries the confirmation.
       if (receipt?.id !== result.id || receipt.state !== "committed")
-        setNotice("Archive restored.");
+        data.setNotice(
+          result.result
+            ? `Archive restored: ${result.result.resources} documents or memories, ${result.result.items} projects, databases or other items, ${result.result.agents} agent identities and ${result.result.revisions} archived revisions.`
+            : "Archive restored.",
+        );
       setReview(null);
       setError("");
       upload.current = null;
@@ -144,7 +151,7 @@ export function WorkspaceRestore() {
         Space archive
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".zip,.json,application/zip,application/json"
           disabled={busy}
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -157,9 +164,7 @@ export function WorkspaceRestore() {
             setReview(null);
             setReceipt(null);
             try {
-              if (file.size > 100 * 1024 * 1024)
-                throw new Error("Choose an archive of at most 100 MiB.");
-              const text = await file.text();
+              const text = await readArchive(file, 200 * 1024 * 1024);
               if (JSON.parse(text).format !== "space.archive.v1")
                 throw new Error(
                   "Choose a complete Space archive. Sample exports and document imports use different formats.",
@@ -406,7 +411,7 @@ export function WorkspaceRestore() {
         </details>
       )}
       <p className="sp-muted">
-        Uploads are encrypted and expire after 24 hours. Up to 100 MiB and
+        Uploads are encrypted and expire after 24 hours. Up to 200 MiB and
         10,000 retained revisions per archive.
       </p>
     </section>
