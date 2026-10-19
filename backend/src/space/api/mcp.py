@@ -601,7 +601,8 @@ def create_mcp(
             Results carry verification='memory', 'handoff' or 'user_authored' and a stale
             flag. Assessed items also carry relevance=direct, historical or conflicting.
             found=false means no supported answer was found in the retrieved evidence;
-            it does not prove no record exists. Pass include_related=true to
+            it does not prove no record exists. A note saying matches did not fit
+            max_chars means retry with a larger max_chars. Pass include_related=true to
             also receive cue-linked claims in a separate, unranked `related` list.
 
             Output: bounded evidence. include_timings adds numeric timings_ms and

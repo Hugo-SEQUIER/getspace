@@ -279,6 +279,8 @@ def full_guide(models, *, resource_access: bool, mine_documents: bool = False) -
             "not a guarantee of model accuracy.",
             "## When recall finds nothing",
             "A recall result with found=false carries a note saying no supported answer was found. "
+            "If the note instead says matching records did not fit max_chars, retry with a "
+            "larger max_chars before reporting anything. "
             "Report that to the user in plain words; it does not prove no record exists. Then "
             "stop and offer what you do know from the current conversation, clearly labelled as "
             "your own knowledge rather than memory. Do not invent a memory, do not guess at what "

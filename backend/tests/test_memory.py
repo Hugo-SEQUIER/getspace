@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from space.memory import (
+    BUDGET_NOTE,
     ENGINE,
     MAX_LEXICAL_BODIES,
     MAX_LEXICAL_CANDIDATES,
@@ -98,13 +99,111 @@ def test_context_budget_covers_escaped_text_and_provenance():
         source = resource("Handoff", body, category="handoff")
         result = bounded_result([item(source, "recent_handoff")], request, url)
         assert len(json.dumps(result, ensure_ascii=False)) <= request.max_chars
-        if result["items"]:
-            assert result["items"][0]["verification"] == "handoff"
-            assert result["items"][0]["revision"] == 1
+        # Escaped text costs more budget than its length; the answer is cut, never lost.
+        assert result["found"] and result["items"][0]["excerpt"]
+        assert result["items"][0]["verification"] == "handoff"
+        assert result["items"][0]["revision"] == 1
     source = resource("Notes", "Ordinary body")
     result = bounded_result([item(source)], RecallRequest(query="body"), url)
     assert result["items"][0]["verification"] == "user_authored"
     assert result["items"][0]["stale"] is False
+
+
+def production_claim(body):
+    """A memory claim carrying the provenance a production recall item carries."""
+    agent = {"harness": "claude", "id": str(uuid4()), "name": "Claude Code", "revision": 2}
+    source = resource(
+        "Automate: Decider plan gate runs before Gemini in ClassifyPlan (2026-10-08)",
+        body,
+        category="memory",
+    )
+    source["recall"]["sources"] = [{"resource_id": str(uuid4()), "revision": 2}]
+    return item(
+        source,
+        "memory_auto",
+        entry_id=str(uuid4()),
+        verification="memory",
+        author_agent=agent,
+        score=0.5187,
+        relevance="direct",
+        memory_type="factual",
+        importance=2,
+        creator={"agent": agent, "basis": "captured", "kind": "agent"},
+        classification={
+            "category_ids": [str(uuid4()), str(uuid4())],
+            "method": "typesafe",
+            "project_ids": [str(uuid4())],
+            "reason": "matched",
+            "scope": "project",
+            "section_ids": [str(uuid4())],
+        },
+        evidence_context={
+            "resource_title": "Memory: Automate: Decider plan gate runs before Gemini (2026-10-08)",
+            "scope": "project",
+            "projects": ["Automate"],
+            "categories": ["Project", "Coding"],
+            "sections": ["BTP Consultants"],
+            "source_titles": ["Journal — 2026-10-08 — Space and Automate"],
+        },
+        candidate_origin="lexical",
+    )
+
+
+def long_url(id_, revision):
+    return f"https://app.getspace.sh/resources/{id_}?space_id={uuid4()}&revision={revision}"
+
+
+def test_first_answer_survives_minimum_budget_despite_production_provenance():
+    claim = (
+        "Design decision merged in Automate PR #22. ClassifyPlan first asks the Decider "
+        "whether a page is an interior floor plan, before calling Gemini. "
+        * 4
+        + "Below PLAN_GATE_THRESHOLD (0.5) the page is classified facade with no Gemini call. "
+        + "The PR measured about 1.5 s per page on 38 production pages."
+    )
+    ranked = [production_claim(claim), production_claim(claim)]
+    request = RecallRequest(query="PLAN_GATE_THRESHOLD", strategy="lexical", max_chars=2000)
+    roomy_request = request.model_copy(update={"max_chars": 20000})
+    empty = bounded_result([production_claim("")], roomy_request, long_url)
+    # The provenance alone exceeds the minimum budget, which used to drop the answer
+    # and report that nothing was stored.
+    assert len(json.dumps(empty, ensure_ascii=False)) > request.max_chars
+    result = bounded_result(ranked, request, long_url)
+    assert len(json.dumps(result, ensure_ascii=False)) <= request.max_chars
+    assert result["found"] is True and "note" not in result
+    assert len(result["items"]) == 1 and result["has_more"] is True
+    answer = result["items"][0]
+    assert "PLAN_GATE_THRESHOLD (0.5)" in answer["excerpt"] and answer["truncated"]
+    # Citations survive; only optional context is shed.
+    assert answer["entry_id"] and answer["sources"] and answer["url"]
+    assert "evidence_context" not in answer
+    # With room to spare, nothing is shed or cut.
+    roomy = bounded_result(ranked, roomy_request, long_url)
+    assert roomy["items"][0]["excerpt"] == claim and "evidence_context" in roomy["items"][0]
+
+
+def test_cut_excerpt_keeps_the_match_and_its_exact_passage_offsets():
+    body = "Unrelated weather bulletin. " * 60 + "Mira travels by car." + " End." * 40
+    start = 100
+    ranked = item(
+        resource("Commute evidence", body),
+        body=body[start:],
+        passage={"start": start, "end": len(body)},
+    )
+    request = RecallRequest(query="car", max_chars=2000)
+    result = bounded_result([ranked], request, url)
+    selected = result["items"][0]
+    assert len(json.dumps(result, ensure_ascii=False)) <= request.max_chars
+    assert selected["truncated"] and "Mira travels by car." in selected["excerpt"]
+    assert selected["excerpt"] == body[selected["passage"]["start"] : selected["passage"]["end"]]
+
+
+def test_record_that_cannot_fit_is_reported_as_budget_not_absence():
+    oversized = item(resource("t" * 2500, "Mira travels by car."))
+    result = bounded_result([oversized], RecallRequest(query="car", max_chars=2000), url)
+    assert result["found"] is False and result["items"] == [] and result["has_more"] is True
+    assert result["note"] == BUDGET_NOTE
+    assert len(json.dumps(result, ensure_ascii=False)) <= 2000
 
 
 def test_related_framing_fits_the_budget_without_changing_a_full_ranked_answer():
