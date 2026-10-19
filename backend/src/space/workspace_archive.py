@@ -1,16 +1,44 @@
-"""Portable owner archives: all retained revisions, independent of browser caches."""
+"""Portable owner archives: all retained revisions, independent of browser caches.
+
+An export spans many requests while agents keep writing. Each revision records the Space
+content revision it committed under, so every page reads the revisions that existed at
+the first page and the archive is the Space as it was when the export started.
+"""
 
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
+from time import monotonic
 
 from pydantic import Field, model_validator
 
-from space import agents, tasks, workspace_items
+from space import agents, brain, tasks, workspace_items
 from space.memory import Input
-from space.workspace_search import require_snapshot
+from space.workspace import CommandError
+from space.workspace_search import revision as content_revision
 
 FORMAT = "space.archive.v1"
+PAGE_ROWS = 50
+# Keeps pages under gateway response limits: a page stops before the entry that would
+# take it past this size, and always holds at least one entry.
+PAGE_BYTES = 3_000_000
+# Each entry is decrypted and downloaded on its own, about a second apiece on the hosted
+# stack, while the website gives a request 45 seconds. A page stops taking entries after
+# this long; the browser continues from its cursor.
+PAGE_SECONDS = 20
+# Revisions stamped after the snapshot did not exist yet. Each "current" flag marks the
+# latest revision at the snapshot, not the latest one now.
+CORPUS = (
+    "SELECT * FROM ("
+    "SELECT 'r:'||resource_id::text||':'||lpad(revision::text,10,'0') AS cursor,"
+    "resource_id AS id,revision,revision=max(revision) OVER (PARTITION BY resource_id) AS current "
+    "FROM space.resource_revisions WHERE space_revision IS NULL OR space_revision<=%s "
+    "UNION ALL "
+    "SELECT 'i:'||item_id::text||':'||lpad(revision::text,10,'0'),item_id,revision,"
+    "revision=max(revision) OVER (PARTITION BY item_id) "
+    "FROM space.workspace_item_revisions WHERE space_revision IS NULL OR space_revision<=%s"
+    ") corpus WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT %s"
+)
 
 
 class ExportPage(Input):
@@ -24,68 +52,101 @@ class ExportPage(Input):
         return self
 
 
+def _vector(row):
+    return {
+        "id": str(row["claim_id"]),
+        "model": row["embedding_model"],
+        "vector": json.loads(row["embedding"]),
+    }
+
+
+def _memory_index(workspace, identity, space_id, memory_id, revision, claims):
+    """Recall vectors of the exported claims, as they were at the snapshot."""
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id, human=True, api_key=True)
+        live = connection.execute(
+            "SELECT current_revision FROM space.resources WHERE id=%s", (memory_id,)
+        ).fetchone()
+        index = connection.execute(
+            "SELECT claim_id,text_hash,embedding::text,embedding_model "
+            "FROM space.memory_claims WHERE memory_id=%s ORDER BY claim_id",
+            (memory_id,),
+        ).fetchall()
+        if live is not None and live["current_revision"] == revision:
+            return [_vector(row) for row in index]
+        # The memory changed after the snapshot. A vector depends only on the claim text,
+        # so each claim takes the live or retired vector of the text it had then.
+        retired = connection.execute(
+            "SELECT claim_id,text_hash,embedding::text,embedding_model "
+            "FROM space.retired_claim_vectors WHERE memory_id=%s ORDER BY retired_at DESC",
+            (memory_id,),
+        ).fetchall()
+    vectors = {}
+    for row in [*index, *retired]:
+        vectors.setdefault((str(row["claim_id"]), bytes(row["text_hash"])), row)
+    found = (vectors.get((claim["id"], brain.text_hash(claim["value"]))) for claim in claims)
+    return [_vector(row) for row in found if row is not None]
+
+
+def _entry(workspace, identity, space_id, row):
+    if row["cursor"][0] == "i":
+        value = workspace_items.get(workspace, identity, space_id, row["id"], row["revision"])
+        return {"entity": "item", "current": row["current"], "value": value}
+    try:
+        value = workspace.get_resource(
+            identity, space_id, row["id"], row["revision"], _internal=True
+        )
+    except CommandError as error:
+        if error.status != 404:
+            raise
+        return None  # Permanently deleted while the export ran.
+    value.pop("memory", None)  # _memory retains edited and forgotten state plus cue graph.
+    if row["current"] and value.get("_memory"):
+        value["memory_index"] = _memory_index(
+            workspace, identity, space_id, row["id"], row["revision"], value["_memory"]["claims"]
+        )
+    return {"entity": "resource", "current": row["current"], "value": value}
+
+
 def export_page(workspace, identity, space_id, request: ExportPage):
+    started = monotonic()
     identity = replace(identity, selected_space_id=space_id)
     # An owner export includes history and internal memory state, never access grants.
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, space_id, human=True, api_key=True)
-    snapshot = require_snapshot(workspace, identity, space_id, request.snapshot)
-    with workspace.db.transaction(identity) as connection:
-        workspace._scope(connection, identity, space_id, human=True, api_key=True)
+        current = connection.execute("SELECT content_revision FROM space.spaces").fetchone()[
+            "content_revision"
+        ]
+        snapshot = current if request.snapshot is None else request.snapshot
+        if snapshot > current:
+            raise CommandError("Unknown snapshot. Start the export again.", 422)
         rows = connection.execute(
-            "SELECT * FROM ("
-            "SELECT 'r:'||v.resource_id::text||':'||lpad(v.revision::text,10,'0') AS cursor, "
-            "v.resource_id AS id,v.revision,r.current_revision=v.revision AS current "
-            "FROM space.resource_revisions v JOIN space.resources r ON r.id=v.resource_id "
-            "AND (r.organization_id,r.space_id)=(v.organization_id,v.space_id) UNION ALL "
-            "SELECT 'i:'||v.item_id::text||':'||lpad(v.revision::text,10,'0'),v.item_id,"
-            "v.revision,i.current_revision=v.revision FROM space.workspace_item_revisions v "
-            "JOIN space.workspace_items i ON (i.organization_id,i.space_id,i.id)="
-            "(v.organization_id,v.space_id,v.item_id) UNION ALL "
-            "SELECT 'a:'||id::text,id,revision,true FROM space.agent_identities "
-            "WHERE deleted_at IS NULL) corpus "
-            "WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT 3",
-            (request.after, request.after),
+            CORPUS, (snapshot, snapshot, request.after, request.after, PAGE_ROWS + 1)
         ).fetchall()
-    # Two full revisions keep even maximum-sized documents under gateway response limits.
     entries = []
-    profiles = None
-    for row in rows[:2]:
-        kind = row["cursor"][0]
-        if kind == "a":
-            profiles = profiles or agents.list_profiles(workspace, identity)["items"]
-            value = next(profile for profile in profiles if profile["id"] == str(row["id"]))
-            entity = "agent"
-        elif kind == "i":
-            value = workspace_items.get(workspace, identity, space_id, row["id"], row["revision"])
-            entity = "item"
-        else:
-            value = workspace.get_resource(
-                identity, space_id, row["id"], row["revision"], _internal=True
+    task_columns = None
+    if not request.after:
+        task_columns = tasks.columns(workspace, identity, space_id)["columns"]
+        entries = [
+            {"entity": "agent", "current": True, "value": profile}
+            for profile in sorted(
+                agents.list_profiles(workspace, identity)["items"], key=lambda p: p["id"]
             )
-            value.pop("memory", None)  # _memory retains edited and forgotten state plus cue graph.
-            entity = "resource"
-            if row["current"] and value.get("_memory"):
-                with workspace.db.transaction(identity) as connection:
-                    workspace._scope(connection, identity, space_id, human=True, api_key=True)
-                    index = connection.execute(
-                        "SELECT claim_id,embedding::text,embedding_model "
-                        "FROM space.memory_claims WHERE memory_id=%s ORDER BY claim_id",
-                        (row["id"],),
-                    ).fetchall()
-                value["memory_index"] = [
-                    {
-                        "id": str(claim["claim_id"]),
-                        "model": claim["embedding_model"],
-                        "vector": json.loads(claim["embedding"]),
-                    }
-                    for claim in index
-                ]
-        entries.append({"entity": entity, "current": row["current"], "value": value})
-    task_columns = (
-        tasks.columns(workspace, identity, space_id)["columns"] if not request.after else None
-    )
-    require_snapshot(workspace, identity, space_id, snapshot)
+        ]
+    size = len(json.dumps(entries, default=str))
+    taken = 0
+    for row in rows[:PAGE_ROWS]:
+        if taken and monotonic() - started > PAGE_SECONDS:
+            break
+        entry = _entry(workspace, identity, space_id, row)
+        cost = len(json.dumps(entry, default=str)) if entry else 0
+        if taken and size + cost > PAGE_BYTES:
+            break
+        size += cost
+        taken += 1
+        if entry:
+            entries.append(entry)
+    content_revision(workspace, identity, space_id)  # Rechecks access after decryption.
     return {
         **({"task_columns": task_columns} if task_columns is not None else {}),
         "format": FORMAT,
@@ -93,5 +154,5 @@ def export_page(workspace, identity, space_id, request: ExportPage):
         "snapshot": snapshot,
         "exported_at": datetime.now(UTC).isoformat(),
         "entries": entries,
-        "next_cursor": rows[1]["cursor"] if len(rows) > 2 else None,
+        "next_cursor": rows[taken - 1]["cursor"] if taken < len(rows) else None,
     }

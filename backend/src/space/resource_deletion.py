@@ -136,6 +136,9 @@ def delete_memory(workspace, identity, space_id, resource_id, expected_revision)
         )
         brain.forget(connection, resource_id)
         connection.execute(
+            "DELETE FROM space.retired_claim_vectors WHERE memory_id=%s", (resource_id,)
+        )
+        connection.execute(
             "DELETE FROM space.events WHERE command_id IN "
             "(SELECT id FROM space.commands WHERE resource_id=%s)",
             (resource_id,),

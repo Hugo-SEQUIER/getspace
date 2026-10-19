@@ -307,7 +307,12 @@ def test_activity_retention_is_independent_of_command_retention(commands):
         )
     service.save(owner, space, change())
     with connect() as connection:
-        assert purge(connection, days=180) == {"events": 0, "commands": 0, "activity_events": 1}
+        assert purge(connection, days=180) == {
+            "events": 0,
+            "commands": 0,
+            "activity_events": 1,
+            "retired_claim_vectors": 0,
+        }
     assert overview.snapshot(service, owner, space)["summary"]["document_writes"] == 1
 
 

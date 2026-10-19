@@ -52,6 +52,7 @@ The runtime runs each transaction in Psycopg pipeline mode, which batches the sc
 | `0035_selfhosted_limits` | Makes every Space unlimited by default |
 | `0036_oauth_server` | Sign-in for apps: registered clients, authorization requests and tokens |
 | `0037_change_revisions` | Records which kinds of content changed at each content revision, so the website reloads only the lists whose kind changed |
+| `0038_export_snapshots` | Stamps each revision with the content revision it committed under, and keeps the recall vectors of deleted claims for a day, so an export reads the Space as it was at its first page |
 
 Migration `0003` installs the `vector` extension in the `space` schema, because the restricted logins resolve types through `search_path = pg_catalog, space`; it stops if `vector` is already installed in another schema. The claim index is created with 1,536 dimensions. When `SPACE_MEMORY_EMBEDDING_DIMENSIONS` asks for another width (16 to 2000), the installer rebuilds the column and its index while the table is empty, and refuses to change the width once embeddings are stored.
 

@@ -8,17 +8,23 @@ RESOURCE_KINDS = ("document", "task", "memory")
 KINDS = (*RESOURCE_KINDS, *ITEM_KINDS, "columns")
 
 # Each kind records the content revision it last changed at, so one statement bumps the
-# Space revision and stamps every changed kind with the new value.
+# Space revision and stamps every changed kind with the new value. The new value also
+# stays in a transaction setting, so revisions written after the bump record it too.
 BUMP = (
-    "UPDATE space.spaces SET content_revision=content_revision+1,"
-    "change_revisions=change_revisions||"
-    "(SELECT jsonb_object_agg(kind,content_revision+1) FROM unnest(%s::text[]) kind)"
-)
-BUMP_SPACE = (
-    "UPDATE space.spaces SET content_revision=content_revision+1,"
+    "WITH bumped AS (UPDATE space.spaces SET content_revision=content_revision+1,"
     "change_revisions=change_revisions||"
     "(SELECT jsonb_object_agg(kind,content_revision+1) FROM unnest(%s::text[]) kind) "
-    "WHERE organization_id=%s AND id=%s"
+    "RETURNING id,content_revision) "
+    "SELECT set_config('space.content_revision',id::text||':'||content_revision,true) "
+    "FROM bumped"
+)
+BUMP_SPACE = (
+    "WITH bumped AS (UPDATE space.spaces SET content_revision=content_revision+1,"
+    "change_revisions=change_revisions||"
+    "(SELECT jsonb_object_agg(kind,content_revision+1) FROM unnest(%s::text[]) kind) "
+    "WHERE organization_id=%s AND id=%s RETURNING id,content_revision) "
+    "SELECT set_config('space.content_revision',id::text||':'||content_revision,true) "
+    "FROM bumped"
 )
 
 

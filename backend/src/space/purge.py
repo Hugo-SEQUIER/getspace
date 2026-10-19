@@ -124,6 +124,13 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "DELETE FROM space.memory_claims WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) AS rows FROM space.memory_claims WHERE organization_id=%s AND space_id=%s",
     ),
+    # After memory_claims: deleting a claim keeps its vector here.
+    (
+        "retired_claim_vectors",
+        "DELETE FROM space.retired_claim_vectors WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) AS rows FROM space.retired_claim_vectors "
+        "WHERE organization_id=%s AND space_id=%s",
+    ),
     (
         "resource_terms",
         "DELETE FROM space.resource_terms WHERE organization_id=%s AND space_id=%s",

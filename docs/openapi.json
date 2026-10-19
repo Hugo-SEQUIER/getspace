@@ -1901,7 +1901,7 @@
           "Export"
         ],
         "summary": "Export one page of the Space",
-        "description": "Exports everything in the Space, including history, one page at a time. Send the first page's `snapshot` with `after` on the next pages; a 409 means the Space changed, so start again.",
+        "description": "Exports everything in the Space, including history, one page at a time. Send the first page's `snapshot` with `after` on the next pages. The archive is the Space as it was at the first page: writes made meanwhile never interrupt it and are left out.",
         "operationId": "export_v1_spaces__space_id__export_post",
         "security": [
           {
@@ -2026,16 +2026,6 @@
           },
           "404": {
             "description": "Not found. Other Spaces also look absent to a key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: a stale expected_revision, a reused command_id, or a changed snapshot. Re-read and retry.",
             "content": {
               "application/json": {
                 "schema": {

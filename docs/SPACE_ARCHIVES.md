@@ -6,7 +6,7 @@ Whole-Space search reads complete current content from the server through bounde
 
 ## Export
 
-In Settings → Data, choose the complete Space export. It includes every retained resource, project and database revision, the trash, named agent identities and the current memory index. Agent connections and credentials are excluded. The download is a ZIP holding one `space.archive.v1` JSON file with readable private content; keep it in a location you control. The browser compresses each page as it arrives, so the export is limited only by ZIP's 4 GiB file size; a larger export reports an error instead of presenting a partial file as complete. Personal API keys can page through the same export with `POST /v1/spaces/{space_id}/export`.
+In Settings → Data, choose the complete Space export. It includes every retained resource, project and database revision, the trash, named agent identities and the current memory index. Agent connections and credentials are excluded. The download is a ZIP holding one `space.archive.v1` JSON file with readable private content; keep it in a location you control. The browser compresses each page as it arrives, so the export is limited only by ZIP's 4 GiB file size; a larger export reports an error instead of presenting a partial file as complete. Personal API keys can page through the same export with `POST /v1/spaces/{space_id}/export`. The archive is the Space as it was when the export started: every page reads the revisions that existed at the first page, so agents and other tabs writing meanwhile never interrupt an export, and their changes are left out. A page holds up to 50 revisions within about 3 MB and stops after 20 seconds, and the browser continues from its cursor.
 
 ## Merge restore
 

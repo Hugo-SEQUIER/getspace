@@ -434,6 +434,7 @@ def test_command_retention_removes_only_rows_past_the_window(database):
             "events": 1,
             "commands": 1,
             "activity_events": 0,
+            "retired_claim_vectors": 0,
         }
     with connect_as(admin=True) as connection:
         commands = connection.execute(
