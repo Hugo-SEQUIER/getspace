@@ -1,7 +1,7 @@
 import Link from "@web/lib/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSpace } from "./provider";
-import { useWorkspaceSearch } from "./workspace-search";
+import { localEntries, useWorkspaceSearch } from "./workspace-search";
 import { Icon, type IconName } from "./ui-icon";
 import { Modal } from "./ui";
 import { useFeedback } from "../notifications";
@@ -21,7 +21,9 @@ export function CommandPalette({ base, onClose, onCreate }: {
   const data = useSpace();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Kind>("all");
-  const search = useWorkspaceSearch(data.space?.id, base, query, !!query.trim() && filter !== "agent");
+  // Known titles answer the first keystrokes; body matches join once the index is in.
+  const known = useMemo(() => localEntries(data), [data.resources, data.projects, data.databases, data.memories]);
+  const search = useWorkspaceSearch(data.space?.id, base, query, !!query.trim() && filter !== "agent", undefined, known);
   useEffect(() => filter === "agent" ? data.watchAgents() : undefined, [filter, data.watchAgents]);
   const local: Result[] = [
     ...[...data.resources].filter(r => r.recall?.category !== "memory").sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(r => ({ id: r.id, title: r.title, type: r.kind, href: `${base}/${r.kind === "task" ? "tasks" : "documents"}/${encodeURIComponent(r.id)}` })),

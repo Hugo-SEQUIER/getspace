@@ -613,8 +613,14 @@ class Workspace:
         }
 
     def list_resources(
-        self, identity, space_id: UUID, kind: Literal["document", "task"], after: UUID | None = None
+        self,
+        identity,
+        space_id: UUID,
+        kind: Literal["document", "task"],
+        after: UUID | None = None,
+        limit: int = 50,
     ):
+        """One page of summaries. `limit` is validated by the API route (1 to 500)."""
         with self.db.transaction(identity) as connection:
             scope = self._scope(connection, identity, space_id)
             rows = connection.execute(
@@ -629,12 +635,12 @@ class Workspace:
                 # decrypted only to be dropped. A handoff is excluded here too: it is read
                 # through resume recall, not listed as a document.
                 "AND r.memory_kind IS NULL "
-                "ORDER BY r.id LIMIT 51",
-                ("record" if kind == "task" else "document", after, after),
+                "ORDER BY r.id LIMIT %s",
+                ("record" if kind == "task" else "document", after, after, limit + 1),
             ).fetchall()
             key_rows = {
                 key_id: self._key_row(connection, scope, key_id)
-                for key_id in {row["key_id"] for row in rows[:50]}
+                for key_id in {row["key_id"] for row in rows[:limit]}
             }
         keys = {
             id_: self._unwrap_key(scope["organization_id"], scope["space_id"], row)
@@ -653,10 +659,13 @@ class Workspace:
                 ),
                 scope["principal_id"],
             )
-            for row in rows[:50]
+            for row in rows[:limit]
         ]
         self._recheck(identity, space_id)
-        return {"items": items, "next_cursor": rows[49]["resource_id"] if len(rows) > 50 else None}
+        return {
+            "items": items,
+            "next_cursor": rows[limit - 1]["resource_id"] if len(rows) > limit else None,
+        }
 
     def get_resource(
         self,

@@ -18,8 +18,11 @@ export function workspaceReadPlan(pathname: string) {
   return { required, supporting: supporting.filter(kind => !required.includes(kind)) };
 }
 
+// Summaries are small, so one page covers most Spaces; the backend caps a page at 500.
+export const RESOURCE_PAGE_SIZE = 200;
+
 export function workspaceReadPath(spaceId: string, kind: WorkspaceRead) {
   return kind === "document" || kind === "task"
-    ? `spaces/${spaceId}/resources?kind=${kind}`
+    ? `spaces/${spaceId}/resources?kind=${kind}&limit=${RESOURCE_PAGE_SIZE}`
     : `spaces/${spaceId}/items?kind=${kind}&deleted=false`;
 }

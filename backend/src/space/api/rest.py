@@ -137,9 +137,13 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
         summary="List documents or tasks",
     )
     def resources(
-        space_id: UUID, kind: Literal["document", "task"], after: UUID | None = None, session=read
+        space_id: UUID,
+        kind: Literal["document", "task"],
+        after: UUID | None = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 50,
+        session=read,
     ):
-        return workspace.list_resources(session[0], space_id, kind, after)
+        return workspace.list_resources(session[0], space_id, kind, after, limit)
 
     @public.get(
         "/spaces/{space_id}/resources/{resource_id}",

@@ -23,7 +23,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Tasks: create, detail, status | `workspace`, `projects` | `tasks` | |
 | Tasks: board drag, keyboard moves, columns, bulk actions, view-only | | `tasks` | |
 | Tasks board: database rows planned for today | | `today-plan` | |
-| Search | `workspace` | | Type tabs not yet asserted |
+| Search: titles answer before the index, body matches after one index read, type tabs, the palette reuses the index | `workspace` | `search` | |
 | Projects: create, rename, task filter, linked databases | `projects` | `project-databases` | Trash and sections: not yet |
 | Databases: create, records, reload, record panel | `databases` | `database-record-panel` | Properties, board view and import are not covered |
 | Webhooks: create with signing secret | `databases` | | Rotate, remove and deliveries: not yet |

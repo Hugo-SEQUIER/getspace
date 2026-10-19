@@ -20,6 +20,10 @@ function versionedSpace(path: string) {
   return { spaceId: match[1], kinds: contentKinds(url) };
 }
 
+function searchIndex(path: string) {
+  return /\/search\/index$/.test(new URL(path, "https://cache.invalid/").pathname);
+}
+
 /** The kinds of content a read shows; undefined means it depends on every kind. */
 function contentKinds(url: URL): string[] | undefined {
   const [, , , collection, id] = url.pathname.split("/");
@@ -123,10 +127,17 @@ export class ReadCache {
     const versionKey = JSON.stringify([path, allPages]);
     return {
       queryKey,
+      // The search index is the whole Space's text and costs one full pass to rebuild,
+      // so it outlives the default five minutes away from the search views.
+      ...(searchIndex(path) ? { gcTime: 60 * 60_000 } : {}),
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<T> => {
         if (!account || account !== this.account) throw new Error("Account changed");
         const readVersion = this.readVersion;
-        const versioned = readVersion && versionedSpace(path);
+        const cached = this.client.getQueryState<T>(queryKey);
+        // A first read has nothing to compare with, so a version check would only add a
+        // round trip before anything can show. The next background refresh reads once in
+        // full and records the version; later refreshes can then skip unchanged content.
+        const versioned = readVersion && cached?.data !== undefined && versionedSpace(path);
         // Capture the version BEFORE reading content. A concurrent edit will then
         // force another full read next time, even if this response spans the edit.
         const version = versioned ? readVersionFor(await this.client.fetchQuery({
@@ -137,7 +148,6 @@ export class ReadCache {
         signal.throwIfAborted();
         if (account !== this.account) throw new Error("Account changed");
         const previous = this.versions.get(versionKey);
-        const cached = this.client.getQueryState<T>(queryKey);
         if (version !== undefined && previous?.version === version &&
           Date.now() - previous.fetchedAt < FULL_RECHECK_MS &&
           cached?.data !== undefined && !cached.isInvalidated) return cached.data;

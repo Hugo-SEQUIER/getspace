@@ -109,7 +109,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** Requests the app sent that the website's /api proxy would answer with 404. */
     unproxied: [] as string[],
     gates: new Map<string, Gate>(),
-    /** Holds `status:<id>`, `create` or `detail:<id>` requests until the gate is released. */
+    /** Holds `status:<id>`, `create`, `detail:<id>` or `index` requests until the gate is released. */
     hold(key: string) {
       const gate = new Gate();
       state.gates.set(key, gate);
@@ -166,6 +166,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     }
     if (path.endsWith('/search/index')) {
       state.searchIndexReads++;
+      await pass('index');
       const entries = [...state.tasks, ...state.documents].map(({ body, author, revision, ...entry }) => ({ ...entry, text: body }));
       return send({ items: entries, next_cursor: null });
     }

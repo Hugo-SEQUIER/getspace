@@ -163,6 +163,23 @@ def test_documents_tasks_and_history_share_canonical_resources(commands):
         assert connection.execute("SELECT count(*) AS n FROM space.events").fetchone()["n"] == 3
 
 
+def test_resource_pages_follow_the_requested_size(commands):
+    service, identity, space, _ = commands
+    ids = sorted(
+        service.save(identity, space, change().model_copy(update={"title": f"Doc {n}"}))["id"]
+        for n in range(5)
+    )
+    first = service.list_resources(identity, space, "document", limit=2)
+    assert [item["id"] for item in first["items"]] == ids[:2]
+    assert str(first["next_cursor"]) == ids[1]
+    second = service.list_resources(identity, space, "document", UUID(ids[1]), limit=2)
+    assert [item["id"] for item in second["items"]] == ids[2:4]
+    last = service.list_resources(identity, space, "document", UUID(ids[3]), limit=2)
+    assert [item["id"] for item in last["items"]] == ids[4:] and last["next_cursor"] is None
+    whole = service.list_resources(identity, space, "document", limit=5)
+    assert len(whole["items"]) == 5 and whole["next_cursor"] is None
+
+
 def test_concurrent_updates_have_one_winner(commands):
     service, identity, space, _ = commands
     first = service.save(identity, space, change())

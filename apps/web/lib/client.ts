@@ -7,7 +7,9 @@ import { ApiError, sendBrowserRequest } from "./browser-http";
 
 export { ApiError } from "./browser-http";
 
-const reads = new ReadScheduler(2);
+// Six reads in flight: the workspace opens with about a dozen independent lists, and
+// HTTP/2 multiplexes them on one connection. Selected documents still go first.
+const reads = new ReadScheduler(6);
 let readCache: ReadCache | undefined;
 let cacheAccount: string | null = null;
 let cacheEpoch = 0;

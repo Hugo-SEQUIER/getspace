@@ -9,13 +9,13 @@ import { teamsAvailable } from "../../../lib/features";
 import { docsLinks, sourceCode } from "../../../lib/docs-links";
 
 import Link from "@web/lib/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@web/lib/navigation";
 import { message } from "../../../lib/client";
 import { useFeedback } from "../notifications";
 import { statuses, type Project, type Status } from "../../../lib/space/types";
 import { useSpace } from "./provider";
-import { useWorkspaceSearch } from "./workspace-search";
+import { localEntries, useWorkspaceSearch } from "./workspace-search";
 import { ItemTrash } from "./item-trash";
 import { Icon } from "./ui-icon";
 import {
@@ -37,8 +37,10 @@ export function SearchView({ base }: { base: string }) {
   const data = useSpace();
   const [query, setQuery] = useState(""),
     [type, setType] = useState("All");
-  const search = useWorkspaceSearch(data.space?.id, base, query, true);
-  useFeedback({ error: search.error, loading: search.loading ? "Searching your Space…" : null });
+  // Titles the workspace already knows answer at once; bodies join when the index lands.
+  const local = useMemo(() => localEntries(data), [data.resources, data.projects, data.databases, data.memories]);
+  const search = useWorkspaceSearch(data.space?.id, base, query, true, undefined, local);
+  useFeedback({ error: search.error, loading: search.loading ? "Loading full text…" : null });
   const results = search.items.filter((r) => type === "All" || r.type === type);
   const [limit, setLimit] = useState(80);
   return (
@@ -79,7 +81,7 @@ export function SearchView({ base }: { base: string }) {
         </div>
         <p className="sp-search-caption">
           {results.length} results in your Space
-          {search.loading && " · Loading your Space…"}
+          {search.loading && " · Loading full text…"}
         </p>
         {search.error && (
           <p>
@@ -141,12 +143,15 @@ export function ProjectsView({ base, id }: { base: string; id?: string }) {
   const [editing, setEditing] = useState<Project | null>(null);
   const [status, setStatus] = useState<Status>("todo");
   const newId = useRef(crypto.randomUUID());
+  // The summaries already list each item's project, so the page fills before the index.
+  const localResources = useMemo(() => localEntries({ resources: data.resources }), [data.resources]);
   const related = useWorkspaceSearch(
     data.space?.id,
     base,
     "",
     !!id,
     id,
+    localResources,
   );
   useFeedback({
     error: error || related.error || (create ? data.sectionError : ""),

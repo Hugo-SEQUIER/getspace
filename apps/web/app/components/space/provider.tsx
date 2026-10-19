@@ -507,7 +507,7 @@ function useData() {
         items: Resource[];
         next_cursor: string | null;
       }>(
-        `spaces/${space.id}/resources?kind=${kind}&after=${encodeURIComponent(cursors[kind]!)}`,
+        `${workspaceReadPath(space.id, kind)}&after=${encodeURIComponent(cursors[kind]!)}`,
       );
       if (current !== generation.current) return;
       setResources((old) => [
