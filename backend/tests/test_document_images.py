@@ -146,6 +146,9 @@ def test_workspace_search_matches_readable_source_text_and_never_shows_encoded_s
         "revision": 1,
         "kind": "document",
         "key_id": "key",
+        "wrapping_provider": "test",
+        "wrapping_key_reference": "test",
+        "wrapped_key": b"",
         "object_key": None,
         "encrypted_record": b"",
         "created_at": datetime.now(UTC),
@@ -164,7 +167,7 @@ def test_workspace_search_matches_readable_source_text_and_never_shows_encoded_s
     workspace = SimpleNamespace(
         db=SimpleNamespace(transaction=lambda identity: nullcontext(connection)),
         _scope=lambda *args: {"organization_id": None, "space_id": None, "principal_id": None},
-        _key_row=lambda *args: {},
+        _key_rows=Workspace._key_rows,
         _unwrap_key=lambda *args: None,
         _unpack=lambda *args: original,
         _summary=Workspace._summary,

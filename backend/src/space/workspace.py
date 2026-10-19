@@ -3,12 +3,14 @@
 import asyncio
 import hmac
 import json
+import select
+import weakref
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
-from contextvars import copy_context
+from contextvars import ContextVar, copy_context
 from copy import deepcopy
 from datetime import UTC, datetime
-from time import perf_counter
+from time import monotonic, perf_counter
 from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -115,11 +117,27 @@ class SaveResource(BaseModel):
         return self
 
 
+# Read-only transactions opt in here, so test doubles of Database.transaction keep their
+# one-argument signature. See Database.transaction.
+_deferred_fence: ContextVar[bool] = ContextVar("space_deferred_fence", default=False)
+
+
+@contextmanager
+def deferred_fence():
+    """Verify the environment fence with the first query instead of before it."""
+    token = _deferred_fence.set(True)
+    try:
+        yield
+    finally:
+        _deferred_fence.reset(token)
+
+
 class Database:
     def __init__(self, settings: Settings, *, pool_size: int | None = None):
         # A self-hosted installation has no environment fence: one database, one service.
         self.environment_id = None
         self.required_connections = settings.database_connection_budget
+        self._returned = weakref.WeakKeyDictionary()
         self.pool = ConnectionPool(
             settings.database_url.get_secret_value(),
             min_size=0,
@@ -128,14 +146,45 @@ class Database:
             timeout=8,
             max_waiting=max(16, settings.database_pool_size * 4),
             configure=self._configure_budget,
-            # Reject connections closed while idle before handing them to a request.
-            check=ConnectionPool.check_connection,
+            # Reject connections closed while idle before handing them to a request. A
+            # connection used moments ago is pinged only after it sat idle, so a busy
+            # session does not pay a database round trip for every transaction.
+            check=self._check_idle_connection,
+            reset=self._mark_returned,
             kwargs={
                 **database_connection_options(settings),
                 "connect_timeout": 5,
                 "row_factory": dict_row,
             },
         )
+
+    # Longer than a browsing pause between requests, shorter than a pooler's idle cutoff.
+    IDLE_CHECK_SECONDS = 30.0
+
+    def _mark_returned(self, connection):
+        self._returned[connection] = monotonic()
+
+    def _check_idle_connection(self, connection):
+        returned = self._returned.get(connection)
+        if (
+            returned is None
+            or monotonic() - returned >= self.IDLE_CHECK_SECONDS
+            or self._socket_has_news(connection)
+        ):
+            ConnectionPool.check_connection(connection)
+
+    @staticmethod
+    def _socket_has_news(connection):
+        """A backend terminated while idle sends its notice and closes the socket, which
+        makes it readable; the full check then discards the connection. No round trip."""
+        fileno = getattr(connection, "fileno", None)
+        if fileno is None:
+            return False
+        try:
+            readable, _, _ = select.select([fileno()], [], [], 0)
+        except (OSError, ValueError):
+            return True
+        return bool(readable)
 
     @staticmethod
     def _configure(connection):
@@ -185,7 +234,16 @@ class Database:
 
     @contextmanager
     def transaction(self, identity: Identity):
+        """An identified transaction.
+
+        The environment fence is normally verified before any other statement. Inside
+        `deferred_fence()`, for transactions that only read, it rides the pipeline with
+        the caller's first query and is verified when the block ends, saving one round
+        trip; a failed fence still rolls the transaction back and raises before any
+        result is returned to the caller.
+        """
         identity.check()
+        deferred_check = _deferred_fence.get()
         # Keep query order and an explicit atomic transaction, but batch commands
         # until a result is needed instead of waiting for each setup statement.
         try:
@@ -193,7 +251,9 @@ class Database:
                 with read_stage("db_pool"):
                     connection = stack.enter_context(self.pool.connection())
                 with read_stage("db_transaction"), connection.transaction(), connection.pipeline():
-                    self.check_environment(connection)
+                    pending = self._queue_environment_check(connection)
+                    if not deferred_check:
+                        self._verify_environment(pending)
                     connection.execute(
                         "SELECT set_config('space.identity_issuer', %s, true)", (identity.issuer,)
                     )
@@ -201,6 +261,8 @@ class Database:
                         "SELECT set_config('space.identity_subject', %s, true)", (identity.subject,)
                     )
                     yield connection
+                    if deferred_check:
+                        self._verify_environment(pending)
         except RaiseException as error:
             messages = {
                 "space.storage_quota": "Space storage limit reached. Contact the operator.",
@@ -224,10 +286,16 @@ class Database:
             yield connection
 
     def check_environment(self, connection):
-        row = connection.execute(
+        self._verify_environment(self._queue_environment_check(connection))
+
+    def _queue_environment_check(self, connection):
+        return connection.execute(
             "SELECT space.check_environment(%s) AS ready", (getattr(self, "environment_id", None),)
-        ).fetchone()
-        if not row["ready"]:
+        )
+
+    @staticmethod
+    def _verify_environment(cursor):
+        if not cursor.fetchone()["ready"]:
             raise CommandError("Environment unavailable during maintenance or recovery", 503)
 
 
@@ -307,6 +375,9 @@ class Workspace:
         )
         self.retrieval = retrieval
         self._object_reads = ThreadPoolExecutor(max_workers=4, thread_name_prefix="space-object")
+        # Search pages read every document body; a separate small pool keeps that bulk work
+        # from queueing a selected document behind it.
+        self._index_reads = ThreadPoolExecutor(max_workers=2, thread_name_prefix="space-index")
         self.memory_models = memory_models or MemoryModels(Settings(environment="test"))
 
     def _unwrap_key(self, organization_id, space_id, row):
@@ -334,6 +405,7 @@ class Workspace:
     async def aclose(self):
         await asyncio.gather(self._recall_admission.aclose(), self._write_admission.aclose())
         await asyncio.to_thread(self._object_reads.shutdown, wait=True)
+        await asyncio.to_thread(self._index_reads.shutdown, wait=True)
         if hasattr(self.memory_models, "close"):
             await asyncio.to_thread(self.memory_models.close)
 
@@ -583,8 +655,22 @@ class Workspace:
         }
 
     def _recheck(self, identity, space_id):
-        with self.db.transaction(identity) as connection:
+        # Read-only, so the environment fence can share the scope lookup's round trip.
+        with deferred_fence(), self.db.transaction(identity) as connection:
             self._scope(connection, identity, space_id)
+
+    @staticmethod
+    def _key_rows(rows):
+        """Wrapping-key rows carried by a page query, so no key is fetched separately."""
+        return {
+            row["key_id"]: {
+                "id": row["key_id"],
+                "wrapping_provider": row["wrapping_provider"],
+                "wrapping_key_reference": row["wrapping_key_reference"],
+                "wrapped_key": row["wrapped_key"],
+            }
+            for row in rows
+        }
 
     @staticmethod
     def _summary(row, metadata, principal_id=None):
@@ -625,11 +711,14 @@ class Workspace:
             scope = self._scope(connection, identity, space_id)
             rows = connection.execute(
                 "SELECT v.resource_id, v.revision, v.key_id, v.encrypted_metadata, "
-                "v.created_at, v.author_client_id, v.author_principal_id, r.kind "
+                "v.created_at, v.author_client_id, v.author_principal_id, r.kind, "
+                "k.wrapping_provider, k.wrapping_key_reference, k.wrapped_key "
                 "FROM space.resources r JOIN space.resource_revisions v "
                 "ON (r.organization_id,r.space_id,r.id,"
                 "r.current_revision)=(v.organization_id,v.space_id,"
                 "v.resource_id,v.revision) "
+                "JOIN space.space_keys k ON (k.organization_id,k.space_id,k.id)="
+                "(v.organization_id,v.space_id,v.key_id) "
                 "WHERE r.kind=%s AND (%s::uuid IS NULL OR r.id>%s) "
                 # Memory is not a document, and the readable marker says so, so no row is
                 # decrypted only to be dropped. A handoff is excluded here too: it is read
@@ -638,10 +727,7 @@ class Workspace:
                 "ORDER BY r.id LIMIT %s",
                 ("record" if kind == "task" else "document", after, after, limit + 1),
             ).fetchall()
-            key_rows = {
-                key_id: self._key_row(connection, scope, key_id)
-                for key_id in {row["key_id"] for row in rows[:limit]}
-            }
+            key_rows = self._key_rows(rows[:limit])
         keys = {
             id_: self._unwrap_key(scope["organization_id"], scope["space_id"], row)
             for id_, row in key_rows.items()

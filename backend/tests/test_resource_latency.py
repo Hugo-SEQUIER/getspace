@@ -12,6 +12,7 @@ from test_workspace import change
 from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 
+from space import workspace_items, workspace_search
 from space.app import create_app
 from space.read_timing import collect_read_timings, read_stage, record_timing
 from space.settings import Settings
@@ -101,3 +102,14 @@ def test_rest_forwards_thread_timings_on_success_and_provider_failure(
         )
         assert missing.status_code == 404
         assert "space_key" not in missing.headers["server-timing"]
+
+
+def test_page_reads_carry_their_keys_without_a_separate_key_query(commands, monkeypatch):
+    service, owner, space, _ = commands
+    saved = service.save(owner, space, change())
+    monkeypatch.setattr(service, "_key_row", lambda *args: pytest.fail("Extra key query"))
+    listed = service.list_resources(owner, space, "document")
+    assert [item["id"] for item in listed["items"]] == [saved["id"]]
+    page = workspace_search.index(service, owner, space)
+    assert [entry["id"] for entry in page["items"]] == [saved["id"]]
+    assert workspace_items.listing(service, owner, space, "project")["items"] == []

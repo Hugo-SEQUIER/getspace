@@ -29,8 +29,11 @@ CORPUS = (
 )
 # Revisions are immutable, so pinning the listed ones keeps the page consistent.
 RESOURCES = (
-    "SELECT v.*, r.kind FROM space.resources r JOIN space.resource_revisions v "
+    "SELECT v.*, r.kind, k.wrapping_provider, k.wrapping_key_reference, k.wrapped_key "
+    "FROM space.resources r JOIN space.resource_revisions v "
     "ON (r.organization_id,r.space_id,r.id)=(v.organization_id,v.space_id,v.resource_id) "
+    "JOIN space.space_keys k ON (k.organization_id,k.space_id,k.id)="
+    "(v.organization_id,v.space_id,v.key_id) "
     "WHERE (v.resource_id,v.revision) IN (SELECT * FROM unnest(%s::uuid[],%s::integer[]))"
 )
 ITEMS = ROW + (  # noqa: S608 - static SQL; all values are parameters
@@ -109,17 +112,14 @@ def _page(workspace, identity, space_id, after, size, expected=None):
             else []
         )
         items = connection.execute(ITEMS, _pinned(item_rows)).fetchall() if item_rows else []
-        key_rows = {
-            key_id: workspace._key_row(connection, scope, key_id)
-            for key_id in {row["key_id"] for row in [*resources, *items]}
-        }
+        key_rows = workspace._key_rows([*resources, *items])
     keys = {
         key_id: workspace._unwrap_key(scope["organization_id"], scope["space_id"], row)
         for key_id, row in key_rows.items()
     }
     # Object bodies download concurrently, like the single-resource read.
     pending = {
-        row["resource_id"]: workspace._object_reads.submit(
+        row["resource_id"]: workspace._index_reads.submit(
             copy_context().run, workspace._read_resource_object, row["object_key"], perf_counter()
         )
         for row in resources

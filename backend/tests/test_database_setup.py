@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import select
 import shutil
 import subprocess
 import time
@@ -212,8 +213,13 @@ def test_runtime_pool_replaces_a_connection_terminated_while_idle(database):
     try:
         with runtime.pool.connection() as connection:
             old_pid = connection.info.backend_pid
+            pooled = connection
         with connect_as(admin=True) as administrator:
             administrator.execute("SELECT pg_terminate_backend(%s)", (old_pid,))
+        # Termination returns before the backend writes its notice and closes. The pool
+        # trusts a recently used connection until that notice makes its socket readable.
+        readable, _, _ = select.select([pooled.fileno()], [], [], 10)
+        assert readable, "the terminated backend's notice reached the pooled connection"
         with runtime.pool.connection() as connection:
             assert connection.info.backend_pid != old_pid
             assert connection.execute("SELECT 1 AS alive").fetchone() == {"alive": 1}
