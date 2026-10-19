@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from space import (
     agents,
     brain,
+    content_changes,
     memory_classification,
     memory_creator,
     memory_link_index,
@@ -947,7 +948,9 @@ class Workspace:
                     ).fetchone()
                     if intent is None:
                         raise CommandError("Upload expired. Save again with a fresh command.", 409)
-                connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+                content_changes.changed(
+                    connection, content_changes.resource_kinds(request.kind, memory_kind)
+                )
                 if snapshot is not None:
                     self._check_manifest(connection, snapshot)
                 for ref in recall["sources"]:

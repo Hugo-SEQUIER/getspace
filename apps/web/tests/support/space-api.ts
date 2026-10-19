@@ -95,6 +95,8 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     resourceReads: [] as string[],
     deletes: [] as { id: string; expected: number }[],
     taskListReads: 0,
+    /** Full search-index reads; typing must never add one. */
+    searchIndexReads: 0,
     /** Task IDs whose next status save fails with 503. */
     failStatus: new Set<string>(),
     /** Task IDs whose next delete fails with 409. */
@@ -161,6 +163,11 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
         }
       }
       return send({ items: state.views });
+    }
+    if (path.endsWith('/search/index')) {
+      state.searchIndexReads++;
+      const entries = [...state.tasks, ...state.documents].map(({ body, author, revision, ...entry }) => ({ ...entry, text: body }));
+      return send({ items: entries, next_cursor: null });
     }
     if (path.endsWith('/tasks/columns')) {
       if (method === 'POST') {

@@ -9,7 +9,7 @@ import { webhookProxyAllowed } from "./webhooks.ts";
 // source and the e2e fixtures both check this predicate.
 // Output: true when the proxy forwards the path.
 export const PROXY_ALLOWED =
-  /^(workspace|workspaces|organizations(?:\/[a-f0-9-]{36}\/(?:spaces|members(?:\/[a-f0-9-]{36})?|invitations(?:\/[a-f0-9-]{36})?))?|invitations\/accept|agent-identities(?:\/[a-f0-9-]{36})?|agents(?:\/[a-f0-9-]{36}(?:\/identity)?)?|device\/(?:claim|consent)|oauth\/(?:details|consent)|spaces\/[a-f0-9-]{36}\/(?:access|usage|overview|restores(?:\/[a-f0-9-]{36}(?:\/(?:review|commit|parts\/\d+))?)?|export|search|items(?:\/[a-f0-9-]{36}(?:\/visibility)?)?|resources(?:\/[a-f0-9-]{36})?|tasks\/(?:columns|[a-f0-9-]{36}\/status)|handoffs|views|context|memories(?:\/[a-f0-9-]{36})?|memory\/(?:provider|build|remember|claims|change|imports(?:\/(?:preview|[a-f0-9-]{36}\/retry))?|jobs(?:\/[a-f0-9-]{36})?)))$/;
+  /^(workspace|workspaces|organizations(?:\/[a-f0-9-]{36}\/(?:spaces|members(?:\/[a-f0-9-]{36})?|invitations(?:\/[a-f0-9-]{36})?))?|invitations\/accept|agent-identities(?:\/[a-f0-9-]{36})?|agents(?:\/[a-f0-9-]{36}(?:\/identity)?)?|device\/(?:claim|consent)|oauth\/(?:details|consent)|spaces\/[a-f0-9-]{36}\/(?:access|usage|overview|restores(?:\/[a-f0-9-]{36}(?:\/(?:review|commit|parts\/\d+))?)?|export|search(?:\/index)?|items(?:\/[a-f0-9-]{36}(?:\/visibility)?)?|resources(?:\/[a-f0-9-]{36})?|tasks\/(?:columns|[a-f0-9-]{36}\/status)|handoffs|views|context|memories(?:\/[a-f0-9-]{36})?|memory\/(?:provider|build|remember|claims|change|imports(?:\/(?:preview|[a-f0-9-]{36}\/retry))?|jobs(?:\/[a-f0-9-]{36})?)))$/;
 
 export const READ_VERSION = /^spaces\/[a-f0-9-]{36}\/read-version$/;
 

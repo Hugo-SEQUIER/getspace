@@ -170,8 +170,14 @@ test("failed or looping pagination cannot be cached as a complete catalog", asyn
   await assert.rejects(cache.read("items", { allPages: true }), /Repeated page cursor/);
 });
 
+/** Tests write a version as a plain string for the Space-wide version only. */
+const versionsOf = readVersion => async (...args) => {
+  const value = await readVersion(...args);
+  return typeof value === "string" ? { version: value } : value;
+};
+
 function versionedCache(t, fetch, readVersion) {
-  const cache = new ReadCache(fetch, readVersion);
+  const cache = new ReadCache(fetch, versionsOf(readVersion));
   cache.setAccount("owner-a");
   t.after(() => cache.dispose());
   return cache;
@@ -188,7 +194,7 @@ test("older backends retain full refreshes until version checks are explicitly e
   cache.refetchStale();
   await tick();
   assert.equal(calls, 2, "missing bootstrap capability must use the original full read protocol");
-  cache.setReadVersion(async () => { checks++; return "1"; });
+  cache.setReadVersion(versionsOf(async () => { checks++; return "1"; }));
   for (let check = 0; check < 2; check++) {
     t.mock.timers.tick(31000);
     cache.refetchStale();
@@ -320,11 +326,11 @@ test("unchanged content still gets a bounded full recheck for metadata outside t
   const cache = versionedCache(t, async () => ({ provider: ++calls }), async () => "1");
   t.after(cache.watch("spaces/a/memories", () => {}, assert.fail));
   await tick();
-  for (let minute = 1; minute <= 5; minute++) {
+  for (let minute = 1; minute <= 15; minute++) {
     t.mock.timers.tick(60000);
     cache.refetchStale();
     await tick();
-    assert.equal(calls, minute < 5 ? 1 : 2);
+    assert.equal(calls, minute < 15 ? 1 : 2);
   }
 });
 
@@ -391,4 +397,55 @@ test("a selected document goes ahead of queued refreshes without exceeding the c
   assert.deepEqual(started, ["active-a", "active-b", "selected-document", "refresh-a", "refresh-b"]);
   second.resolve();
   await Promise.all([a, b, refreshA, refreshB, selected, canceledRead]);
+});
+
+test("a change to one kind reloads only reads showing that kind", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: 100000 });
+  const kinds = { document: 1, task: 1, memory: 1, project: 1, folder: 1, database: 1, category: 1, section: 1, columns: 1 };
+  let revision = 1;
+  const paths = [];
+  const cache = versionedCache(t, async path => { paths.push(path); return { items: [], next_cursor: null }; }, async () => ({
+    version: `1:${revision}`,
+    versions: Object.fromEntries(Object.entries(kinds).map(([kind, value]) => [kind, `2:${kind}:${value}`])),
+  }));
+  const reads = {
+    documents: "spaces/a/resources?kind=document",
+    projects: "spaces/a/items?kind=project&deleted=false",
+    folders: "spaces/a/items?kind=folder&deleted=false",
+    memories: "spaces/a/memories?limit=50",
+    columns: "spaces/a/tasks/columns",
+    document: "spaces/a/resources/one",
+    search: "spaces/a/search/index",
+  };
+  for (const path of Object.values(reads)) t.after(cache.watch(path, () => {}, assert.fail));
+  await tick();
+  const refresh = async change => {
+    paths.length = 0;
+    change();
+    t.mock.timers.tick(61000);
+    cache.refetchStale();
+    await tick();
+    return Object.keys(reads).filter(name => paths.includes(reads[name])).sort();
+  };
+  assert.deepEqual(await refresh(() => {}), [], "nothing changed, nothing reloads");
+  assert.deepEqual(await refresh(() => { revision++; kinds.memory++; }), ["document", "memories", "search"]);
+  assert.deepEqual(await refresh(() => { revision++; kinds.project++; }), ["memories", "projects", "search"]);
+  assert.deepEqual(await refresh(() => { revision++; kinds.columns++; }), ["columns", "search"]);
+  assert.deepEqual(await refresh(() => { revision++; kinds.document++; kinds.memory++; }), ["document", "documents", "memories", "search"]);
+});
+
+test("without per-kind versions every versioned read follows the Space version", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: 100000 });
+  let version = "1";
+  const paths = [];
+  const cache = versionedCache(t, async path => { paths.push(path); return { items: [], next_cursor: null }; }, async () => version);
+  const reads = ["spaces/a/items?kind=project", "spaces/a/tasks/columns", "spaces/a/memories"];
+  for (const path of reads) t.after(cache.watch(path, () => {}, assert.fail));
+  await tick();
+  paths.length = 0;
+  version = "2";
+  t.mock.timers.tick(61000);
+  cache.refetchStale();
+  await tick();
+  assert.deepEqual(paths.sort(), [...reads].sort());
 });

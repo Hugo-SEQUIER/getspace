@@ -257,6 +257,15 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     def search(space_id: UUID, body: workspace_search.Search, session=read):
         return workspace_search.search(workspace, session[0], space_id, body)
 
+    # The website loads this once per Space version and matches as people type.
+    @router.get("/spaces/{space_id}/search/index")
+    def search_index(
+        space_id: UUID,
+        after: Annotated[str | None, Query(pattern=r"^[ir]:[0-9a-f-]{36}$")] = None,
+        session=read,
+    ):
+        return workspace_search.index(workspace, session[0], space_id, after)
+
     @public.get(
         "/spaces/{space_id}/memories/{resource_id}", tags=["Memory"], summary="Get a memory"
     )

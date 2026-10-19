@@ -79,7 +79,7 @@ export function SearchView({ base }: { base: string }) {
         </div>
         <p className="sp-search-caption">
           {results.length} results in your Space
-          {search.loading && ` · Searching… ${search.scanned} items checked`}
+          {search.loading && " · Loading your Space…"}
         </p>
         {search.error && (
           <p>

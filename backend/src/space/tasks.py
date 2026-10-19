@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator
 
-from space import agents, overview
+from space import agents, content_changes, overview
 from space.memory import Input
 from space.providers import key_operation
 
@@ -167,7 +167,7 @@ def add_column(workspace, identity, space_id, change: AddColumn):
                 "UPDATE space.collections SET encrypted_schema=%s WHERE id=%s",
                 (encrypted, row["id"]),
             )
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection, ("columns",))
             result = _columns(schema)
     workspace._recheck(identity, space_id)
     return result
@@ -289,7 +289,7 @@ def set_status(workspace, identity, space_id, resource_id, change: SetStatus):
                 "VALUES(%s,%s,%s,%s,'resource.updated')",
                 (scope["organization_id"], space_id, uuid4(), change.command_id),
             )
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection, content_changes.resource_kinds("record"))
             overview.record_write(
                 connection,
                 scope,

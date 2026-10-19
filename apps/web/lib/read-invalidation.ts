@@ -11,9 +11,10 @@ export function affectedReads(path: string) {
     // Seen marks are personal state: they change nothing else, and nothing else changes them.
     if (command === "views")
       return (read: string) => read === `spaces/${space}/views`;
-    const groups = /^tasks\/[^/]+\/status$/.test(command) ? ["resources", "memories", "overview"]
-      : command.startsWith("items") ? ["items", "memories", "overview"]
-      : /^(resources|handoffs|memory\/)/.test(command) ? ["resources", "memories"] : null;
+    // The search index holds every kind of content, so each content write refreshes it.
+    const groups = /^tasks\/[^/]+\/status$/.test(command) ? ["resources", "memories", "overview", "search"]
+      : command.startsWith("items") ? ["items", "memories", "overview", "search"]
+      : /^(resources|handoffs|memory\/)/.test(command) ? ["resources", "memories", "search"] : null;
     return (read: string) => read.startsWith(`spaces/${space}/`)
       && (!groups || groups.includes(read.slice(`spaces/${space}/`.length).split(/[/?]/)[0]));
   }

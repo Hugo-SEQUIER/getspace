@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from space import agents
+from space import agents, content_changes
 from space.memory import Input
 
 MAX_DATABASE_RECORDS = 1000
@@ -421,7 +421,7 @@ def save(workspace, identity, space_id, change: SaveItem, *, deleted=False, emit
                     fingerprint,
                 ),
             )
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection, (change.kind,))
     return get(workspace, identity, space_id, change.item_id, revision)
 
 

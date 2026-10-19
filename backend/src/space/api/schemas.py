@@ -194,6 +194,14 @@ class ReadVersion(Closed):
     version: str = Field(
         description="Opaque. It changes whenever content, your role or visibility changes."
     )
+    versions: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Opaque, one per kind of content (document, task, memory, project, folder, "
+            "database, category, section, columns). Each changes only when that kind "
+            "changes, or when your role or visibility changes."
+        ),
+    )
 
 
 class Usage(Closed):

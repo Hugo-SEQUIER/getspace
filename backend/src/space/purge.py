@@ -14,6 +14,8 @@ from uuid import UUID
 
 from psycopg.pq import TransactionStatus
 
+from space import content_changes
+
 # Referential order: children first, one entry per Space-owned table. Every statement is
 # written out rather than built: this module deletes rows, and a constructed query string
 # has no place where data is destroyed.
@@ -332,9 +334,11 @@ def purge_space(
                     )
                 if not account:
                     connection.execute(
-                        "UPDATE space.spaces SET content_revision=content_revision+1 "
+                        "UPDATE space.spaces SET content_revision=content_revision+1,"
+                        "change_revisions=change_revisions||(SELECT "
+                        "jsonb_object_agg(kind,content_revision+1) FROM unnest(%s::text[]) kind) "
                         "WHERE organization_id=%s AND id=%s",
-                        parameters,
+                        (list(content_changes.KINDS), *parameters),
                     )
             for table, delete, count in STEPS:
                 if table == "collections" and not account:

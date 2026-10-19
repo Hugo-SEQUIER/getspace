@@ -1,5 +1,5 @@
 import { scopedAgentPath, selectedSpaceKey } from "./space/teams";
-import { ReadCache, ReadScheduler, type ReadOptions } from "./read-cache";
+import { ReadCache, ReadScheduler, type ReadOptions, type SpaceVersions } from "./read-cache";
 import { isTimeout, READ_TIMEOUT_MS, timeoutMessage } from "./request-timeouts";
 import { PersistentReads, erasePersistentReads } from "./persistent-reads";
 import { affectedReads } from "./read-invalidation";
@@ -21,11 +21,13 @@ function browserReadCache() {
   return readCache ??= new ReadCache((path, signal) => api(path, "GET", undefined, signal));
 }
 
-async function readVersion(spaceId: string, signal: AbortSignal) {
-  const result = await api<{ version: string }>(`spaces/${spaceId}/read-version`, "GET", undefined, signal);
+async function readVersion(spaceId: string, signal: AbortSignal): Promise<SpaceVersions> {
+  const result = await api<SpaceVersions>(`spaces/${spaceId}/read-version`, "GET", undefined, signal);
   if (typeof result.version !== "string" || !result.version)
     throw new Error("Could not check for changes. Try again.");
-  return result.version;
+  // Older backends send only the Space-wide version; every read then compares that.
+  const versions = result.versions && typeof result.versions === "object" ? result.versions : undefined;
+  return { version: result.version, versions };
 }
 
 export function getReadQueryClient() {

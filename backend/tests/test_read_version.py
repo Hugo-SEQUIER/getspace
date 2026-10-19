@@ -18,8 +18,9 @@ from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 from test_workspace_items import project
 
-from space import read_version, tasks, teams, workspace_items
+from space import read_version, resource_deletion, tasks, teams, workspace_items
 from space.app import create_app
+from space.content_changes import KINDS
 from space.memory import RememberClaims
 from space.security.auth import Identity
 from space.settings import Settings
@@ -44,7 +45,7 @@ def stub_workspace(*, role="member", visibility="shared", revision=2**63 - 1):
     connection.execute.return_value.fetchone.side_effect = [
         scope,
         {"role": role},
-        {"content_revision": revision, "visibility": visibility},
+        {"content_revision": revision, "change_revisions": {"memory": 7}, "visibility": visibility},
     ]
 
     @contextmanager
@@ -60,10 +61,14 @@ def test_version_is_exact_and_reads_no_keys_content_or_manifests():
     service, scope, connection = stub_workspace()
     owner = Identity("https://identity.invalid", str(uuid4()), int(time.time()) + 600)
     result = read_version.snapshot(service, owner, scope["space_id"])
-    assert result == {"version": "1:9223372036854775807:member:shared"}
+    assert result["version"] == "1:9223372036854775807:member:shared"
+    assert result["versions"] == {
+        kind: f"2:{kind}:{7 if kind == 'memory' else 0}:member:shared" for kind in KINDS
+    }
     queries = [call.args[0] for call in connection.execute.call_args_list]
     assert queries[-1] == (
-        "SELECT content_revision,visibility FROM space.spaces WHERE organization_id=%s AND id=%s"
+        "SELECT content_revision,change_revisions,visibility FROM space.spaces "
+        "WHERE organization_id=%s AND id=%s"
     )
     assert connection.execute.call_args.args[1] == (scope["organization_id"], scope["space_id"])
     lock = next(i for i, query in enumerate(queries) if "pg_advisory_xact_lock_shared" in query)
@@ -108,7 +113,8 @@ def test_rest_requires_browser_auth_and_explicit_uuid_and_preserves_access_error
         connection.execute.assert_not_called()
         response = http.get(endpoint, headers=auth)
         assert response.status_code == 200, response.text
-        assert response.json() == {"version": "1:9007199254740993:viewer:shared"}
+        assert response.json()["version"] == "1:9007199254740993:viewer:shared"
+        assert response.json()["versions"]["memory"] == "2:memory:7:viewer:shared"
         assert response.headers["Cache-Control"] == "no-store"
         connection.execute.return_value.fetchone.side_effect = [None]
         assert http.get(endpoint, headers=auth).status_code == 404
@@ -224,3 +230,51 @@ def test_version_respects_tenant_fencing_and_revoked_grants(commands):
     with pytest.raises(CommandError) as error:
         read_version.snapshot(service, reader, space)
     assert error.value.status == 403
+
+
+def test_each_write_changes_only_the_kinds_its_lists_show(commands):
+    service, owner, space, _ = commands
+
+    def changed(action):
+        before = read_version.snapshot(service, owner, space)
+        action()
+        after = read_version.snapshot(service, owner, space)
+        assert after["version"] != before["version"]
+        return {kind for kind in KINDS if after["versions"][kind] != before["versions"][kind]}
+
+    saved = {}
+    assert changed(lambda: saved.update(service.save(owner, space, change()))) == {
+        "document",
+        "memory",  # Memory listings show whether a source changed.
+    }
+    item = {}
+    assert changed(lambda: item.update(workspace_items.save(service, owner, space, project()))) == {
+        "project"
+    }
+    assert changed(
+        lambda: tasks.add_column(
+            service,
+            owner,
+            space,
+            tasks.AddColumn(
+                command_id=uuid4(), expected_revision=1, value="blocked", label="Blocked"
+            ),
+        )
+    ) == {"columns"}
+    service.memory_models = Models()
+    assert changed(
+        lambda: service.remember_claims(
+            owner,
+            space,
+            RememberClaims(
+                command_id=uuid4(),
+                title="Preference",
+                claims=[{"index": "Database", "value": "Use PostgreSQL."}],
+            ),
+        )
+    ) == {"memory"}
+    assert changed(
+        lambda: resource_deletion.delete_resource(
+            service, owner, space, UUID(saved["id"]), saved["revision"]
+        )
+    ) == {"document", "memory"}

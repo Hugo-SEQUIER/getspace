@@ -3,15 +3,40 @@ import type { PersistentReads } from "./persistent-reads";
 
 export type ReadOptions = { fresh?: boolean; allPages?: boolean };
 type Page = { items: unknown[]; next_cursor: string | null };
-type ReadVersion = (spaceId: string, signal: AbortSignal) => Promise<string>;
-const FULL_RECHECK_MS = 5 * 60_000;
+/** `version` changes with any content; each `versions` entry only with its kind. */
+export type SpaceVersions = { version: string; versions?: Record<string, string> };
+type ReadVersion = (spaceId: string, signal: AbortSignal) => Promise<SpaceVersions>;
+// A backstop full read for anything a version could miss. Per-kind versions already catch
+// every content write, so this can be rare.
+const FULL_RECHECK_MS = 15 * 60_000;
+const ITEM_KINDS = ["project", "folder", "database", "category", "section"];
+const RESOURCE_KINDS = ["document", "task", "memory"];
 
 /** Only content covered by the Space revision can skip an unchanged response. */
 function versionedSpace(path: string) {
   const url = new URL(path, "https://cache.invalid/");
-  const match = /^\/spaces\/([^/]+)\/(?:resources(?:\/[^/]+)?|items(?:\/[^/]+)?|memories(?:\/[^/]+)?|tasks\/columns)$/.exec(url.pathname);
+  const match = /^\/spaces\/([^/]+)\/(?:resources(?:\/[^/]+)?|items(?:\/[^/]+)?|memories(?:\/[^/]+)?|tasks\/columns|search\/index)$/.exec(url.pathname);
   if (!match || url.searchParams.has("query")) return undefined;
-  return match[1];
+  return { spaceId: match[1], kinds: contentKinds(url) };
+}
+
+/** The kinds of content a read shows; undefined means it depends on every kind. */
+function contentKinds(url: URL): string[] | undefined {
+  const [, , , collection, id] = url.pathname.split("/");
+  const kind = url.searchParams.get("kind");
+  if (collection === "resources")
+    return !id && (kind === "document" || kind === "task") ? [kind] : RESOURCE_KINDS;
+  if (collection === "items") return !id && kind && ITEM_KINDS.includes(kind) ? [kind] : ITEM_KINDS;
+  // Memory pages name the categories, projects and sections that classify each claim.
+  if (collection === "memories") return ["memory", "category", "project", "section"];
+  if (collection === "tasks") return ["columns"];
+  return undefined;
+}
+
+/** The part of the Space version this read depends on; the whole one when unknown. */
+function readVersionFor(versions: SpaceVersions, kinds: string[] | undefined) {
+  const parts = kinds?.map(kind => versions.versions?.[kind]);
+  return parts?.every(part => typeof part === "string") ? parts.join("|") : versions.version;
 }
 
 async function storageTicket(store: PersistentReads, barrier: Promise<void>) {
@@ -101,14 +126,14 @@ export class ReadCache {
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<T> => {
         if (!account || account !== this.account) throw new Error("Account changed");
         const readVersion = this.readVersion;
-        const spaceId = readVersion && versionedSpace(path);
+        const versioned = readVersion && versionedSpace(path);
         // Capture the version BEFORE reading content. A concurrent edit will then
         // force another full read next time, even if this response spans the edit.
-        const version = spaceId ? await this.client.fetchQuery({
-          queryKey: [account, `spaces/${spaceId}/read-version`, false],
-          queryFn: ({ signal }) => readVersion!(spaceId, signal),
+        const version = versioned ? readVersionFor(await this.client.fetchQuery({
+          queryKey: [account, `spaces/${versioned.spaceId}/read-version`, false],
+          queryFn: ({ signal }) => readVersion!(versioned.spaceId, signal),
           staleTime: 1000,
-        }) : undefined;
+        }), versioned.kinds) : undefined;
         signal.throwIfAborted();
         if (account !== this.account) throw new Error("Account changed");
         const previous = this.versions.get(versionKey);
