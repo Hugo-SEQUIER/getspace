@@ -5,6 +5,10 @@
 {$CADDY_SITE_ADDRESS} {
 	encode zstd gzip
 
+	# Some clients drop the final slash of the MCP address. Answer that redirect here, at the
+	# https address, instead of letting the API redirect to the http address it sees.
+	redir /mcp /mcp/ 308
+
 	@api path /mcp /mcp/* /v1/* /health/* /oauth/* /.well-known/oauth-authorization-server* /.well-known/oauth-protected-resource*
 	handle @api {
 		reverse_proxy api:8000
