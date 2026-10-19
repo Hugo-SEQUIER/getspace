@@ -66,10 +66,18 @@ def provider_line(models) -> str:
     embedding_target = (
         info.get("embedding_endpoint") or info.get("endpoint") or "the configured provider"
     )
+    anthropic = (
+        f"Extraction and relevance chat go first to {info['anthropic_model']} on the Anthropic "
+        "API, and to the configured text or relevance model only when that request fails. "
+        "Anthropic requests have no store=false option. "
+        if info.get("anthropic_model")
+        else ""
+    )
     return (
         f"Structured writes send claim values for embedding to {embedding_target}. "
         f"Raw extraction uses text model {info['text_model']} at {info['endpoint']}. "
-        "The embedding model is "
+        + anthropic
+        + "The embedding model is "
         f"{info['embedding_model']}. "
         + classification
         + relationships

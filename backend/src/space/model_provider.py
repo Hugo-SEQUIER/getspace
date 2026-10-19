@@ -50,6 +50,48 @@ def strict_schema(value):
     return value
 
 
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+# Constraint keywords the Messages API schema compiler rejects. The response model
+# still validates them, so dropping them here loosens nothing.
+UNSUPPORTED_SCHEMA_KEYS = {
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+}
+# The retrieval policy asks for JSON without a response model; invoke validates it.
+POLICY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "enum": ["EXPAND", "RE_QUERY", "STOP"]},
+        "new_query": {"type": "string"},
+        "frontier_ids": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+
+def anthropic_schema(value):
+    """Remove unsupported constraints from schema nodes, never from property names."""
+    if isinstance(value, list):
+        return [anthropic_schema(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if key in UNSUPPORTED_SCHEMA_KEYS:
+            continue
+        if key in ("properties", "$defs") and isinstance(item, dict):
+            result[key] = {name: anthropic_schema(v) for name, v in item.items()}
+        else:
+            result[key] = anthropic_schema(item)
+    return result
+
+
 class MemoryModels:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -74,6 +116,14 @@ class MemoryModels:
                 self.settings.memory_provider_url,
                 self.settings.memory_text_model,
             ]
+            + ([self.anthropic_model] if self.anthropic_model else [])
+        )
+
+    @property
+    def anthropic_model(self) -> str | None:
+        """The Messages API model tried before the configured provider, if any."""
+        return (
+            self.settings.memory_anthropic_model if self.settings.memory_anthropic_api_key else None
         )
 
     @property
@@ -111,6 +161,7 @@ class MemoryModels:
             "text_model": self.settings.memory_text_model,
             "relevance_model": self.settings.memory_relevance_model
             or self.settings.memory_text_model,
+            "anthropic_model": self.anthropic_model,
             "embedding_model": self.settings.memory_embedding_model,
             "relevance_provider": self.settings.memory_relevance_provider,
             "classification_provider": self.settings.memory_classification_provider,
@@ -215,6 +266,7 @@ class ModelSession:
         failure=ModelError,
         timing_stage=None,
         stage=None,
+        auth_headers=None,
     ):
         if timing_stage not in (None, "chat_assessment", "chat_conflicts"):
             raise ValueError("Unknown provider timing stage")
@@ -236,7 +288,7 @@ class ModelSession:
         if remaining <= 0:
             raise ModelError("Memory processing exceeded its request budget")
         request_deadline = time.monotonic() + min(remaining, timeout)
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", **(auth_headers or {})}
         if api_key:
             headers["Authorization"] = "Bearer " + api_key.get_secret_value()
         try:
@@ -309,6 +361,16 @@ class ModelSession:
             # Trusted application instructions; user queries and stored evidence stay
             # in the separate user message. No request model exposes this argument.
             system += "\n" + instructions
+        if self.settings.memory_anthropic_api_key:
+            try:
+                return self._parse(
+                    self._anthropic_chat(system, prompt, schema, purpose, timing_stage),
+                    response_format,
+                )
+            except ModelError:
+                # Any Anthropic failure, an unusable answer included, gets one attempt on
+                # the configured provider within the same request budget.
+                pass
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         text_model = (
             self.settings.memory_relevance_model or self.settings.memory_text_model
@@ -367,6 +429,58 @@ class ModelSession:
                 content = result["choices"][0]["message"]["content"]
             except (KeyError, IndexError, TypeError):
                 raise ModelError("Memory model returned an invalid completion") from None
+        return self._parse(content, response_format)
+
+    def _anthropic_chat(self, system, prompt, schema, purpose, timing_stage):
+        """Parameters: the system and user text, response schema, purpose and timing stage.
+
+        What it does: asks the Anthropic Messages API for schema-constrained JSON.
+        Output: the answer text; refusals and truncated answers raise ModelError.
+        """
+        effort = (
+            self.settings.memory_relevance_reasoning_effort
+            if purpose == "relevance"
+            else self.settings.memory_reasoning_effort
+        )
+        output_config = {
+            "format": {
+                "type": "json_schema",
+                "schema": anthropic_schema(strict_schema(schema or POLICY_SCHEMA)),
+            }
+        }
+        payload = {
+            "model": self.settings.memory_anthropic_model,
+            "max_tokens": 6000,
+            "system": system,
+            "messages": [{"role": "user", "content": prompt}],
+            "output_config": output_config,
+        }
+        # Sampling parameters are left out: current Claude models reject them.
+        if effort == "none":
+            payload["thinking"] = {"type": "disabled"}
+        elif effort:
+            output_config["effort"] = effort
+        result = self._request(
+            ANTHROPIC_MESSAGES_URL,
+            payload,
+            None,
+            timing_stage=timing_stage,
+            auth_headers={
+                "x-api-key": self.settings.memory_anthropic_api_key.get_secret_value(),
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        try:
+            if result["stop_reason"] != "end_turn":
+                raise ValueError
+            texts = [block["text"] for block in result["content"] if block["type"] == "text"]
+            if len(texts) != 1 or not isinstance(texts[0], str):
+                raise ValueError
+        except (KeyError, TypeError, ValueError):
+            raise ModelError("Memory model returned an invalid completion") from None
+        return texts[0]
+
+    def _parse(self, content, response_format):
         try:
             if not isinstance(content, str) or len(content) > 100_000:
                 raise ValueError

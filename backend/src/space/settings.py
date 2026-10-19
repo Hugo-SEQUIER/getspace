@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     memory_api_key: SecretStr | None = None
     memory_text_model: str | None = None
     memory_relevance_model: str | None = None
+    # Optional first-party Anthropic key. When set, extraction and relevance chat go to
+    # the Messages API first and fall back to memory_provider_url on any failure.
+    memory_anthropic_api_key: SecretStr | None = None
+    memory_anthropic_model: str = Field(default="claude-haiku-5-5", min_length=1)
     # Decision models answer typed questions with probabilities instead of text. They
     # judge recall evidence, organize memories and link related ones, each when its
     # provider is "decision"; "typesafe", the earlier name, still means the same. Any
