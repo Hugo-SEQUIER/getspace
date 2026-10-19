@@ -477,10 +477,11 @@ def create_mcp(
             Prefer a status from task_columns; a new status value is saved as a column
             labelled from it (add_task_column picks the label), and set_task_status moves
             a task without resending its body. Set status
-            "needs_you" on a task or document when the work cannot continue without the
-            person's decision, approval or merge: it stays on their home page until they
-            change it, so never write a separate "blocked" document instead. Stay within
-            1 MiB.
+            "needs_you" on a task when the work cannot continue without the person's
+            decision, approval or merge: it stays on their home page until they change it.
+            Only tasks take it; when a document needs review, save the document, then a
+            needs_you task that names it, and never write a separate "blocked" document.
+            Stay within 1 MiB.
             Output: the saved resource. Reuse command_id unchanged on retry.
             """
             return await command(workspace.save, space_id, change, agent_id=agent_id)

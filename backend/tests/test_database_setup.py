@@ -373,7 +373,29 @@ def test_explicit_connection_allowance_is_preserved_and_runtime_checks_actual_ro
             runtime._configure_budget(connection)
     finally:
         with engine.begin() as connection:
-            apply_foundation(connection, password, connection_limit=5)
+            connection.exec_driver_sql("ALTER ROLE space_app CONNECTION LIMIT 5")
+
+
+def test_setup_never_lowers_an_existing_connection_allowance(database):
+    connect_as, engine, _, _, password = database
+    try:
+        with engine.begin() as connection:
+            apply_foundation(connection, password, connection_limit=20)
+        with pytest.raises(DatabaseSetupError, match="would lower the space_app allowance from 20"):
+            with engine.begin() as connection:
+                apply_foundation(connection, password, connection_limit=18)
+        with engine.begin() as connection:
+            apply_foundation(connection, password, connection_limit=20)
+        with connect_as(runtime=True) as connection:
+            assert (
+                connection.execute(
+                    "SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user"
+                ).fetchone()[0]
+                == 20
+            )
+    finally:
+        with engine.begin() as connection:
+            connection.exec_driver_sql("ALTER ROLE space_app CONNECTION LIMIT 5")
 
 
 def test_setup_refuses_an_unrelated_role_without_adopting_it(database):

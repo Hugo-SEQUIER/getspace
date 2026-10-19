@@ -121,3 +121,15 @@ def test_api_key_writes_are_a_client_and_needs_you_is_a_default_status(commands)
         )["status"]
         == "needs_you"
     )
+
+
+def test_only_tasks_can_wait_on_the_person():
+    def flagged(kind, **values):
+        return SaveResource(
+            command_id=uuid4(), kind=kind, title="Report", status="needs_you", **values
+        )
+
+    for values in ({"expected_revision": 0}, {"resource_id": uuid4(), "expected_revision": 3}):
+        with pytest.raises(ValueError, match="Only tasks can wait on the person"):
+            flagged("document", **values)
+    assert flagged("task", expected_revision=0).status == "needs_you"

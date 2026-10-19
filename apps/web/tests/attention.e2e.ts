@@ -92,3 +92,13 @@ test('the task board shows a Needs you column before Done only while a task is f
   const order = await browser.evaluate(() => Array.from(document.querySelectorAll('[data-status]')).map(node => node.getAttribute('data-status')));
   expect(order.indexOf('needs_you')).toBeLessThan(order.indexOf('done'));
 });
+
+test('only tasks wait on the person: a document carrying the old flag is not listed under Needs you', async ({ app, screen, space }) => {
+  space.tasks.push(flagged);
+  space.documents.push({ ...report, status: 'needs_you' });
+  await app.open('/app/');
+  const needsYou = screen.getByRole('region', 'Needs you');
+  await expect(needsYou.getByRole('link', 'Approve the outreach batch')).toBeVisible();
+  await expect(needsYou.getByRole('link', 'Daily SEO report')).toHaveCount(0);
+  await expect(screen.getByRole('region', 'New since you looked').getByRole('link', 'Daily SEO report')).toBeVisible();
+});

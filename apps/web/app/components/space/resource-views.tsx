@@ -295,6 +295,7 @@ export function ResourceForm({
                     onChange={(e) =>
                       setPriority(e.target.value as Resource["priority"])
                     }
+                    disabled={busy}
                   >
                     {["High", "Medium", "Low"].map((p) => (
                       <option key={p}>{p}</option>

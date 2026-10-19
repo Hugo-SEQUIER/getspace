@@ -413,6 +413,22 @@ export function queryRecords(
     });
 }
 
+// Keeps rows where they were on screen when an edit changes their sort key, so
+// a saved cell does not jump to the top under "Last edited". New rows take
+// their sorted position and removed rows drop out.
+export function keepRecordOrder<T extends { id: string }>(
+  previous: readonly string[],
+  sorted: readonly T[],
+) {
+  const byId = new Map(sorted.map((record) => [record.id, record]));
+  const known = new Set(previous);
+  const order = previous.filter((id) => byId.has(id));
+  sorted.forEach((record, index) => {
+    if (!known.has(record.id)) order.splice(Math.min(index, order.length), 0, record.id);
+  });
+  return order.map((id) => byId.get(id)!);
+}
+
 // A database read from the API is validated before its fields are rendered or saved.
 export function isWorkspaceDatabase(
   value: unknown,

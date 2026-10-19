@@ -15,7 +15,7 @@ test("an item is unseen only when someone else wrote a revision the person has n
   assert.ok(isUnseen(item("a", { author: "Teammate" }), {}));
 });
 
-test("needs-you items are listed once, memory never appears, and both lists are newest first", () => {
+test("needs-you tasks are listed once, memory never appears, and both lists are newest first", () => {
   const seen = { old: 2 };
   const { needsYou, unseen } = attentionItems([
     item("old"),
@@ -24,9 +24,10 @@ test("needs-you items are listed once, memory never appears, and both lists are 
     item("mine-flagged", { status: "needs_you", author: "you", updated_at: "2026-10-09T00:00:00Z" }),
     item("memory", { kind: "document", recall: { category: "memory" } }),
     item("memo-flag", { kind: "document", status: "needs_you", recall: { category: "memory" } }),
+    item("doc-flag", { kind: "document", status: "needs_you" }),
   ], seen);
   assert.deepEqual(needsYou.map(r => r.id), ["mine-flagged", "flagged"], "a flag counts whoever set it");
-  assert.deepEqual(unseen.map(r => r.id), ["fresh"]);
+  assert.deepEqual(unseen.map(r => r.id), ["doc-flag", "fresh"], "only tasks wait on the person");
 });
 
 test("seen marks index by resource, keep the highest revision and merge upwards only", () => {

@@ -390,6 +390,7 @@ test('task creation shows progress, keeps the draft on failure, and retries with
   await expect(createDialog.getByRole('status')).toHaveText('Creating task…');
   await expect(createDialog.getByRole('button', 'Save')).toBeDisabled();
   await expect(createDialog.getByLabel('Title')).toBeDisabled();
+  await expect(createDialog.getByLabel('Priority')).toBeDisabled();
   await browser.keyboard.press('Escape');
   await expect(createDialog).toBeVisible();
   await expect.poll(() => firstCreate.arrivals).toBe(1);

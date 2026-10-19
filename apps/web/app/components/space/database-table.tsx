@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { cellLink, fieldTypes, fieldValue, optionColor, type DatabaseField, type DatabaseRecord, type FieldValue, type WorkspaceDatabase } from "../../../lib/space/databases";
 import { message } from "../../../lib/client";
 import { Avatar } from "./ui";
@@ -174,6 +174,56 @@ function EditableCell({
   );
 }
 
+// A popover menu beside its trigger, shared by the row menu and the selection bar.
+// Arrow keys, Home and End move between enabled items, and Tab closes the menu.
+function useActionMenu(align: "start" | "end") {
+  const id = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  function position() {
+    if (!trigger.current || !menu.current) return;
+    const bounds = trigger.current.getBoundingClientRect();
+    const width = menu.current.offsetWidth || 192;
+    const height = menu.current.offsetHeight || 120;
+    const left = align === "end" ? bounds.right - width : bounds.left;
+    menu.current.style.left = `${Math.max(12, Math.min(window.innerWidth - width - 12, left))}px`;
+    menu.current.style.top = `${bounds.bottom + height + 4 < window.innerHeight - 12 ? bounds.bottom + 4 : Math.max(12, bounds.top - height - 4)}px`;
+  }
+  return {
+    trigger, menu, position,
+    triggerProps: {
+      ref: trigger, "aria-haspopup": "menu" as const, "aria-expanded": open, popoverTarget: id,
+      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault(); position(); menu.current?.showPopover();
+        }
+      },
+    },
+    menuProps: {
+      ref: menu, id, popover: "auto" as const, role: "menu",
+      onToggle: () => {
+        const isOpen = menu.current?.matches(":popover-open") ?? false;
+        setOpen(isOpen);
+        if (isOpen) {
+          position();
+          requestAnimationFrame(() => menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus());
+        }
+      },
+      onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Tab") { menu.current?.hidePopover(); return; }
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+        if (!buttons.length || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+          : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+      },
+    },
+  };
+}
+
 function RowActions({ record, canWrite, saving, duplicate, copy, remove }: {
   record: DatabaseRecord;
   canWrite: boolean;
@@ -182,21 +232,11 @@ function RowActions({ record, canWrite, saving, duplicate, copy, remove }: {
   copy: () => Promise<void>;
   remove: () => Promise<void>;
 }) {
-  const id = useId();
-  const trigger = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
+  const { trigger, menu, position, triggerProps, menuProps } = useActionMenu("end");
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   useFeedback({ error });
-  function position() {
-    if (!trigger.current || !menu.current) return;
-    const bounds = trigger.current.getBoundingClientRect();
-    const height = menu.current.offsetHeight || 120;
-    menu.current.style.left = `${Math.max(12, Math.min(window.innerWidth - 204, bounds.right - 192))}px`;
-    menu.current.style.top = `${bounds.bottom + height + 4 < window.innerHeight - 12 ? bounds.bottom + 4 : Math.max(12, bounds.top - height - 4)}px`;
-  }
   async function run(action: () => Promise<void>) {
     if (working.current) return;
     working.current = true; setBusy(true); setError("");
@@ -208,32 +248,9 @@ function RowActions({ record, canWrite, saving, duplicate, copy, remove }: {
     finally { working.current = false; setBusy(false); }
   }
   return <div className="sp-db-row-actions" aria-busy={busy}>
-    <button ref={trigger} type="button" className="sp-icon-button" aria-label={`Actions for ${record.name}`}
-      aria-haspopup="menu" aria-expanded={open} popoverTarget={id} onClick={() => { setError(""); position(); }}
-      onKeyDown={(event) => {
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault(); position(); menu.current?.showPopover();
-        }
-      }}><Icon name="more" size={15} /></button>
-    <div ref={menu} id={id} popover="auto" className="sp-db-row-menu" role="menu" aria-label={`Actions for ${record.name}`}
-      onToggle={() => {
-        const isOpen = menu.current?.matches(":popover-open") ?? false;
-        setOpen(isOpen);
-        if (isOpen) {
-          position();
-          requestAnimationFrame(() => menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus());
-        }
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Tab") { menu.current?.hidePopover(); return; }
-        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
-        if (!buttons.length || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-        event.preventDefault();
-        const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
-          : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
-        buttons[next]?.focus();
-      }}>
+    <button {...triggerProps} type="button" className="sp-icon-button" aria-label={`Actions for ${record.name}`}
+      onClick={() => { setError(""); position(); }}><Icon name="more" size={15} /></button>
+    <div {...menuProps} className="sp-db-row-menu" aria-label={`Actions for ${record.name}`}>
       <button type="button" role="menuitem" disabled={!canWrite || saving || busy} onClick={() => void run(duplicate)}><Icon name="copy" size={14} />Duplicate row</button>
       <button type="button" role="menuitem" disabled={busy} onClick={() => void run(copy)}><Icon name="copy" size={14} />Copy row</button>
       <button type="button" role="menuitem" className="sp-danger-text" disabled={!canWrite || saving || busy} onClick={() => void run(remove)}><Icon name="trash" size={14} />Delete row</button>
@@ -241,11 +258,43 @@ function RowActions({ record, canWrite, saving, duplicate, copy, remove }: {
   </div>;
 }
 
-export function SelectedRowActions({ count, canWrite, saving, clear, duplicate, copy, remove }: {
+// Sets a select property on every selected record at once. Only select properties are offered.
+function SetOptionMenu({ fields, disabled, run, setOption }: {
+  fields: readonly DatabaseField[];
+  disabled: boolean;
+  run: (action: () => Promise<void>) => Promise<boolean>;
+  setOption: (field: DatabaseField, value: string | null) => Promise<void>;
+}) {
+  const { trigger, menu, position, triggerProps, menuProps } = useActionMenu("start");
+  const label = fields.length === 1 ? `Set ${fields[0].name}` : "Set value";
+  async function choose(field: DatabaseField, value: string | null) {
+    if (await run(() => setOption(field, value))) {
+      menu.current?.hidePopover();
+      trigger.current?.focus({ preventScroll: true });
+    } else requestAnimationFrame(position);
+  }
+  return <>
+    <button {...triggerProps} type="button" className="text-button" aria-label={`${label} on selected`}
+      disabled={disabled} onClick={position}><Icon name="board" size={14} />{label}</button>
+    <div {...menuProps} className="sp-db-row-menu sp-db-option-menu" aria-label={`${label} on selected`}>
+      {fields.map((field) => <div key={field.id} role="group" aria-label={field.name}>
+        {fields.length > 1 && <p aria-hidden="true">{field.name}</p>}
+        {field.options?.map((option) => <button key={option} type="button" role="menuitem" disabled={disabled}
+          onClick={() => void choose(field, option)}><RecordValue field={field} value={option} /></button>)}
+        <button type="button" role="menuitem" className="is-empty" disabled={disabled}
+          onClick={() => void choose(field, null)}>No {field.name.toLowerCase()}</button>
+      </div>)}
+    </div>
+  </>;
+}
+
+export function SelectedRowActions({ count, canWrite, saving, selects, clear, setOption, duplicate, copy, remove }: {
   count: number;
   canWrite: boolean;
   saving: boolean;
+  selects: readonly DatabaseField[];
   clear: () => void;
+  setOption: (field: DatabaseField, value: string | null) => Promise<void>;
   duplicate: () => Promise<void>;
   copy: () => Promise<void>;
   remove: () => Promise<void>;
@@ -255,15 +304,16 @@ export function SelectedRowActions({ count, canWrite, saving, clear, duplicate, 
   const [error, setError] = useState("");
   useFeedback({ error });
   async function run(action: () => Promise<void>) {
-    if (working.current) return;
+    if (working.current) return false;
     working.current = true; setBusy(true); setError("");
-    try { await action(); }
-    catch (cause) { setError(message(cause)); }
+    try { await action(); return true; }
+    catch (cause) { setError(message(cause)); return false; }
     finally { working.current = false; setBusy(false); }
   }
   return <div className="sp-db-selection-bar" role="group" aria-label="Selected record actions" aria-busy={busy}>
     <span>{count} selected</span>
     <div className="sp-actions">
+      {selects.length > 0 && <SetOptionMenu fields={selects} disabled={!canWrite || saving || busy} run={run} setOption={setOption} />}
       <button type="button" className="text-button" aria-label="Duplicate selected" disabled={!canWrite || saving || busy} onClick={() => void run(duplicate)}><Icon name="copy" size={14} />Duplicate</button>
       <button type="button" className="text-button" aria-label="Copy selected" disabled={busy} onClick={() => void run(copy)}><Icon name="copy" size={14} />Copy</button>
       <button type="button" className="text-button sp-danger-text" aria-label="Delete selected" disabled={!canWrite || saving || busy} onClick={() => void run(remove)}><Icon name="trash" size={14} />Delete</button>
@@ -301,8 +351,17 @@ export function DatabaseTable({ database, rows, canWrite, saving, selected, sele
   useEffect(() => {
     if (all.current) all.current.indeterminate = selectedOnPage > 0 && selectedOnPage < rows.length;
   }, [selectedOnPage, rows.length]);
+  // Once a record is selected, a click anywhere on a row selects or clears it instead of editing or opening.
+  // Keyboard activation (detail 0) still runs each control, and the checkbox, row menu and an open editor keep their clicks.
+  const selecting = selected.size > 0;
+  function toggleRow(event: ReactMouseEvent, row: DatabaseRecord) {
+    if (event.detail === 0 || (event.target as Element).closest(".sp-db-select-target, .sp-db-row-actions, input:not([type=checkbox]), select")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    select([row.id], !selected.has(row.id));
+  }
   return <div ref={wrap} className="sp-db-table-wrap" tabIndex={0} aria-label="Database table, scroll horizontally for more properties">
-    <table className="sp-db-table">
+    <table className={`sp-db-table${selecting ? " is-selecting" : ""}`}>
       <thead><tr>
         <th className="sp-db-selection-column"><input ref={all} type="checkbox" aria-label="Select all records on this page"
           disabled={!rows.length} checked={rows.length > 0 && selectedOnPage === rows.length}
@@ -316,9 +375,12 @@ export function DatabaseTable({ database, rows, canWrite, saving, selected, sele
         </th>)}
         <th><button aria-label="Add property" disabled={!canWrite} onClick={() => property("new")}><Icon name="plus" size={14} /><span>Add property</span></button></th>
       </tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.id} data-record-id={row.id} className={selected.has(row.id) ? "is-selected" : undefined}>
-        <td className="sp-db-selection-column"><input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.has(row.id)}
-          onChange={(event) => select([row.id], event.target.checked)} /></td>
+      <tbody>{rows.map((row) => <tr key={row.id} data-record-id={row.id} className={selected.has(row.id) ? "is-selected" : undefined}
+        onClickCapture={selecting ? (event) => toggleRow(event, row) : undefined}>
+        <td className="sp-db-selection-column"><label className="sp-db-select-target">
+          <input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.has(row.id)}
+            onChange={(event) => select([row.id], event.target.checked)} />
+        </label></td>
         <td className="sp-db-name-column"><div className="sp-db-name-cell">
           <button className="sp-db-record-name" onClick={() => open(row)}>
             <Avatar name={row.name} small kind="organization" /><span className="sp-db-record-label" title={row.name}>{row.name}</span><Icon name="external" size={12} />

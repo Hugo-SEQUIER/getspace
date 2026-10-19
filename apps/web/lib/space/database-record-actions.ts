@@ -1,4 +1,4 @@
-import type { DatabaseRecord, FieldValue, WorkspaceDatabase } from "./databases";
+import { fieldValue, type DatabaseRecord, type FieldValue, type WorkspaceDatabase } from "./databases.ts";
 
 export function duplicateDatabaseRecord(
   database: WorkspaceDatabase,
@@ -74,6 +74,30 @@ export function deleteDatabaseRecords(
     ids.add(original.id);
   }
   return { ...database, records: database.records.filter((record) => !ids.has(record.id)) };
+}
+
+// Sets one select property on every selected record in a single snapshot; only select properties qualify.
+// Records that already hold the value keep their last-edited time.
+export function setDatabaseRecordsOption(
+  database: WorkspaceDatabase,
+  recordIds: readonly string[],
+  fieldId: string,
+  value: string | null,
+  now = new Date().toISOString(),
+): WorkspaceDatabase {
+  const field = database.fields.find((item) => item.id === fieldId);
+  if (field?.type !== "select")
+    throw new Error("This property changed. Reload the database before editing it.");
+  const next = fieldValue(field, value);
+  const ids = new Set(recordIds);
+  const available = new Set(database.records.map((record) => record.id));
+  if ([...ids].some((id) => !available.has(id)))
+    throw new Error("A selected record no longer exists. Reload the database before changing it.");
+  return {
+    ...database,
+    records: database.records.map((record) => !ids.has(record.id) || (record.values[field.id] ?? null) === next ? record
+      : { ...record, values: { ...record.values, [field.id]: next }, updatedAt: now }),
+  };
 }
 
 function tsvCell(value: FieldValue | undefined): string {

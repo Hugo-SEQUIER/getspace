@@ -66,7 +66,7 @@ export function HomeView({ base, onSearch, searchShortcut }: {
         <h2 id="home-needs-you-title">Needs you<span className="sp-home-attention-count">{attention.needsYou.length}</span></h2>
         <Link href={`${base}/tasks`}>All tasks</Link>
       </div>
-      <p className="sp-home-attention-hint">Agents flagged these as waiting on your decision, approval or merge. Change the status once you have answered.</p>
+      <p className="sp-home-attention-hint">Agents flagged these tasks as waiting on your decision, approval or merge. Change the status once you have answered.</p>
       <AttentionList base={base} items={attention.needsYou} projectNames={projectNames} />
     </section>}
     {data.viewsReady && data.resourcesReady && attention.unseen.length > 0 && <section className="sp-home-v2-section sp-home-attention" aria-label="New since you looked">

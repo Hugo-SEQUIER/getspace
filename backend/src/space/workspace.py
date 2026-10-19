@@ -112,6 +112,11 @@ class SaveResource(BaseModel):
             raise ValueError("Session handoffs must be documents")
         if self.kind != "document" and self.folder is not None:
             raise ValueError("Only documents can belong to a folder")
+        if self.kind == "document" and self.status == tasks.NEEDS_YOU:
+            raise ValueError(
+                "Only tasks can wait on the person. Create a task with status needs_you "
+                "that names this document instead"
+            )
         if len(self.model_dump_json().encode()) > 1024 * 1024:
             raise ValueError("Resource exceeds 1 MiB")
         return self

@@ -14,12 +14,14 @@ from space.memory import Input
 from space.providers import key_operation
 
 Status = Annotated[str, Field(min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9_-]*$")]
-# needs_you is accepted everywhere without being a stored column: the board always shows
-# it, and the home page lists such tasks as waiting on the person.
+# needs_you is accepted on every task without being a stored column: the board always
+# shows it, and the home page lists such tasks as waiting on the person. Documents never
+# carry it; an agent waiting on a document flags a task that names it.
+NEEDS_YOU = "needs_you"
 DEFAULT_LABELS = {
     "todo": "To do",
     "in_progress": "In progress",
-    "needs_you": "Needs you",
+    NEEDS_YOU: "Needs you",
     "done": "Done",
 }
 MAX_COLUMNS = 30
