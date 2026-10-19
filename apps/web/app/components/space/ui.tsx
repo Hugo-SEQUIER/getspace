@@ -204,13 +204,16 @@ export function Empty({
   icon = "document",
   title,
   children,
+  valley = false,
 }: {
   icon?: IconName;
   title: string;
   children: ReactNode;
+  /** A first-use state: ends on the public site's engraved valley. */
+  valley?: boolean;
 }) {
   return (
-    <div className="sp-empty">
+    <div className="sp-empty" data-valley={valley || undefined}>
       <span className="sp-empty-icon">
         <Icon name={icon} size={28} />
       </span>

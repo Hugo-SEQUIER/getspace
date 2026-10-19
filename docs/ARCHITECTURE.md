@@ -25,7 +25,7 @@ flowchart LR
 | Service | What it runs | Database login |
 |---|---|---|
 | `db` | PostgreSQL 17 with pgvector (`pgvector/pgvector:0.8.2-pg17`). All data lives in the `db-data` volume. | |
-| `migrate` | `python -m space.install`, then exits. It creates the restricted logins `space_app`, `space_worker` and `space_webhook` with the passwords from `.env`, or resets existing logins to those passwords, applies the Alembic migrations through `0035_selfhosted_limits`, sizes the empty memory index to `SPACE_MEMORY_EMBEDDING_DIMENSIONS`, and logs in as each login to verify it. It runs on every `docker compose up`. | `postgres`, the superuser |
+| `migrate` | `python -m space.install`, then exits. It creates the restricted logins `space_app`, `space_worker` and `space_webhook` with the passwords from `.env`, or resets existing logins to those passwords, applies the Alembic migrations through `0040_webhook_inbox`, sizes the empty memory index to `SPACE_MEMORY_EMBEDDING_DIMENSIONS`, and logs in as each login to verify it. It runs on every `docker compose up`. | `postgres`, the superuser |
 | `api` | The FastAPI application in one Uvicorn process: the REST API under `/v1`, the MCP endpoint at `/mcp/`, and `/health/live` and `/health/ready`. At startup it creates the owner's Private Space if it does not exist yet. | `space_app` |
 | `worker` | `python -m space.job_worker`, which runs memory extraction jobs. While the queue is empty it runs one cheap query every 3 seconds; each job attempt runs in a fresh child process. | `space_worker` for the queue, `space_app` for content |
 | `webhooks` | `python -m space.webhook_worker --loop`, which delivers signed webhooks with the same idle check. | `space_webhook` for the queue, `space_app` for content |
@@ -58,7 +58,7 @@ backend/src/space/
   memory_pipeline.py          Extraction with the vendored Memora runtime
   brain.py                    The pgvector claim index and its search SQL
   recall_candidates.py        Recall candidates: vector, keyword and linked claims, lexical sources
-  relevance.py                Evidence assessment after retrieval; typesafe_relevance.py is the TypeSafe route
+  relevance.py                Evidence assessment after retrieval; decision_relevance.py is the decision-model route
   memory_classification.py    Categories, sections and projects for each claim; catalog_shortlist.py for large catalogs
   memory_routing.py           Routing rules attached to containers; space_map.py builds the Space map
   memory_relationships.py     Inferred links between memories; memory_node_links.py and memory_link_index.py
@@ -70,7 +70,7 @@ backend/src/space/
   teams.py                    Organizations, members and shared Spaces (hidden in the website)
   agents.py                   Agent identities
   quotas.py                   Usage counters
-  model_provider.py           The bounded HTTP transport to the model provider and TypeSafe
+  model_provider.py           The bounded HTTP transport to the model provider and the decision model
   guide.py                    The operating guide served to agents
   retention.py, webhook_retention.py, purge.py
                               Operator maintenance commands

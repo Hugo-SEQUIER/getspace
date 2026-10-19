@@ -3,6 +3,7 @@ import { docsLinks } from "../../../lib/docs-links";
 import { SpaceMark, Wordmark } from "../space/brand";
 import { Icon, type IconName } from "../space/ui-icon";
 import styles from "./connection.module.css";
+import "../../valley.css";
 
 export function ConnectionShell({
   children,
@@ -12,7 +13,7 @@ export function ConnectionShell({
   wide?: boolean;
 }) {
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} sp-valley`}>
       <header className={styles.header}>
         <a href="/app" aria-label="Space home">
           <Wordmark />

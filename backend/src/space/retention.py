@@ -20,6 +20,8 @@ from space.database_setup import InstallSettings, connect
 
 COMMAND_RETENTION_DAYS = 180
 ACTIVITY_RETENTION_DAYS = 90
+# Any export finishes well within a day; migration 0036 keeps retired vectors for exports.
+RETIRED_VECTOR_RETENTION_DAYS = 1
 BATCH_SIZE = 10000
 
 # Events first: they reference the commands being removed.
@@ -51,6 +53,16 @@ DELETE FROM space.activity_events
 WHERE ctid IN (
     SELECT ctid FROM space.activity_events
     WHERE created_at < now() - make_interval(days => %s)
+    LIMIT %s
+)
+"""
+
+# Recall vectors kept for exports that started before a claim changed.
+RETIRED_VECTORS_SQL = """
+DELETE FROM space.retired_claim_vectors
+WHERE ctid IN (
+    SELECT ctid FROM space.retired_claim_vectors
+    WHERE retired_at < now() - make_interval(days => %s)
     LIMIT %s
 )
 """
@@ -90,7 +102,15 @@ def purge(connection, *, days: int = COMMAND_RETENTION_DAYS, batch_size: int = B
     events = _delete_in_batches(connection, EVENTS_SQL, days, batch_size)
     commands = _delete_in_batches(connection, COMMANDS_SQL, days, batch_size)
     activity = _delete_in_batches(connection, ACTIVITY_SQL, ACTIVITY_RETENTION_DAYS, batch_size)
-    return {"events": events, "commands": commands, "activity_events": activity}
+    vectors = _delete_in_batches(
+        connection, RETIRED_VECTORS_SQL, RETIRED_VECTOR_RETENTION_DAYS, batch_size
+    )
+    return {
+        "events": events,
+        "commands": commands,
+        "activity_events": activity,
+        "retired_claim_vectors": vectors,
+    }
 
 
 def main(argv=None) -> int:
@@ -118,6 +138,7 @@ def main(argv=None) -> int:
         f"older than {args.days} days."
     )
     print(f"Removed {counts['activity_events']} activity events older than 90 days.")
+    print(f"Removed {counts['retired_claim_vectors']} retired recall vectors older than 1 day.")
     return 0
 
 

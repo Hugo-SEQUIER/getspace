@@ -442,6 +442,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
               </div>
             ) : (
               <Empty
+                valley={!filtered}
                 title={
                   filtered
                     ? "No documents found"

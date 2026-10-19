@@ -20,6 +20,7 @@ from space import (
     resource_deletion,
     space_map,
     tasks,
+    webhook_inbox,
     workspace_items,
     workspace_search,
 )
@@ -474,12 +475,14 @@ def create_mcp(
             A project must name an existing project in this Space. Kind cannot change.
             Tasks cannot carry recall.category="handoff". Generated memory is never
             edited here: use remember, remember_claims, extract_memory or change_memory.
-            Task statuses must exist in task_columns; add_task_column adds a status and
-            set_task_status moves a task without resending its body. Set status
-            "needs_you" on a task or document when the work cannot continue without the
-            person's decision, approval or merge: it stays on their home page until they
-            change it, so never write a separate "blocked" document instead. Stay within
-            1 MiB.
+            Prefer a status from task_columns; a new status value is saved as a column
+            labelled from it (add_task_column picks the label), and set_task_status moves
+            a task without resending its body. Set status
+            "needs_you" on a task when the work cannot continue without the person's
+            decision, approval or merge: it stays on their home page until they change it.
+            Only tasks take it; when a document needs review, save the document, then a
+            needs_you task that names it, and never write a separate "blocked" document.
+            Stay within 1 MiB.
             Output: the saved resource. Reuse command_id unchanged on retry.
             """
             return await command(workspace.save, space_id, change, agent_id=agent_id)
@@ -522,8 +525,9 @@ def create_mcp(
             change: tasks.SetStatus,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Parameters: task ID, current revision, configured status and command ID.
+            """Parameters: task ID, current revision, status and command ID.
             What it does: atomically changes only task status, preserving all other content.
+            Prefer a status from task_columns; a new value is saved as a column.
             Use "needs_you" when the task now waits on the person's decision, approval
             or merge; the person moves it on from their home page.
             Output: the saved task. Reuse command_id unchanged on retry; stale revisions fail.
@@ -556,6 +560,60 @@ def create_mcp(
                 lambda actor: resource_deletion.delete_resource(
                     workspace, actor, space_id, resource_id, expected_revision
                 ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+            )
+        )
+        async def pull_events(
+            space_id: UUID,
+            request: webhook_inbox.PullEvents | None = None,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: optional subscription_id or database_id filter and limit (1-50).
+            What it does: leases the oldest waiting database change events from this
+            Space's agent inbox for ten minutes, so another agent pulling at the same
+            time does not receive them. The Space owner creates an inbox subscription
+            under Settings → Webhooks, choosing a database and optionally one select
+            transition such as Stage → Review. Each item carries a stable delivery_id
+            and the event: database_id, record_id, operation, revisions, changed field
+            IDs and, for a filtered subscription, the before/after values of that one
+            field. Read the current record with query_database before acting; the
+            event is a hint, not the record. Call ack_events with each delivery_id once
+            the work is done; an unacknowledged lease returns to the queue, and after
+            five pulls without acknowledgement the delivery fails and the owner can
+            redeliver it. Requires a write grant held by the Space owner. Poll on a
+            schedule; nothing pushes to the agent. Output: items, has_more, lease_seconds.
+            """
+            return await command(
+                lambda actor: webhook_inbox.pull(
+                    workspace, actor, space_id, request or webhook_inbox.PullEvents()
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+            )
+        )
+        async def ack_events(
+            space_id: UUID,
+            request: webhook_inbox.AcknowledgeEvents,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: delivery_ids (1-50) returned by pull_events.
+            What it does: marks those inbox deliveries delivered so no agent receives
+            them again, and closes their receipts in Settings → Webhooks. Acknowledge
+            after the work is done, or at once when the event needs no action.
+            Repeating an acknowledgement is harmless. Output: one status per ID:
+            acknowledged, already_done or not_found.
+            """
+            return await command(
+                lambda actor: webhook_inbox.acknowledge(workspace, actor, space_id, request),
                 agent_id=agent_id,
             )
 
@@ -601,7 +659,8 @@ def create_mcp(
             Results carry verification='memory', 'handoff' or 'user_authored' and a stale
             flag. Assessed items also carry relevance=direct, historical or conflicting.
             found=false means no supported answer was found in the retrieved evidence;
-            it does not prove no record exists. Pass include_related=true to
+            it does not prove no record exists. A note saying matches did not fit
+            max_chars means retry with a larger max_chars. Pass include_related=true to
             also receive cue-linked claims in a separate, unranked `related` list.
 
             Output: bounded evidence. include_timings adds numeric timings_ms and
@@ -712,18 +771,18 @@ def create_mcp(
         async def remember(
             space_id: UUID, change: RememberMemory, agent_id: UUID | None = None
         ) -> dict[str, Any]:
-            """Save authored text directly: Jev organization, embedding and storage.
+            """Save authored text directly: model organization, embedding and storage.
 
             Memory is autonomous: it is indexed immediately and is available to every
             authorized agent without human review. This sends your text to the configured
-            embedding provider and Jev when configured, without text generation. Wording
-            is preserved; text over 2,000 characters is split into bounded claims. A write
-            fails while no memory provider is configured.
+            embedding provider and the decision model when configured, without text
+            generation. Wording is preserved; text over 2,000 characters is split into
+            bounded claims. A write fails while no memory provider is configured.
             `importance` is 0 to 3, where 0 means undeclared; use it for
             constraints, decisions and corrections you expect to matter later. Prefer
             save_handoff for session context with decisions and
             next actions, and extract_memory to mine documents or conversations.
-            Optional links connect this node to exact existing memory IDs without Jev approval;
+            Optional links connect this node to exact existing memory IDs without model approval;
             use expands_on for a detail-to-subject connection. When the user states where
             something belongs, pass routes_to with up to 8 exact container IDs from
             get_space_map. Reuse command_id unchanged on retry.
@@ -776,7 +835,7 @@ def create_mcp(
             remains in the previous immutable revision. classify pins manual assignments:
             scope, category_ids, project_ids and section_ids, each list holding at most 32
             unique IDs, and a project's active parent section is added automatically.
-            classify without classification replaces the assignments using Jev when
+            classify without classification replaces the assignments using the decision model when
             configured. Never replace a user correction without their request. Read
             list_memories first to get current entry IDs and values.
             """

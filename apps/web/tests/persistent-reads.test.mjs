@@ -53,6 +53,9 @@ test("only currently accessible spaces restore; unknown endpoints and search nev
   assert.deepEqual(await next.restore(), []);
   for (const endpoint of ["workspace", "auth/session", `spaces/${space}/memory/jobs`, `${path}&query=private`, `spaces/${other}/memories`])
     assert.equal(persistableRead(endpoint, new Set([space])), false);
+  // The index is Space content, so a reload can search before every body is re-read.
+  assert.equal(persistableRead(`spaces/${space}/search/index`, new Set([space])), true);
+  assert.equal(persistableRead(`spaces/${space}/search`, new Set([space])), false);
 });
 
 test("mutations and logout fence already-started reads across tabs", async t => {

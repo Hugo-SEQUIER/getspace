@@ -39,7 +39,7 @@ Two tables grow with every write, and two more with activity. Nothing prunes the
 
 | Command | What it removes |
 |---|---|
-| `python -m space.retention` | Command and event rows older than 180 days (`--days` changes the window), then Overview activity older than 90 days. It works in committed batches of 10,000 rows (`--batch-size`) until nothing is left, and prints the counts. |
+| `python -m space.retention` | Command and event rows older than 180 days (`--days` changes the window), then Overview activity older than 90 days, then the recall vectors of deleted memory claims older than one day, which exports in progress may still read. It works in committed batches of 10,000 rows (`--batch-size`) until nothing is left, and prints the counts. |
 | `python -m space.webhook_retention` | Delivered or failed webhook deliveries older than 30 days with their attempts, events no delivery still references, command receipts older than 30 days, and subscriptions removed more than 30 days ago. Each run removes at most one batch of 1,000 rows per table (`--batch-size`, up to 10,000); run it again while it reports removals. |
 
 A command row is what makes a retry safe: within the window, repeating a command ID returns the original result. After its row is pruned, a retry of that command is applied again. Imports of Memora exports rely on the same rows to skip records they already imported.

@@ -700,9 +700,6 @@
 .sp-db-record-modal .sp-modal-footer .sp-muted {
   color: var(--color-muted);
 }
-.sp-compact .sp-db-table td {
-  height: 42px;
-}
 @media (max-width: 1200px) {
   .sp-db-library-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

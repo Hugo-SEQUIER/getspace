@@ -148,7 +148,7 @@ def claim(connection):
             "(e.organization_id,e.space_id,e.id)=(d.organization_id,d.space_id,d.event_id) "
             "WHERE ((d.status='queued' AND d.available_at<=clock_timestamp()) OR "
             "(d.status='processing' AND d.lease_until<=clock_timestamp())) AND d.attempts<%s "
-            "AND NOT s.paused AND s.removed_at IS NULL "
+            "AND s.delivery='endpoint' AND NOT s.paused AND s.removed_at IS NULL "
             "AND d.created_at>=clock_timestamp()-make_interval(days=>%s) "
             "AND e.created_at>=clock_timestamp()-make_interval(days=>%s) "
             "ORDER BY d.available_at,d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1",
@@ -193,11 +193,13 @@ def finish(connection, job, result):
     with connection.transaction():
         changed = (
             connection.execute(
+                # One clock reading per statement: clock_timestamp() advances between
+                # columns, so available_at would fall a microsecond short of the delay.
                 "UPDATE space.webhook_deliveries SET status=%s,status_code=%s,error_code=%s,"
-                "available_at=clock_timestamp()+make_interval(secs=>%s),lease_id=NULL,"
-                "lease_until=NULL,updated_at=clock_timestamp() WHERE organization_id=%s "
+                "available_at=statement_timestamp()+make_interval(secs=>%s),lease_id=NULL,"
+                "lease_until=NULL,updated_at=statement_timestamp() WHERE organization_id=%s "
                 "AND space_id=%s AND id=%s AND lease_id=%s AND cycle=%s AND attempts=%s "
-                "AND status='processing' AND lease_until>clock_timestamp()",
+                "AND status='processing' AND lease_until>statement_timestamp()",
                 (
                     status,
                     result.status_code,

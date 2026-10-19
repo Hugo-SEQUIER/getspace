@@ -57,6 +57,7 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
     loading: busy ? "Updating memory…" : searching ? "Searching memory…" : data.memoryLoading || data.memoryMoreLoading ? "Loading memory…" : null,
     clearError: () => setError(""),
   });
+  const activeJobs = data.memoryJobs.filter(job => job.status === "queued" || job.status === "processing").length;
   const completedJobs = data.memoryJobs.filter(job => job.status === "ready")
     .map(job => `${job.id}:${job.result?.revision}`).sort().join(",");
   const searchRequest = useRef(0);
@@ -191,18 +192,19 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
     ? `/resources/${selected.sourceId}?space_id=${data.space?.id}&revision=${selected.sourceRevision}`
     : null;
   const creatorColor = (name: string | null) =>
-    name === "Codex" ? "#885dff" : name === "You" ? "#38bba8" : "#d28b39";
-  const categoryPalette = ["#885dff", "#38bba8", "#df7a5c", "#508ad1", "#c361a0", "#a18b34", "#69a25e", "#b36c44"];
+    name === "Codex" ? "#5b6fb5" : name === "You" ? "#6f8a4a" : "#d9825a";
+  // The evening valley: dusk blue, apricot, olive, plum, ochre, slate teal, lavender, umber.
+  const categoryPalette = ["#5b6fb5", "#d9825a", "#6f8a4a", "#a8668f", "#b8913a", "#4f8a8b", "#8a7fc4", "#8a6a4f"];
   const liveCategories = data.organizationItems
     .filter(i => i.kind === "category" && !i.deleted)
     .sort((a, b) => a.id.localeCompare(b.id));
   const categoryColor = (id: string) => categoryPalette[
     liveCategories.findIndex(i => i.id === id) % categoryPalette.length
-  ] ?? "#8791a5";
+  ] ?? "#939a95";
   const colors = (m: MemoryVector) => {
     if (colorBy === "creator") return creatorColor(m.creator);
     const id = [...(m.classification?.category_ids ?? [])].sort().find(id => graphCatalog.categoryIds.has(id));
-    return id ? categoryColor(id) : "#8791a5";
+    return id ? categoryColor(id) : "#939a95";
   };
   const legend = colorBy === "creator"
     ? creators.map(name => ({ id: name, name, color: creatorColor(name) }))
@@ -287,15 +289,11 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
           </button>
         </div>
       </div>
-      {(data.memoryJobs.length > 0 || data.jobError) && (
-        <details className="sp-alert">
-          <summary>Memory extraction · {data.memoryJobs.filter(job => ["queued", "processing"].includes(job.status)).length} in progress</summary>
-          <ul>
-            {data.memoryJobs.map(job => <li key={job.id}>
-              {job.id.slice(0, 8)} · {job.status === "ready" ? "Ready to recall" : job.status === "processing" ? "Processing" : job.status === "queued" ? "Queued" : "Failed. Submit again after checking the source and access"}
-            </li>)}
-          </ul>
-        </details>
+      {activeJobs > 0 && (
+        <p className="sp-memory-jobs" role="status">
+          <span className="sp-loading-orbit" aria-hidden="true" />
+          Memory extraction · {activeJobs} in progress
+        </p>
       )}
       {data.memoryError && (
         <div>
@@ -426,6 +424,7 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
           ) : !filtered.length ? (
             <Empty
               icon="memory"
+              valley={!data.memories.length}
               title={
                 data.memories.length
                   ? "No memories match"

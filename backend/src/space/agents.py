@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator
 
+from space import content_changes
 from space.memory import Input
 
 HARNESSES = (
@@ -184,7 +185,7 @@ def save_profile(workspace, identity, profile, agent_id=None, *, human=True):
                 ),
             ).fetchone()
         if not duplicate or agent_id:
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection)
     value = _view(workspace, identity, scope, row)
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, allow_unidentified=True)
@@ -319,5 +320,5 @@ def delete_profile(workspace, identity, agent_id, expected_revision):
             "UPDATE space.agent_identities SET deleted_at=now(),updated_at=now() WHERE id=%s",
             (agent_id,),
         )
-        connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+        content_changes.changed(connection)
     return {"deleted": True}

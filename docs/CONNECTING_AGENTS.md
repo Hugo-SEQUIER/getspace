@@ -1,6 +1,6 @@
 # Connecting agents
 
-Agents use Space through one MCP endpoint, served over streamable HTTP at your public address plus `/mcp/`, for example `https://space.example.com/mcp/`. This page shows how to connect common clients in each access mode, and how agents identify themselves.
+Agents use Space through one MCP endpoint, served over streamable HTTP at your public address plus `/mcp/`, for example `https://space.example.com/mcp/`. Keep the final slash: a client that drops it is redirected to `/mcp/` by Caddy, at the https address, so the connection still works. This page shows how to connect common clients in each access mode, and how agents identify themselves.
 
 ## Key mode: one token per agent
 

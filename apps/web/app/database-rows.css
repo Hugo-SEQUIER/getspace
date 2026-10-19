@@ -16,6 +16,26 @@
   height: 16px;
   margin: 0;
   accent-color: var(--color-accent);
+  cursor: pointer;
+}
+/* The whole checkbox cell selects its record, not only the box. */
+.sp-db-table tbody td.sp-db-selection-column {
+  padding: 0;
+}
+.sp-db-select-target {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+/* While records are selected, a click anywhere on a row selects or clears it. */
+.sp-db-table.is-selecting tbody tr {
+  cursor: pointer;
+  user-select: none;
+}
+.sp-db-table.is-selecting .sp-db-record-name:hover > svg {
+  opacity: 0;
 }
 .sp-db-name-cell {
   display: flex;
@@ -47,7 +67,8 @@
   color: var(--color-text);
   box-shadow: var(--sp-shadow-hover);
 }
-.sp-db-row-menu > button {
+.sp-db-row-menu > button,
+.sp-db-option-menu [role="group"] > button {
   display: flex;
   width: 100%;
   min-height: 36px;
@@ -57,13 +78,32 @@
   font-size: var(--text-ui);
   padding: 8px 10px;
 }
-.sp-db-row-menu > button:hover:not(:disabled) {
+.sp-db-row-menu > button:hover:not(:disabled),
+.sp-db-option-menu [role="group"] > button:hover:not(:disabled) {
   background: var(--color-panel);
 }
 .sp-db-row-menu > p {
   padding: 4px 8px;
   margin: 0;
   overflow-wrap: anywhere;
+}
+.sp-db-option-menu {
+  width: 240px;
+}
+.sp-db-option-menu [role="group"] + [role="group"] {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-rule);
+}
+.sp-db-option-menu [role="group"] > p {
+  padding: 6px 10px 2px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  overflow-wrap: anywhere;
+}
+.sp-db-option-menu [role="group"] > button.is-empty {
+  color: var(--color-muted);
 }
 .sp-db-selection-bar {
   display: flex;

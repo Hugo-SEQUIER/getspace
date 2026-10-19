@@ -31,7 +31,7 @@ Hide unused product concepts: an empty Private Space does not show CRM, pipeline
 
 ## Databases
 
-Custom databases are first-class navigation in the personal workspace. A user can choose **New database** from Documents or Databases, start blank or with a Clients schema, name it, add typed properties, and create/edit records. Table and board views use the same records; any select property can group the board. A record has a stable identity and editable notes. Property renaming preserves its identity and values; removing an option that is still used requires resolving those records first.
+Custom databases are first-class navigation in the personal workspace. A user can choose **New database** from Documents or Databases, start blank or with a Clients schema, name it, add typed properties, and create/edit records. Table and board views use the same records; any select property can group the board. In the table, a record's checkbox cell selects it. Selected records can be copied, duplicated or deleted together, and the selection bar can set a select property to one option, or clear it, on all of them in a single save; other property types are edited one record at a time. While any record is selected, a click on a row selects or clears that row instead of editing or opening it, and the keyboard and the row menu keep their usual actions. A record has a stable identity and editable notes. Property renaming preserves its identity and values; removing an option that is still used requires resolving those records first.
 
 The first frontend supports text, number, select, date, email, phone, URL, and checkbox properties. The acquisition starter provides contact, email, stage, value, and next follow-up properties without imposing currency or a fixed CRM data model. Further relationships and saved views will extend this foundation. The website and MCP create and edit databases and their records through the same workspace-item commands.
 
@@ -41,7 +41,7 @@ Database creation also offers **Import a file**. Show the supported extensions a
 
 The home page answers "what needs me?" before "what did I touch last?". Two blocks sit above the recent pages, each hidden when empty:
 
-- **Needs you** lists every task or document whose status is `needs_you`, newest first, with the author, project and age. It clears only when the owner changes the status.
+- **Needs you** lists every task whose status is `needs_you`, newest first, with the author, project and age. It clears only when the owner changes the status. Only tasks take this status: the API rejects it on a document, so an agent waiting on a document flags a task that names it.
 - **New since you looked** lists items whose latest revision was written by an agent or a personal API key and not opened since, with a count per project and a "Mark all as seen" action. Opening an item on the website records its current revision as seen, across devices. Generated memory never appears here.
 
 The Home link in the sidebar carries the combined count. Seen marks are website state: the `resource_views` table stores one row per resource with the revision last opened, nothing else. Agents and API keys cannot read or write them.
@@ -68,7 +68,7 @@ The task list uses compact rows with title, status, project, due date, and assig
 
 Drag task cards between columns to change status, with visible drop targets, keyboard controls and a status picker on each card. Moving or opening a task keeps the Board view; adding within a column preselects its status. Scroll surfaces suppress rubber-band overscroll while preserving normal vertical and horizontal scrolling.
 
-Default statuses are To do, In progress, and Done. A fourth built-in status, Needs you, is always accepted but never stored as a column: the board shows it before Done only while a task carries it. An agent sets it when it cannot continue without the person's decision, approval or merge, and the item stays on the home page until the person changes it. Priority, assignee, and due date are optional. An unknown due date stays empty. User-facing dates use the user's timezone; the backend persists unambiguous timestamps.
+Default statuses are To do, In progress, and Done. A fourth built-in status, Needs you, is always accepted but never stored as a column: the board always shows it before Done, so it keeps one shape. A task saved with a status that is not yet a column gets one, labelled from its value (`in_review` becomes In review), and a task database row whose status names no column gets its own column on the board. An agent sets it when it cannot continue without the person's decision, approval or merge, and the item stays on the home page until the person changes it. Priority, assignee, and due date are optional. An unknown due date stays empty. User-facing dates use the user's timezone; the backend persists unambiguous timestamps.
 
 The Tasks view resolves the collection with `system_role=tasks`, then uses the same record query/update commands as every Base. Template field keys map to tenant-local field UUIDs. There is no separate task store maintained by the editor.
 

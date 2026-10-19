@@ -4,7 +4,7 @@ import { serverTiming } from "../lib/server-timing.ts";
 
 const stages = [
   "db_transaction", "recall_total", "recall_sources", "recall_vector", "recall_lexical",
-  "recall_context", "recall_assessment", "recall_auth", "embedding", "jev", "chat",
+  "recall_context", "recall_assessment", "recall_auth", "embedding", "decision", "chat",
 ];
 
 test("forwards numeric recall and provider timings without flattening overlapping stages", () => {

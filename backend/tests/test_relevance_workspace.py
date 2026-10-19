@@ -160,8 +160,8 @@ def test_support_can_come_from_candidate_beyond_the_old_32_resource_load_cap(com
     assert [i["id"] for i in result["items"]] == [last["id"]]
 
 
-def typesafe_wire(service, monkeypatch, before=lambda: None):
-    from test_typesafe_relevance import configured, jev_response, session
+def decision_wire(service, monkeypatch, before=lambda: None):
+    from test_decision_relevance import configured, decision_response, session
 
     from space.model_provider import MemoryModels
 
@@ -171,7 +171,7 @@ def typesafe_wire(service, monkeypatch, before=lambda: None):
             f"c{i}": "direct" if "car" in c["text"] else "irrelevant"
             for i, c in enumerate(payload["state"]["candidates"])
         }
-        return jev_response(
+        return decision_response(
             payload, labels, answerable=0.95 if "direct" in labels.values() else 0.05
         )
 
@@ -190,11 +190,13 @@ def typesafe_wire(service, monkeypatch, before=lambda: None):
     return requests
 
 
-def test_typesafe_recall_preserves_claim_and_real_source_citations(recalled, monkeypatch):
+def test_decision_recall_preserves_claim_and_real_source_citations(recalled, monkeypatch):
     service, owner, space, source, built = recalled
-    requests = typesafe_wire(service, monkeypatch)
+    requests = decision_wire(service, monkeypatch)
     result = service.context(owner, space, RecallRequest(query="automobile", strategy="semantic"))
-    assert len(requests) == 1 and requests[0][0].startswith("https://api.typesafe.ai/")
+    assert len(requests) == 1 and requests[0][0].startswith(
+        "https://openrouter.ai/api/alpha/decisions"
+    )
     claim = result["items"][0]
     assert claim["id"] == built["id"] and claim["excerpt"] == "Mira travels by car."
     assert claim["sources"][0]["resource_id"] == source["id"]
@@ -203,12 +205,12 @@ def test_typesafe_recall_preserves_claim_and_real_source_citations(recalled, mon
     assert claim["entry_id"] == record(service, owner, space, built)["claims"][0]["id"]
 
 
-def test_typesafe_revocation_during_network_call_denies_release_without_fallback(
+def test_decision_revocation_during_network_call_denies_release_without_fallback(
     recalled, monkeypatch
 ):
     service, owner, space, _, _ = recalled
     reader = delegated(service, owner)
-    requests = typesafe_wire(
+    requests = decision_wire(
         service, monkeypatch, lambda: service.revoke(owner, UUID(reader.client_id))
     )
     with pytest.raises(CommandError) as error:
@@ -217,9 +219,9 @@ def test_typesafe_revocation_during_network_call_denies_release_without_fallback
     assert len(requests) == 1
 
 
-def test_typesafe_is_not_called_for_lexical_or_resume(recalled, monkeypatch):
+def test_decision_is_not_called_for_lexical_or_resume(recalled, monkeypatch):
     service, owner, space, _, _ = recalled
-    requests = typesafe_wire(service, monkeypatch)
+    requests = decision_wire(service, monkeypatch)
     service.context(owner, space, RecallRequest(query="car", strategy="lexical"))
     service.context(owner, space, RecallRequest(mode="resume"))
     assert requests == []

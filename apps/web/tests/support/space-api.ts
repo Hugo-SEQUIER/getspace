@@ -76,6 +76,8 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     unlockAttempts: [] as string[],
     /** The owner's display name, as SPACE_OWNER_NAME sets it. */
     ownerName: 'Owner',
+    /** The memory processor the backend reports with the memory listing. */
+    memoryProvider: { enabled: false } as Record<string, unknown>,
     tasks: sampleTasks(),
     documents: [] as Document[],
     projects: [{ id: 'project-a', kind: 'project', name: 'Fixture project', description: '', status: 'todo', revision: 1 }] as Item[],
@@ -88,6 +90,13 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     tokenRequests: [] as Record<string, unknown>[],
     /** The revision of each resource the signed-in person last opened. */
     views: [] as SeenMark[],
+    memoryJobs: [] as { id: string; status: string; attempts: number; error_code: string | null; result: null }[],
+    webhooks: [] as WebhookRow[],
+    /** Bodies of every subscription create or change command, in order. */
+    webhookCommands: [] as Record<string, unknown>[],
+    webhookDeliveries: [] as Record<string, unknown>[],
+    profileImage: null as string | null,
+    profileImageCommands: [] as string[],
     seenCommands: [] as SeenCommand[],
     columns: { columns: [...defaultColumns], revision: 1 },
     statusCommands: [] as StatusCommand[],
@@ -95,6 +104,8 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     resourceReads: [] as string[],
     deletes: [] as { id: string; expected: number }[],
     taskListReads: 0,
+    /** Full search-index reads; typing must never add one. */
+    searchIndexReads: 0,
     /** Task IDs whose next status save fails with 503. */
     failStatus: new Set<string>(),
     /** Task IDs whose next delete fails with 409. */
@@ -107,7 +118,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** Requests the app sent that the website's /api proxy would answer with 404. */
     unproxied: [] as string[],
     gates: new Map<string, Gate>(),
-    /** Holds `status:<id>`, `create` or `detail:<id>` requests until the gate is released. */
+    /** Holds `status:<id>`, `create`, `detail:<id>`, `index` or `agents` requests until the gate is released. */
     hold(key: string) {
       const gate = new Gate();
       state.gates.set(key, gate);
@@ -151,6 +162,12 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     if (path === 'workspace')
       return send({ ...state.space, user: { id: 'owner', email: null }, profile: { displayName: state.ownerName, avatarUrl: null }, access_mode: state.access.mode });
     if (path === 'workspaces') return send({ items: [state.space] });
+    if (path === 'profile/image') {
+      if (method !== 'GET') state.profileImageCommands.push(method);
+      if (method === 'POST') state.profileImage = body.image;
+      if (method === 'DELETE') state.profileImage = null;
+      return send({ image: state.profileImage });
+    }
     if (path.endsWith('/views')) {
       if (method === 'POST') {
         state.seenCommands.push(body);
@@ -161,6 +178,12 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
         }
       }
       return send({ items: state.views });
+    }
+    if (path.endsWith('/search/index')) {
+      state.searchIndexReads++;
+      await pass('index');
+      const entries = [...state.tasks, ...state.documents].map(({ body, author, revision, ...entry }) => ({ ...entry, text: body }));
+      return send({ items: entries, next_cursor: null });
     }
     if (path.endsWith('/tasks/columns')) {
       if (method === 'POST') {
@@ -246,6 +269,32 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       const deleted = url.searchParams.get('deleted') === 'true';
       return send({ items: key ? state[key].filter(entry => !!entry.deleted === deleted) : [], next_cursor: null });
     }
+    if (path.endsWith('/webhooks')) {
+      if (method === 'POST') {
+        state.webhookCommands.push(body);
+        const subscription: WebhookRow = {
+          id: `${String(state.webhooks.length + 1).padStart(8, '0')}-5555-4555-8555-555555555555`, space_id: spaceId,
+          database_id: body.database_id, delivery: body.delivery ?? 'endpoint', endpoint_url: body.endpoint_url ?? null,
+          transition: body.transition ?? null, paused: false, revision: 1, created_at: '2026-10-14T09:00:00Z', updated_at: '2026-10-14T09:00:00Z', removed_at: null,
+        };
+        state.webhooks = [...state.webhooks, subscription];
+        return send(subscription.delivery === 'endpoint' ? { subscription, signing_secret: 'synthetic-fixture-secret-not-a-credential' } : { subscription });
+      }
+      return send({ items: state.webhooks });
+    }
+    if (/\/webhooks\/[^/]+\/deliveries$/.test(path)) return send({ items: state.webhookDeliveries });
+    const webhook = /\/webhooks\/([^/]+)$/.exec(path);
+    if (webhook && method === 'POST') {
+      state.webhookCommands.push({ ...body, id: webhook[1] });
+      const current = state.webhooks.find(item => item.id === webhook[1])!;
+      const subscription: WebhookRow = {
+        ...current, revision: current.revision + 1,
+        paused: body.action === 'pause' ? true : body.action === 'resume' ? false : current.paused,
+        removed_at: body.action === 'remove' ? '2026-10-14T10:00:00Z' : current.removed_at,
+      };
+      state.webhooks = state.webhooks.map(item => item.id === subscription.id ? subscription : item);
+      return send(body.action === 'rotate' ? { subscription, signing_secret: 'synthetic-rotated-secret-not-a-credential' } : { subscription });
+    }
     if (path.endsWith('/search') && method === 'POST') {
       const query = String(body.query ?? '').toLowerCase();
       const items = [...state.tasks, ...state.documents]
@@ -280,14 +329,21 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       })) });
     }
     if (path.endsWith('/restores')) return send({ items: [] });
-    if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: { enabled: false } });
+    if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: state.memoryProvider });
+    if (path.endsWith('/memory/provider')) return send(state.memoryProvider);
     if (path === 'agent-identities' && method === 'POST') {
       const agent = { id: createdAgentId, name: body.name, harness: body.harness, revision: 1 };
       state.agents = [...state.agents.filter(item => item.id !== agent.id), agent];
       return send(agent);
     }
-    if (path === 'agent-identities') return send({ items: state.agents });
-    if (path === 'agents') return send({ items: state.connections });
+    if (path === 'agent-identities') {
+      await pass('agents');
+      return send({ items: state.agents });
+    }
+    if (path === 'agents') {
+      await pass('agents');
+      return send({ items: state.connections });
+    }
     if (path === 'agent-tokens' && method === 'POST') {
       state.tokenRequests.push(body);
       const connection = { id: '77777777-0000-4000-8000-000000000002', client_id: createdClientId, agent_id: body.agent_id, name: body.name, harness: body.harness, can_write: body.can_write, revoked_at: null };
@@ -301,7 +357,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       state.connections = state.connections.map(item => item.client_id === connection[1] ? { ...item, revoked_at: '2026-10-09T00:00:00Z' } : item);
       return send({ revoked: true });
     }
-    if (path.endsWith('/memory/jobs')) return send({ items: [] });
+    if (path.endsWith('/memory/jobs')) return send({ items: state.memoryJobs });
     state.unexpected.push(`${method} ${path}`);
     return send({ error: `Unexpected fixture request: ${path}` }, 500);
   });
@@ -309,6 +365,25 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
 }
 
 export type SpaceMock = Awaited<ReturnType<typeof mockSpace>>;
+
+export type WebhookRow = {
+  id: string; space_id: string; database_id: string; delivery: 'endpoint' | 'inbox'; endpoint_url: string | null;
+  transition: { field_id: string; to: string } | null; paused: boolean; revision: number;
+  created_at: string; updated_at: string; removed_at: string | null;
+};
+
+export const databaseId = '66666666-6666-4666-8666-666666666666';
+
+/** A pipeline database with one select field, so a webhook can filter on Stage → Review. */
+export function sampleDatabase() {
+  return {
+    id: databaseId, kind: 'database', name: 'Pipeline', description: '', revision: 1, deleted: false,
+    fields: [
+      { id: 'stage', name: 'Stage', type: 'select', options: ['New', 'Review', 'Won'] },
+      { id: 'notes', name: 'Notes', type: 'text' },
+    ], records: [], view: 'table', groupBy: 'stage',
+  };
+}
 
 /** Records uncaught page errors in session storage, so they survive reloads within the test. */
 export async function watchPageErrors(browser: Browser) {

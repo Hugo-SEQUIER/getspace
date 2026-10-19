@@ -12,6 +12,7 @@ import {
   createDatabase,
   validateTaskTracking,
   queryRecords,
+  keepRecordOrder,
   applyDatabaseField,
   applyRecordChanges,
   validateRecord,
@@ -34,7 +35,7 @@ import { RecordPanel } from "./database-record-panel";
 import { DatabaseTable, SelectedRowActions } from "./database-table";
 import { DatabaseBoard } from "./database-board";
 import { DatabaseBoardProperties, useDatabaseBoardProperties } from "./database-board-properties";
-import { databaseRecordsTSV, deleteDatabaseRecords, duplicateDatabaseRecords } from "../../../lib/space/database-record-actions";
+import { databaseRecordsTSV, deleteDatabaseRecords, duplicateDatabaseRecords, setDatabaseRecordsOption } from "../../../lib/space/database-record-actions";
 import { useFeedback } from "../notifications";
 
 const ImportDatabaseDialog = dynamic(() =>
@@ -454,9 +455,14 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
   const selects = database?.fields.filter((f) => f.type === "select") ?? [];
   const activeSort = sort === "name" || sort === "created" || database?.fields.some((field) => sort === `property:${field.id}`)
     ? sort : "updated";
-  const records = database
+  const sorted = database
     ? queryRecords(database, query, activeSort, groupField?.id ?? "", filterValue, sortDirection)
     : [];
+  // Re-sort only when the view changes, not when a save bumps a row's sort key.
+  const orderKey = JSON.stringify([databaseKey, query, activeSort, sortDirection, filterValue, groupField?.id]);
+  const shownOrder = useRef<{ key: string; ids: string[] }>({ key: "", ids: [] });
+  const records = shownOrder.current.key === orderKey ? keepRecordOrder(shownOrder.current.ids, sorted) : sorted;
+  shownOrder.current = { key: orderKey, ids: records.map((row) => row.id) };
   const recordPage = useListPage(
     records,
     JSON.stringify([id, query, activeSort, sortDirection, filterValue, database?.view]),
@@ -539,6 +545,14 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
     const duplicateIds = ids.map(() => crypto.randomUUID());
     await update((current) => duplicateDatabaseRecords(current, ids, duplicateIds));
     setRowFeedback(`Duplicated ${ids.length} ${ids.length === 1 ? "record" : "records"}.`);
+  }
+  async function setRowsOption(rows: readonly DatabaseRecord[], field: DatabaseField, value: string | null) {
+    if (!rows.length) return;
+    setRowFeedback("");
+    const ids = rows.map((row) => row.id);
+    await update((current) => setDatabaseRecordsOption(current, ids, field.id, value));
+    const count = `${ids.length} ${ids.length === 1 ? "record" : "records"}`;
+    setRowFeedback(value === null ? `Cleared ${field.name} on ${count}.` : `Set ${field.name} to “${value}” on ${count}.`);
   }
   async function deleteRows(rows: DatabaseRecord[]) {
     if (!canWrite || !rows.length || deletingRows.current) return;
@@ -876,8 +890,9 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
             </div>
           </div>
           {database.view === "table" && selectedRows.length > 0 && <SelectedRowActions
-            count={selectedRows.length} canWrite={canWrite} saving={saving}
+            count={selectedRows.length} canWrite={canWrite} saving={saving} selects={selects}
             clear={() => { setSelection({ key: selectionKey, ids: [] }); setRowFeedback(""); }}
+            setOption={(field, value) => setRowsOption(selectedRows, field, value)}
             duplicate={() => duplicateRows(selectedRows)}
             copy={() => copyRows(selectedRows.map((row) => row.id))} remove={() => deleteRows(selectedRows)}
           />}

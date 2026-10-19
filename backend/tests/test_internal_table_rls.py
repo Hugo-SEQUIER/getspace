@@ -129,7 +129,7 @@ def test_reapplying_rls_migration_and_setup_preserves_internal_rows(database, in
             apply_foundation(connection, password)
     with connect() as connection:
         assert connection.execute("SELECT version_num FROM space.alembic_version").fetchall() == [
-            ("0036_oauth_server",)
+            ("0040_webhook_inbox",)
         ]
         assert connection.execute(
             "SELECT subject_hash FROM space.erased_subjects WHERE subject_hash=%s", (subject_hash,)
@@ -207,7 +207,7 @@ def test_unprivileged_select_grants_do_not_bypass_default_deny(database, interna
             connection.execute(sql.SQL("CREATE ROLE {} NOLOGIN NOBYPASSRLS").format(probe))
             connection.execute(sql.SQL("GRANT USAGE ON SCHEMA space TO {}").format(probe))
             for table, key, value in (
-                ("alembic_version", "version_num", "0036_oauth_server"),
+                ("alembic_version", "version_num", "0040_webhook_inbox"),
                 ("erased_subjects", "subject_hash", subject_hash),
                 ("deletion_receipts", "id", receipt_id),
                 ("environment_control", "environment_id", environment_id),

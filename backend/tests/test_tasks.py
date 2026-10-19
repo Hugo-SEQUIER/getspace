@@ -129,17 +129,48 @@ def test_column_conflicts_and_invalid_status_never_change_tasks(commands):
             tasks.add_column(service, owner, space, change)
         assert error.value.status == 409
     saved = task(service, owner, space, status="backlog")
-    with pytest.raises(CommandError, match="configured"):
-        task(service, owner, space, status="missing")
-    with pytest.raises(CommandError, match="configured"):
-        tasks.set_status(
-            service,
-            owner,
-            space,
-            UUID(saved["id"]),
-            move().model_copy(update={"status": "missing"}),
-        )
     assert service.get_resource(owner, space, UUID(saved["id"])) == saved
+
+
+def test_a_new_status_becomes_a_column_and_needs_you_stays_built_in(commands):
+    service, owner, space, _ = commands
+    saved = task(service, owner, space)
+    moved = tasks.set_status(
+        service, owner, space, UUID(saved["id"]), move().model_copy(update={"status": "in_review"})
+    )
+    assert moved["status"] == "in_review"
+    created = task(service, owner, space, status="blocked")
+    assert created["status"] == "blocked"
+    task(service, owner, space, status="needs_you")
+    config = tasks.columns(service, owner, space)
+    assert config["revision"] == 3
+    assert config["columns"][-2:] == [
+        {"value": "in_review", "label": "In review"},
+        {"value": "blocked", "label": "Blocked"},
+    ]
+    assert "needs_you" not in {column["value"] for column in config["columns"]}
+    # Reusing a status adds nothing.
+    task(service, owner, space, status="in_review")
+    assert tasks.columns(service, owner, space) == config
+
+
+def test_a_new_status_named_like_an_existing_column_is_refused(commands):
+    service, owner, space, _ = commands
+    tasks.add_column(
+        service,
+        owner,
+        space,
+        column().model_copy(update={"value": "review_queue", "label": "Review"}),
+    )
+    with pytest.raises(CommandError, match="review_queue") as error:
+        task(service, owner, space, status="review")
+    assert error.value.status == 409
+    assert [column["value"] for column in tasks.columns(service, owner, space)["columns"]] == [
+        "todo",
+        "in_progress",
+        "done",
+        "review_queue",
+    ]
 
 
 def test_status_move_preserves_content_history_and_index_without_resource_roundtrips(

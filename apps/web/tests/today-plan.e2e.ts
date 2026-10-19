@@ -110,10 +110,11 @@ test('an existing database is turned into a task list from its settings', async 
   expect(planned.type).toBe('date');
   expect(database.tasks).toEqual({ status: 'stage', done: ['Closed'], planned: planned.id });
 
-  // “Open” names no board column, so the row lands in the first one.
+  // “Open” names no saved task column, so the board shows one for it.
   await browser.goto('/app/tasks');
   await screen.getByRole('button', 'Add from databases').tap();
   await screen.getByRole('dialog', 'Add from databases').getByRole('button', 'Add Interview three users to today').tap();
   await screen.getByRole('dialog', 'Add from databases').getByRole('button', 'Done').tap();
-  await expect(card(browser, 'To do', 'Interview three users')).toBeVisible();
+  await expect(card(browser, 'Open', 'Interview three users')).toBeVisible();
+  await expect(card(browser, 'To do', 'Interview three users')).toHaveCount(0);
 });

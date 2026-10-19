@@ -30,34 +30,35 @@ def provider_line(models) -> str:
     info = models.info()
     classification = (
         f"Memory writes also send each claim and the user-defined category, project and section "
-        f"catalog to TypeSafe {info['typesafe_model']} at {info['typesafe_endpoint']} for "
+        f"catalog to decision model {info['decision_model']} at {info['decision_endpoint']} for "
         "organization. A catalog too large to send whole is shortlisted per claim: category, "
         "project and section names and descriptions are then also sent for embedding, once per "
         "item revision. Manual assignments survive edits and rebuilds; unknown matches remain "
         "unassigned. The same request asks whether a claim is a placement rule; a detected "
         "rule and up to eight candidate project, section, folder or database names and "
-        "descriptions go to TypeSafe in one more request, and those container names and "
-        "descriptions are also sent for embedding. TypeSafe requests have no store=false "
+        "descriptions go to the decision model in one more request, and those container names "
+        "and descriptions are also sent for embedding. Decision requests have no store=false "
         "option. "
-        if info.get("classification_provider") == "typesafe"
+        if info.get("classification_provider") == "decision"
         else ""
     )
     relationships = (
         f"Memory writes also send each incoming claim and up to five nearby stored claims "
-        f"to TypeSafe {info['typesafe_model']} at {info['typesafe_endpoint']} to identify "
+        f"to decision model {info['decision_model']} at {info['decision_endpoint']} to identify "
         "related memories. Links are pointers, not verified evidence. Uncertain pairs stay "
         "unlinked; outages store the text with relationships.status=unavailable. "
         "Use get_memory_links to read outgoing links and backlinks. "
-        if info.get("relationship_provider") == "typesafe"
+        if info.get("relationship_provider") == "decision"
         else ""
     )
     assessor = (
-        f"Recall sends query and selected short passages to TypeSafe {info['typesafe_model']} "
-        f"at {info['typesafe_endpoint']}. Longer passages, uncertain judgments and provider "
+        f"Recall sends query and selected short passages to decision model "
+        f"{info['decision_model']} at {info['decision_endpoint']}. Longer passages, uncertain "
+        "judgments and provider "
         f"failures use relevance model {info['relevance_model']} at {info['endpoint']}. "
-        "TypeSafe selects complete verbatim passages; the fallback checks an internal draft "
-        "and extracted support quotes. TypeSafe requests have no store=false option. "
-        if info.get("relevance_provider") == "typesafe"
+        "The decision model selects complete verbatim passages; the fallback checks an internal "
+        "draft and extracted support quotes. Decision requests have no store=false option. "
+        if info.get("relevance_provider") == "decision"
         else "Recall sends query and selected candidate excerpts to "
         f"relevance model {info.get('relevance_model', info['text_model'])}. "
     )
@@ -65,10 +66,18 @@ def provider_line(models) -> str:
     embedding_target = (
         info.get("embedding_endpoint") or info.get("endpoint") or "the configured provider"
     )
+    anthropic = (
+        f"Extraction and relevance chat go first to {info['anthropic_model']} on the Anthropic "
+        "API, and to the configured text or relevance model only when that request fails. "
+        "Anthropic requests have no store=false option. "
+        if info.get("anthropic_model")
+        else ""
+    )
     return (
         f"Structured writes send claim values for embedding to {embedding_target}. "
         f"Raw extraction uses text model {info['text_model']} at {info['endpoint']}. "
-        "The embedding model is "
+        + anthropic
+        + "The embedding model is "
         f"{info['embedding_model']}. "
         + classification
         + relationships
@@ -189,8 +198,8 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "preserve unresolved contradictions instead of selecting a winner.",
             "Use remember with title and text for authored facts, preferences, decisions and "
             "user-written memories, including a single sentence. Use remember_claims for "
-            "already-separated claims with index and value. Jev organises claims when "
-            "configured, then values are embedded "
+            "already-separated claims with index and value. The decision model organises "
+            "claims when configured, then values are embedded "
             "and saved verbatim without text generation. Use extract_memory only to mine "
             "documents or conversations into separate claims, from supplied text or an existing "
             "source revision; it returns a durable job ID. Poll memory_job for queued, processing, "
@@ -206,10 +215,11 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "set_memory_links to replace a node's connections. Supply existing resource IDs; "
             "use expands_on for a detail -> subject connection, such as 'What I like in my "
             "work' -> 'My work'. Resolve ambiguous names before writing; do not choose one "
-            "silently. Explicit links survive edits without Jev approval. Empty links removes "
-            "only explicit connections. get_memory_links returns outgoing links and automatic "
-            "backlinks with origin explicit or inferred. Inferred links remain content-dependent "
-            "AI suggestions, not confirmed facts or evidence. Multiple target nodes are allowed.",
+            "silently. Explicit links survive edits without decision-model approval. Empty "
+            "links removes only explicit connections. get_memory_links returns outgoing links "
+            "and automatic backlinks with origin explicit or inferred. Inferred links remain "
+            "content-dependent AI suggestions, not confirmed facts or evidence. Multiple target "
+            "nodes are allowed.",
             "When something matters more than the rest, say so: each prepared claim takes "
             "importance from 0 "
             "to 3, where 0 means you did not declare it. Declare it for constraints, decisions and "
@@ -279,6 +289,8 @@ def full_guide(models, *, resource_access: bool, mine_documents: bool = False) -
             "not a guarantee of model accuracy.",
             "## When recall finds nothing",
             "A recall result with found=false carries a note saying no supported answer was found. "
+            "If the note instead says matching records did not fit max_chars, retry with a "
+            "larger max_chars before reporting anything. "
             "Report that to the user in plain words; it does not prove no record exists. Then "
             "stop and offer what you do know from the current conversation, clearly labelled as "
             "your own knowledge rather than memory. Do not invent a memory, do not guess at what "

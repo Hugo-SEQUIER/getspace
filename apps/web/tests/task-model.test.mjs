@@ -22,23 +22,22 @@ test("task refresh keeps the just-saved body and status instead of waiting for a
   assert.equal(mergeTaskSummary(summary, { ...task, id: "other" }), summary);
 });
 
-test("a flagged task adds the Needs you column before Done only while it exists", () => {
+test("Needs you is always a column before Done, with or without flagged tasks", () => {
   const columns = [{ value: "todo", label: "To do" }, { value: "in_progress", label: "In progress" }, { value: "done", label: "Done" }];
-  assert.deepEqual(taskColumnsWithResources(columns, [task]), columns);
-  assert.deepEqual(taskColumnsWithResources(columns, [{ ...task, status: "needs_you" }, { ...task, status: "needs_you" }]), [
-    columns[0], columns[1], { value: "needs_you", label: "Needs you" }, columns[2],
-  ]);
-  assert.deepEqual(taskColumnsWithResources([columns[0]], [{ ...task, status: "needs_you" }]), [
-    columns[0], { value: "needs_you", label: "Needs you" },
-  ], "without a Done column it still appears, at the end");
+  const withNeedsYou = [columns[0], columns[1], { value: "needs_you", label: "Needs you" }, columns[2]];
+  assert.deepEqual(taskColumnsWithResources(columns, [task]), withNeedsYou);
+  assert.deepEqual(taskColumnsWithResources(columns, [{ ...task, status: "needs_you" }, { ...task, status: "needs_you" }]), withNeedsYou);
+  assert.deepEqual(taskColumnsWithResources([columns[0]], []), [
+    columns[0], { value: "in_progress", label: "In progress" }, { value: "needs_you", label: "Needs you" }, { value: "done", label: "Done" },
+  ], "missing built-in columns are restored in their usual order");
 });
 
-test("custom and unknown statuses remain visible, in configured order, without duplicates", () => {
-  const columns = [{ value: "todo", label: "To do" }, { value: "backlog", label: "Backlog" }];
+test("a status not yet saved as a column shows under the label the API gives it", () => {
+  const columns = [{ value: "todo", label: "To do" }, { value: "in_progress", label: "In progress" }, { value: "needs_you", label: "Needs you" }, { value: "done", label: "Done" }];
   assert.deepEqual(taskColumnsWithResources(columns, [task, { ...task, status: "review_queue" }, { ...task, status: "review_queue" }]), [
-    ...columns, { value: "review_queue", label: "review queue" },
+    ...columns.slice(0, 3), { value: "review_queue", label: "Review queue" }, columns[3],
   ]);
-  assert.equal(columns.length, 2);
+  assert.equal(columns.length, 4);
 });
 
 test("column names are trimmed and empty, long, or duplicate labels rejected", () => {

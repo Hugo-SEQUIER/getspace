@@ -1,10 +1,10 @@
 import type { Resource, ResourceView } from "./types";
 
-/** The task or document status an agent sets when it cannot continue without the person. */
+/** The task status an agent sets when it cannot continue without the person. Documents never carry it. */
 export const NEEDS_YOU = "needs_you";
 
 export type Attention = {
-  /** Items an agent flagged as waiting on the person, newest first. */
+  /** Tasks an agent flagged as waiting on the person, newest first. */
   needsYou: Resource[];
   /** Items whose latest revision was written by someone else and not opened since, newest first. */
   unseen: Resource[];
@@ -39,14 +39,15 @@ export function isUnseen(resource: Resource, seen: Record<string, number>): bool
 const newestFirst = (a: Resource, b: Resource) => b.updated_at.localeCompare(a.updated_at);
 
 // Parameters: every loaded document and task, and the person's seen marks.
-// What it does: splits out what waits on the person and what changed without them. Generated
-// memory never appears here, and a flagged item is listed once, under "needs you".
+// What it does: splits out the tasks that wait on the person and what changed without them.
+// Generated memory never appears here, and a flagged task is listed once, under "needs you".
 // Output: both lists, newest first.
 export function attentionItems(resources: Resource[], seen: Record<string, number>): Attention {
   const visible = resources.filter(resource => resource.recall?.category !== "memory");
-  const needsYou = visible.filter(resource => resource.status === NEEDS_YOU).sort(newestFirst);
+  const flagged = (resource: Resource) => resource.kind === "task" && resource.status === NEEDS_YOU;
+  const needsYou = visible.filter(flagged).sort(newestFirst);
   const unseen = visible
-    .filter(resource => resource.status !== NEEDS_YOU && isUnseen(resource, seen))
+    .filter(resource => !flagged(resource) && isUnseen(resource, seen))
     .sort(newestFirst);
   return { needsYou, unseen };
 }

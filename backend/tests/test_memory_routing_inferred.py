@@ -11,7 +11,7 @@ from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 
 from space import space_map
-from space.model_provider import TypeSafeError
+from space.model_provider import DecisionError
 
 database = database_fixture
 command_database = command_database_fixture
@@ -21,7 +21,7 @@ commands = commands_fixture
 class RoutingModels(Models):
     """Placement wording is a rule; a container matches when the rule names it."""
 
-    settings = SimpleNamespace(memory_classification_provider="typesafe")
+    settings = SimpleNamespace(memory_classification_provider="decision")
 
     def __init__(self):
         super().__init__()
@@ -32,11 +32,11 @@ class RoutingModels(Models):
 
         def evaluate(payload):
             authorize()
-            self.calls.append(("typesafe", deepcopy(payload)))
+            self.calls.append(("decision", deepcopy(payload)))
             state = payload["state"]
             if "rule" in state:
                 if self.fail_candidates:
-                    raise TypeSafeError("Unavailable")
+                    raise DecisionError("Unavailable")
                 text = state["rule"]["text"]
                 scores = {
                     f"c{n}": 0.95 if c["name"] in text else 0.2
@@ -49,7 +49,7 @@ class RoutingModels(Models):
                 scores["routing"] = 0.95 if any(w in text for w in ("go in", "never")) else 0.1
             return response(payload, scores)
 
-        session.evaluate_typesafe = evaluate
+        session.decide = evaluate
         return session
 
 
@@ -58,12 +58,12 @@ def requests(service, kind):
         return [
             c[1]
             for c in service.memory_models.calls
-            if c[0] == "typesafe" and "rule" in c[1]["state"]
+            if c[0] == "decision" and "rule" in c[1]["state"]
         ]
     return [
         c[1]
         for c in service.memory_models.calls
-        if c[0] == "typesafe" and "memory" in c[1]["state"]
+        if c[0] == "decision" and "memory" in c[1]["state"]
     ]
 
 

@@ -24,7 +24,7 @@ STAGES = frozenset(
         "recall_assessment",
         "recall_auth",
         "embedding",
-        "jev",
+        "decision",
         "chat",
         "chat_assessment",
         "chat_conflicts",

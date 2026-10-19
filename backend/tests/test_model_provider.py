@@ -4,9 +4,9 @@ from threading import Barrier
 
 import httpx
 import pytest
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 
-from space.model_provider import MemoryModels, ModelError
+from space.model_provider import MemoryModels, ModelError, anthropic_schema
 from space.settings import Settings
 
 
@@ -316,7 +316,7 @@ def test_embedding_response_indices_preserve_text_vector_pairing(monkeypatch):
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500, 503])
-@pytest.mark.parametrize("operation", ["text generation", "embedding", "Jev assessment"])
+@pytest.mark.parametrize("operation", ["text generation", "embedding", "decision"])
 def test_failed_requests_identify_operation_and_status_without_provider_content(
     monkeypatch, status, operation
 ):
@@ -330,8 +330,8 @@ def test_failed_requests_identify_operation_and_status_without_provider_content(
     with pytest.raises(ModelError) as error:
         if operation == "embedding":
             session.embed(["Synthetic evidence"])
-        elif operation == "Jev assessment":
-            session.evaluate_typesafe({"state": "Synthetic evidence"})
+        elif operation == "decision":
+            session.decide({"state": "Synthetic evidence"})
         else:
             session.invoke("Synthetic evidence", response_format=Output)
     assert str(error.value) == (
@@ -431,7 +431,7 @@ def test_pool_initialization_is_thread_safe_and_jev_keeps_short_timeout(monkeypa
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(
             executor.map(
-                lambda i: provider.session(lambda: None).evaluate_typesafe({"state": str(i)}),
+                lambda i: provider.session(lambda: None).decide({"state": str(i)}),
                 range(4),
             )
         )
@@ -439,3 +439,115 @@ def test_pool_initialization_is_thread_safe_and_jev_keeps_short_timeout(monkeypa
     assert len(clients) == 1
     assert all(r.extensions["timeout"]["read"] <= 5 for r in requests)
     provider.close()
+
+
+class Bounded(BaseModel):
+    text: str = Field(max_length=20)
+
+
+def anthropic_models(monkeypatch, handler, **overrides):
+    client = httpx.Client
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(httpx, "Client", lambda **kw: client(transport=transport, **kw))
+    return MemoryModels(
+        Settings(
+            memory_provider="openai_compatible",
+            memory_provider_url="https://models.invalid/v1",
+            memory_api_key="fallback-secret-key",
+            memory_text_model="fallback-model",
+            memory_embedding_model="test-embed",
+            memory_anthropic_api_key="anthropic-secret-key",
+            **{"memory_reasoning_effort": "low", **overrides},
+        )
+    )
+
+
+def anthropic_answer(text, stop_reason="end_turn"):
+    return httpx.Response(
+        200,
+        json={
+            "content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": text}],
+            "stop_reason": stop_reason,
+        },
+    )
+
+
+def test_anthropic_is_tried_first_with_a_compatible_schema(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.host)
+        body = json.loads(request.content)
+        assert request.headers["x-api-key"] == "anthropic-secret-key"
+        assert request.headers["anthropic-version"] == "2023-06-01"
+        assert "authorization" not in request.headers
+        assert body["model"] == "claude-haiku-5-5"
+        assert "temperature" not in body and "thinking" not in body
+        assert body["output_config"]["effort"] == "low"
+        schema = body["output_config"]["format"]["schema"]
+        assert schema["additionalProperties"] is False
+        assert "maxLength" not in schema["properties"]["text"]
+        return anthropic_answer('{"text":"ok"}')
+
+    provider = anthropic_models(monkeypatch, handler)
+    value = provider.session(lambda: None).invoke("Input", response_format=Bounded)
+    assert value.text == "ok" and seen == ["api.anthropic.com"]
+    assert provider.info()["anthropic_model"] == "claude-haiku-5-5"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        httpx.Response(529, json={"type": "error"}),
+        anthropic_answer('{"text":"ok"}', stop_reason="refusal"),
+        anthropic_answer('{"text":"ok"}', stop_reason="max_tokens"),
+        anthropic_answer('{"text":"far longer than twenty characters"}'),
+    ],
+)
+def test_anthropic_failure_falls_back_to_the_configured_provider(monkeypatch, failure):
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.host)
+        if request.url.host == "api.anthropic.com":
+            return failure
+        assert request.headers["authorization"] == "Bearer fallback-secret-key"
+        assert json.loads(request.content)["model"] == "fallback-model"
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"text":"ok"}'}}]})
+
+    provider = anthropic_models(monkeypatch, handler)
+    value = provider.session(lambda: None).invoke("Input", response_format=Bounded)
+    assert value.text == "ok" and seen == ["api.anthropic.com", "models.invalid"]
+
+
+def test_anthropic_effort_none_disables_thinking_and_policy_gets_a_schema(monkeypatch):
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["thinking"] == {"type": "disabled"}
+        assert "effort" not in body["output_config"]
+        schema = body["output_config"]["format"]["schema"]
+        assert schema["required"] == ["action", "new_query", "frontier_ids"]
+        return anthropic_answer('{"action":"STOP","new_query":"","frontier_ids":[]}')
+
+    provider = anthropic_models(monkeypatch, handler, memory_reasoning_effort="none")
+    assert provider.session(lambda: None).invoke("Input")["action"] == "STOP"
+
+
+def test_anthropic_schema_keeps_properties_named_like_constraints():
+    schema = {
+        "type": "object",
+        "properties": {"maximum": {"type": "integer", "maximum": 3}},
+        "$defs": {"minLength": {"type": "string", "minLength": 1}},
+    }
+    assert anthropic_schema(schema) == {
+        "type": "object",
+        "properties": {"maximum": {"type": "integer"}},
+        "$defs": {"minLength": {"type": "string"}},
+    }
+
+
+def test_anthropic_key_changes_the_chat_fingerprint_only_when_set(monkeypatch):
+    plain = models(monkeypatch, lambda request: None)
+    routed = anthropic_models(monkeypatch, lambda request: None)
+    assert plain.info()["anthropic_model"] is None
+    assert plain.chat_fingerprint != routed.chat_fingerprint

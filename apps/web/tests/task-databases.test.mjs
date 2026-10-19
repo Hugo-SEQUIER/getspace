@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { applyDatabaseField, createDatabase, isWorkspaceDatabase } from "../lib/space/databases.ts";
-import { boardRows, changeTaskRow, localDay, plannableRows, rowColumn, statusForColumn } from "../lib/space/today.ts";
+import { boardRows, changeTaskRow, columnsWithRows, localDay, plannableRows, rowColumn, statusForColumn, statusValue } from "../lib/space/today.ts";
 
 function row(database, id, name, status, planned) {
   const values = { [database.tasks.status]: status, [database.tasks.planned]: planned };
@@ -53,12 +53,23 @@ test("the board shows today's rows, closed ones included, and open rows left fro
   assert.deepEqual(boardRows([launch()], "2026-10-09").map((r) => r.record.name), ["Fix footer", "Write copy"]);
 });
 
-test("a row whose status no column names lands in the first column", () => {
+test("a row whose status no column names gets its own column before Done", () => {
   const database = launch();
   database.fields[0] = { ...database.fields[0], options: ["Backlog", "In progress", "Done"] };
   database.records[0].values["launch-status"] = "Backlog";
-  const [row] = boardRows([database], "2026-10-08").filter((r) => r.record.id === "a");
-  assert.equal(rowColumn(row, columns), "todo");
+  const rows = boardRows([database], "2026-10-08");
+  const [row] = rows.filter((r) => r.record.id === "a");
+  assert.equal(rowColumn(row, columns), "todo", "without its column it would land in the first one");
+  const shown = columnsWithRows(columns, rows);
+  assert.deepEqual(shown.map((column) => column.label), ["To do", "In progress", "Needs you", "Backlog", "Done"]);
+  assert.equal(rowColumn(row, shown), "backlog");
+  assert.equal(statusForColumn(database, shown.find((column) => column.value === "backlog")), "Backlog");
+  assert.equal(columns.length, 4);
+});
+
+test("status names become safe column values", () => {
+  assert.equal(statusValue("  In Review!  "), "in_review");
+  assert.equal(statusValue("🚀"), null);
 });
 
 test("dropping a row on a column picks the status that column names", () => {

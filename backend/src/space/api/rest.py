@@ -16,6 +16,7 @@ from space import (
     memora_jobs,
     oauth_server,
     overview,
+    profile_images,
     quotas,
     read_version,
     resource_views,
@@ -137,9 +138,13 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
         summary="List documents or tasks",
     )
     def resources(
-        space_id: UUID, kind: Literal["document", "task"], after: UUID | None = None, session=read
+        space_id: UUID,
+        kind: Literal["document", "task"],
+        after: UUID | None = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 50,
+        session=read,
     ):
-        return workspace.list_resources(session[0], space_id, kind, after)
+        return workspace.list_resources(session[0], space_id, kind, after, limit)
 
     @public.get(
         "/spaces/{space_id}/resources/{resource_id}",
@@ -256,6 +261,15 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     )
     def search(space_id: UUID, body: workspace_search.Search, session=read):
         return workspace_search.search(workspace, session[0], space_id, body)
+
+    # The website loads this once per Space version and matches as people type.
+    @router.get("/spaces/{space_id}/search/index")
+    def search_index(
+        space_id: UUID,
+        after: Annotated[str | None, Query(pattern=r"^[ir]:[0-9a-f-]{36}$")] = None,
+        session=read,
+    ):
+        return workspace_search.index(workspace, session[0], space_id, after)
 
     @public.get(
         "/spaces/{space_id}/memories/{resource_id}", tags=["Memory"], summary="Get a memory"
@@ -533,6 +547,19 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     @router.get("/workspaces")
     def workspaces(session=auth):
         return teams.listing(workspace, session[0])
+
+    # The signed-in person's own picture, kept in their personal Space whichever Space is open.
+    @router.get("/profile/image")
+    def profile_image(session=auth):
+        return profile_images.get(workspace, session[0])
+
+    @router.post("/profile/image")
+    def save_profile_image(body: profile_images.SaveImage, session=auth):
+        return profile_images.save(workspace, session[0], body)
+
+    @router.delete("/profile/image")
+    def delete_profile_image(session=auth):
+        return profile_images.delete(workspace, session[0])
 
     @router.post("/organizations")
     def create_organization(body: teams.CreateTeam, session=auth):

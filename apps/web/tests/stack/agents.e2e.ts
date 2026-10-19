@@ -16,12 +16,3 @@ test('a named agent identity is created, listed and survives a reload', { sessio
   await expect(screen.getByRole('button', new RegExp(`^${name} `))).toBeVisible();
 });
 
-test('account appearance switches density and the choice persists for this browser', { session: 'owner' }, async ({ app, screen }) => {
-  await app.open('/app/settings/account');
-  await screen.getByRole('button', 'Compact').tap();
-  await expect(screen.getByRole('button', 'Compact')).toHaveAttribute('aria-pressed', 'true');
-  await app.open('/app/settings/account');
-  await expect(screen.getByRole('button', 'Compact')).toHaveAttribute('aria-pressed', 'true');
-  await screen.getByRole('button', 'Comfortable').tap();
-  await expect(screen.getByRole('button', 'Comfortable')).toHaveAttribute('aria-pressed', 'true');
-});

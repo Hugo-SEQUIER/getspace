@@ -172,7 +172,7 @@ def test_admission_is_released_after_validation_or_consumer_failure(monkeypatch,
         assert result == ()
 
 
-def test_hosted_archives_are_upgraded_before_validation():
+def test_older_archives_are_upgraded_before_validation():
     kept, gone = str(uuid4()), str(uuid4())
 
     def resource(id_, sources, method="manual"):
@@ -187,13 +187,13 @@ def test_hosted_archives_are_upgraded_before_validation():
         }
 
     value = archive(
-        entries=[resource(kept, []), resource(str(uuid4()), [kept, gone], method="decision")]
+        entries=[resource(kept, []), resource(str(uuid4()), [kept, gone], method="typesafe")]
     )
     # A source deleted for good before the export is dropped; one in the archive is kept.
     assert schema.upgrade_archive(value) == 1
     upgraded = value["entries"][1]["value"]
     assert upgraded["recall"]["sources"] == [{"resource_id": kept, "revision": 1}]
-    assert upgraded["_memory"]["claims"][0]["classification"]["method"] == "typesafe"
+    assert upgraded["_memory"]["claims"][0]["classification"]["method"] == "decision"
     assert value["entries"][0]["value"]["_memory"]["claims"][0]["classification"] == {
         "method": "manual"
     }

@@ -2,6 +2,8 @@
 
 from uuid import uuid4
 
+from space import content_changes
+
 
 def delete_resource(workspace, identity, space_id, resource_id, expected_revision):
     from space.workspace import CommandError
@@ -58,7 +60,9 @@ def delete_resource(workspace, identity, space_id, resource_id, expected_revisio
             "DELETE FROM space.resource_revisions WHERE resource_id=%s", (resource_id,)
         )
         connection.execute("DELETE FROM space.resources WHERE id=%s", (resource_id,))
-        connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+        content_changes.changed(
+            connection, content_changes.resource_kinds(row["kind"], row["memory_kind"])
+        )
     return {"deleted": True}
 
 
@@ -132,6 +136,9 @@ def delete_memory(workspace, identity, space_id, resource_id, expected_revision)
         )
         brain.forget(connection, resource_id)
         connection.execute(
+            "DELETE FROM space.retired_claim_vectors WHERE memory_id=%s", (resource_id,)
+        )
+        connection.execute(
             "DELETE FROM space.events WHERE command_id IN "
             "(SELECT id FROM space.commands WHERE resource_id=%s)",
             (resource_id,),
@@ -141,5 +148,5 @@ def delete_memory(workspace, identity, space_id, resource_id, expected_revision)
             "DELETE FROM space.resource_revisions WHERE resource_id=%s", (resource_id,)
         )
         connection.execute("DELETE FROM space.resources WHERE id=%s", (resource_id,))
-        connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+        content_changes.changed(connection, ("memory",))
     return {"deleted": True}

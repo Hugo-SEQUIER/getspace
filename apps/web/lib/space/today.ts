@@ -1,4 +1,5 @@
 import { fieldValue, validateTaskTracking, type DatabaseRecord, type TaskTracking, type WorkspaceDatabase } from "./databases.ts";
+import { insertBeforeDone } from "./task-model.ts";
 import type { TaskColumn } from "./types.ts";
 
 export type PlannedRow = {
@@ -96,6 +97,31 @@ export function boardRows(databases: readonly WorkspaceDatabase[], today: string
 }
 
 const sameLabel = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+// Parameters: a status a task database uses, such as "Review".
+// What it does: makes the task status value a column for it would use.
+// Output: the value, such as "review", or null when the name has no letters or digits.
+export function statusValue(name: string): string | null {
+  const value = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
+  return value || null;
+}
+
+// Parameters: the board's columns and the task database rows shown on it.
+// What it does: gives every open row's status its own column, before Done, so a row named
+// "Review" sits under Review instead of falling into the first column. Dropping a task there
+// saves that status, which the API keeps as a column.
+// Output: the columns to display; the input is not changed.
+export function columnsWithRows(columns: readonly TaskColumn[], rows: readonly PlannedRow[]): TaskColumn[] {
+  const result = [...columns];
+  for (const row of rows) {
+    if (row.status === null || row.database.tasks?.done.includes(row.status)) continue;
+    if (result.some((column) => sameLabel(column.label, row.status!))) continue;
+    const value = statusValue(row.status);
+    if (!value || result.some((column) => column.value === value)) continue;
+    insertBeforeDone(result, { value, label: row.status.trim() });
+  }
+  return result;
+}
 
 // Parameters: a board row and the board's columns.
 // What it does: places a closed row under Done and any other row under the column named like

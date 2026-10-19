@@ -67,7 +67,7 @@ test('a person creates an API key, copies it once and revokes it', async ({ app,
   await screen.getByRole('navigation', 'Settings').getByRole('link', 'API keys').tap();
   await expect(browser).toHaveURL('/app/settings/api-keys');
   await expect(screen.getByRole('heading', 'API keys', { level: 1 })).toBeVisible();
-  await expect(screen.getByRole('heading', 'No API keys yet')).toBeVisible();
+  await expect(screen.getByText('No API keys yet.')).toBeVisible();
   await expect(screen.getByRole('link', 'Read the documentation')).toHaveAttribute('href', 'https://github.com/Hugo-SEQUIER/getspace/tree/main/docs');
   await expect(screen.getByText('https://api.example.invalid', { exact: true })).toBeVisible();
 
@@ -91,7 +91,7 @@ test('a person creates an API key, copies it once and revokes it', async ({ app,
   await expect(key).toContainText('spk_FixtureT…');
   await expect(key).toContainText('Read and write');
   await expect(key).toContainText('Never used');
-  await expect(screen.getByRole('heading', 'No API keys yet')).toHaveCount(0);
+  await expect(screen.getByText('No API keys yet.')).toHaveCount(0);
   await expect(screen.getByLabel('Name')).toHaveValue('');
 
   // The token is shown only until the person dismisses it.
@@ -105,7 +105,7 @@ test('a person creates an API key, copies it once and revokes it', async ({ app,
   await dialog.getByRole('button', 'Revoke key').tap();
   await expect(screen.getByRole('dialog')).toHaveCount(0);
   await expect(screen.getByRole('listitem', 'API key Reading dashboard')).toHaveCount(0);
-  await expect(screen.getByRole('heading', 'No API keys yet')).toBeVisible();
+  await expect(screen.getByText('No API keys yet.')).toBeVisible();
   expect(fixture.revoked).toEqual(['33333333-3333-4333-8333-333333333333']);
 });
 
@@ -113,7 +113,7 @@ test('a viewer can only create read-only keys', async ({ app, screen, browser })
   const fixture: Fixture = { role: 'viewer', keys: [], created: [], revoked: [] };
   await fakeApi(browser, fixture);
   await app.open('/app/settings/api-keys');
-  await expect(screen.getByRole('heading', 'No API keys yet')).toBeVisible();
+  await expect(screen.getByText('No API keys yet.')).toBeVisible();
   await expect(screen.getByRole('radio', /^Read and write/)).toHaveCount(0);
   await expect(screen.getByText('You can view this Space without editing it, so your keys are read-only.')).toBeVisible();
   await screen.getByLabel('Name').fill('Weekly report');

@@ -4,11 +4,11 @@ import copy
 import json
 
 import pytest
+from test_decision_relevance import decision_response, session
 from test_relevance import item
-from test_typesafe_relevance import jev_response, session
 
 from space import relevance
-from space.model_provider import TYPESAFE_ENDPOINT
+from space.settings import DECISIONS_URL
 
 
 def source(body, **changes):
@@ -25,7 +25,7 @@ def test_full_coverage_split_uses_jev_and_retains_raw_offsets(monkeypatch, separ
     model, requests = session(monkeypatch)
     diagnostics = {}
     selected = relevance.select([original], "Project facts?", model, diagnostics=diagnostics)
-    assert len(requests) == 1 and requests[0][0] == TYPESAFE_ENDPOINT
+    assert len(requests) == 1 and requests[0][0] == DECISIONS_URL
     texts = [c["text"] for c in requests[0][1]["state"]["candidates"]]
     assert len(texts) > 1 and "".join(texts) == body
     assert all(len(text) <= 500 for text in texts)
@@ -41,7 +41,7 @@ def test_full_coverage_split_uses_jev_and_retains_raw_offsets(monkeypatch, separ
         assert "entry_id" not in view and view["evidence_truncated"]
     assert end == len(body) and original == snapshot
     assert diagnostics == {
-        "route": "jev",
+        "route": "decision",
         "fallback_reason": None,
         "candidate_count": 1,
         "assessed_units": len(texts),
@@ -67,7 +67,7 @@ def test_unsafe_candidate_forces_original_chat_fallback_for_every_candidate(
     model, requests = session(monkeypatch)
     diagnostics = {}
     relevance.select(records, "facts", model, diagnostics=diagnostics)
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     candidates = json.loads(requests[0][1]["messages"][1]["content"])["candidates"]
     assert len(candidates) == 2
     assert [c["text"] for c in candidates] == [i["body"] for i in records]
@@ -80,7 +80,7 @@ def test_long_authored_claim_is_never_split_or_mutated(monkeypatch):
     model, requests = session(monkeypatch)
     selected = relevance.select([original], "Source?", model)
     assert original == before
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     assert selected[0]["body"] == original["body"]
     assert selected[0]["entry_id"] == original["entry_id"]
     assert "passage" not in selected[0]
@@ -91,7 +91,7 @@ def test_no_candidates_dropped_to_fit_fifty_shaped_units(monkeypatch):
     model, requests = session(monkeypatch)
     diagnostics = {}
     relevance.select(originals, "facts", model, diagnostics=diagnostics)
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     candidates = json.loads(requests[0][1]["messages"][1]["content"])["candidates"]
     assert len(candidates) == 2 and candidates[1]["text"] == originals[1]["body"]
     assert diagnostics["fallback_reason"] == "size"
@@ -103,7 +103,7 @@ def test_subset_of_source_returns_only_accepted_passage(monkeypatch):
             f"c{i}": "direct" if i == 1 else "irrelevant"
             for i in range(len(payload["state"]["candidates"]))
         }
-        return jev_response(payload, labels)
+        return decision_response(payload, labels)
 
     original = source("A complete sentence describes project storage. " * 30)
     model, requests = session(monkeypatch, choose)
@@ -117,7 +117,7 @@ def test_subset_of_source_returns_only_accepted_passage(monkeypatch):
 
 def test_confidence_fallback_discards_split_representation_not_originals(monkeypatch):
     originals = [source("A complete sentence about storage. " * 25), item()]
-    model, requests = session(monkeypatch, lambda _, p: jev_response(p, answerable=0.5))
+    model, requests = session(monkeypatch, lambda _, p: decision_response(p, answerable=0.5))
     diagnostics = {}
     selected = relevance.select(originals, "Storage?", model, diagnostics=diagnostics)
     candidates = json.loads(requests[1][1]["messages"][1]["content"])["candidates"]
@@ -137,7 +137,7 @@ def test_project_context_disambiguates_same_body_without_creating_support(monkey
             f"c{i}": "direct" if c["evidence_context"]["projects"] == ["Alpha"] else "irrelevant"
             for i, c in enumerate(records)
         }
-        return jev_response(payload, labels)
+        return decision_response(payload, labels)
 
     body = "The database is PostgreSQL."
     originals = [
@@ -157,7 +157,7 @@ def test_full_serialized_context_budget_triggers_fallback(monkeypatch, field):
     model, requests = session(monkeypatch)
     diagnostics = {}
     relevance.select([item(**changes)], "database?", model, diagnostics=diagnostics)
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     assert diagnostics["fallback_reason"] == "size"
     candidate = json.loads(requests[0][1]["messages"][1]["content"])["candidates"][0]
     assert candidate[field] == changes[field]
@@ -165,7 +165,7 @@ def test_full_serialized_context_budget_triggers_fallback(monkeypatch, field):
 
 def test_chat_and_conflicts_keep_context_but_cannot_quote_it(monkeypatch):
     records = [item(body=f"Fact {i}.", evidence_context={"projects": ["Alpha"]}) for i in range(2)]
-    model, requests = session(monkeypatch, lambda _, p: jev_response(p, answerable=0.5))
+    model, requests = session(monkeypatch, lambda _, p: decision_response(p, answerable=0.5))
     relevance.select(records, "Alpha facts?", model)
     for _, payload in requests[1:]:
         candidates = json.loads(payload["messages"][1]["content"])["candidates"]
@@ -185,20 +185,20 @@ def test_chat_and_conflicts_keep_context_but_cannot_quote_it(monkeypatch):
 
 def test_diagnostics_distinguish_confident_abstention_empty_and_provider_fallback(monkeypatch):
     model, requests = session(
-        monkeypatch, lambda _, p: jev_response(p, {"c0": "irrelevant"}, answerable=0.05)
+        monkeypatch, lambda _, p: decision_response(p, {"c0": "irrelevant"}, answerable=0.05)
     )
     diagnostics = {}
     assert relevance.select([], "database?", model, diagnostics=diagnostics) == []
     assert diagnostics["route"] == "none" and diagnostics["fallback_reason"] is None
     assert relevance.select([item()], "database?", model, diagnostics=diagnostics) == []
     assert len(requests) == 1
-    assert diagnostics["route"] == "jev" and diagnostics["fallback_reason"] is None
+    assert diagnostics["route"] == "decision" and diagnostics["fallback_reason"] is None
     assert diagnostics["selected_units"] == 0
 
     def malformed(payload):
         return {}
 
-    model.evaluate_typesafe = malformed
+    model.decide = malformed
     relevance.select([item()], "database?", model, diagnostics=diagnostics)
     assert diagnostics["route"] == "chat" and diagnostics["fallback_reason"] == "provider"
 
@@ -214,7 +214,9 @@ def test_diagnostics_distinguish_confident_abstention_empty_and_provider_fallbac
 def test_diagnostics_do_not_call_confident_conflicts_or_temporal_rejection_uncertain(
     monkeypatch, labels, answerable, stale, reason
 ):
-    model, _ = session(monkeypatch, lambda _, p: jev_response(p, labels, answerable=answerable))
+    model, _ = session(
+        monkeypatch, lambda _, p: decision_response(p, labels, answerable=answerable)
+    )
     diagnostics = {}
     relevance.select([item(stale=stale)], "Current database?", model, diagnostics=diagnostics)
     assert diagnostics["route"] == "chat" and diagnostics["fallback_reason"] == reason

@@ -1,12 +1,44 @@
-"""Bounded full-content search, with explicit continuation and snapshot consistency."""
+"""Bounded full-content search, with explicit continuation and snapshot consistency.
 
+Matching happens in the application after each page is decoded. Each page is read in
+one transaction and decoded together, then authorization and the snapshot are rechecked
+once: a page costs a fixed handful of statements however many items it holds.
+"""
+
+from contextvars import copy_context
+from time import perf_counter
 from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from space import workspace_items
 from space.memory import Input, document_text
 from space.workspace import CommandError
+from space.workspace_items import ROW
+
+SEARCH_PAGE = 25
+INDEX_PAGE = 100
+# Browsers match index text locally; a bound keeps one oversized document from
+# dominating the payload. Search pages still match the full text.
+INDEX_TEXT = 100_000
+
+CORPUS = (
+    "SELECT * FROM (SELECT 'r:'||id::text AS cursor,id,current_revision AS revision "
+    "FROM space.resources UNION ALL SELECT 'i:'||id::text,id,current_revision "
+    "FROM space.workspace_items WHERE NOT deleted) corpus "
+    "WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT %s"
+)
+# Revisions are immutable, so pinning the listed ones keeps the page consistent.
+RESOURCES = (
+    "SELECT v.*, r.kind, k.wrapping_provider, k.wrapping_key_reference, k.wrapped_key "
+    "FROM space.resources r JOIN space.resource_revisions v "
+    "ON (r.organization_id,r.space_id,r.id)=(v.organization_id,v.space_id,v.resource_id) "
+    "JOIN space.space_keys k ON (k.organization_id,k.space_id,k.id)="
+    "(v.organization_id,v.space_id,v.key_id) "
+    "WHERE (v.resource_id,v.revision) IN (SELECT * FROM unnest(%s::uuid[],%s::integer[]))"
+)
+ITEMS = ROW + (  # noqa: S608 - static SQL; all values are parameters
+    "WHERE (i.id,v.revision) IN (SELECT * FROM unnest(%s::uuid[],%s::integer[]))"
+)
 
 
 class Search(Input):
@@ -24,12 +56,16 @@ class Search(Input):
         return self
 
 
+def _revision(connection):
+    return connection.execute("SELECT content_revision FROM space.spaces").fetchone()[
+        "content_revision"
+    ]
+
+
 def revision(workspace, identity, space_id):
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, space_id)
-        return connection.execute("SELECT content_revision FROM space.spaces").fetchone()[
-            "content_revision"
-        ]
+        return _revision(connection)
 
 
 def require_snapshot(workspace, identity, space_id, expected):
@@ -55,79 +91,145 @@ def read_memory(workspace, identity, space_id, resource_id):
     }
 
 
-def search(workspace, identity, space_id, request: Search):
-    snapshot = require_snapshot(workspace, identity, space_id, request.snapshot)
+def _pinned(rows):
+    return [row["id"] for row in rows], [row["revision"] for row in rows]
+
+
+def _page(workspace, identity, space_id, after, size, expected=None):
+    """One page of searchable entries, read in one transaction and rechecked once."""
     with workspace.db.transaction(identity) as connection:
-        workspace._scope(connection, identity, space_id)
-        rows = connection.execute(
-            "SELECT * FROM (SELECT 'r:'||id::text AS cursor,id,current_revision AS revision "
-            "FROM space.resources UNION ALL SELECT 'i:'||id::text,id,current_revision "
-            "FROM space.workspace_items WHERE NOT deleted) corpus "
-            "WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT 26",
-            (request.after, request.after),
-        ).fetchall()
-    needle = request.query.strip().casefold()
-    results = []
-
-    def match(value):
-        return not needle or needle in value.casefold()
-
-    def result(id_, kind, title, content, **extra):
-        if match(title + "\n" + content):
-            start = max(0, content.casefold().find(needle) - 50) if needle else 0
-            results.append(
-                {
-                    "id": id_,
-                    "kind": kind,
-                    "title": title,
-                    "description": content[start : start + 180],
-                    **extra,
-                }
+        scope = workspace._scope(connection, identity, space_id)
+        snapshot = _revision(connection)
+        if expected is not None and snapshot != expected:
+            raise CommandError("Space changed. Restart to include the latest changes.", 409)
+        corpus = connection.execute(CORPUS, (after, after, size + 1)).fetchall()
+        page = corpus[:size]
+        resource_rows = [row for row in page if row["cursor"].startswith("r:")]
+        item_rows = [row for row in page if row["cursor"].startswith("i:")]
+        resources = (
+            connection.execute(RESOURCES, _pinned(resource_rows)).fetchall()
+            if resource_rows
+            else []
+        )
+        items = connection.execute(ITEMS, _pinned(item_rows)).fetchall() if item_rows else []
+        key_rows = workspace._key_rows([*resources, *items])
+    keys = {
+        key_id: workspace._unwrap_key(scope["organization_id"], scope["space_id"], row)
+        for key_id, row in key_rows.items()
+    }
+    # Object bodies download concurrently, like the single-resource read.
+    pending = {
+        row["resource_id"]: workspace._index_reads.submit(
+            copy_context().run, workspace._read_resource_object, row["object_key"], perf_counter()
+        )
+        for row in resources
+        if row["object_key"]
+    }
+    try:
+        payloads = {
+            row["resource_id"]: pending[row["resource_id"]].result()
+            if row["resource_id"] in pending
+            else row["encrypted_record"]
+            for row in resources
+        }
+    finally:
+        # On failure, cancel queued reads and drain active ones before returning.
+        for future in pending.values():
+            if not future.cancel():
+                future.exception()
+    entries = {}
+    for row in items:
+        data = workspace._unpack(
+            keys[row["key_id"]],
+            scope,
+            row["id"],
+            row["revision"],
+            "workspace_item",
+            row["encrypted_payload"],
+        )["data"]
+        text = data.get("description", "")
+        if row["kind"] == "database":
+            text += "\n" + "\n".join(
+                " ".join(
+                    str(value)
+                    for value in [record["name"], record["notes"], *record["values"].values()]
+                    if value is not None
+                )
+                for record in data["records"]
             )
-
-    for row in rows[:25]:
-        if row["cursor"].startswith("i:"):
-            if request.project:
-                continue
-            item = workspace_items.get(workspace, identity, space_id, row["id"], row["revision"])
-            text = item["description"]
-            if item["kind"] == "database":
-                text += "\n" + "\n".join(
-                    " ".join(
-                        str(value)
-                        for value in [record["name"], record["notes"], *record["values"].values()]
-                        if value is not None
-                    )
-                    for record in item["records"]
-                )
-                text += "\n" + " ".join(field["name"] for field in item["fields"])
-            result(item["id"], item["kind"], item["name"], text)
+            text += "\n" + " ".join(field["name"] for field in data["fields"])
+        entries[row["id"]] = [
+            {"id": str(row["id"]), "kind": row["kind"], "title": data["name"], "text": text}
+        ]
+    for row in resources:
+        content = workspace._unpack(
+            keys[row["key_id"]],
+            scope,
+            row["resource_id"],
+            row["revision"],
+            "source" if row["kind"] == "document" else "record",
+            payloads[row["resource_id"]],
+        )
+        summary = workspace._summary(row, content, scope["principal_id"])
+        if summary["recall"]["category"] == "memory":
+            entries[row["resource_id"]] = [
+                {
+                    "id": summary["id"] + ":" + claim["id"],
+                    "kind": "memory",
+                    "title": claim["value"],
+                    "text": summary["title"],
+                    "resource_id": summary["id"],
+                    "project": summary["project"],
+                }
+                for claim in (content.get("memory") or {}).get("claims", [])
+            ]
         else:
-            resource = workspace.get_resource(identity, space_id, row["id"], row["revision"])
-            if request.project and resource.get("project") != str(request.project):
-                continue
-            if resource["recall"]["category"] == "memory":
-                for claim in resource.get("memory", {}).get("claims", []):
-                    result(
-                        resource["id"] + ":" + claim["id"],
-                        "memory",
-                        claim["value"],
-                        resource["title"],
-                        resource_id=resource["id"],
-                    )
-            else:
-                result(
-                    resource["id"],
-                    resource["kind"],
-                    resource["title"],
-                    document_text(resource["body"]),
-                    status=resource["status"],
-                    updated_at=resource["updated_at"],
-                )
+            entries[row["resource_id"]] = [
+                {
+                    "id": summary["id"],
+                    "kind": summary["kind"],
+                    "title": summary["title"],
+                    "text": document_text(content["body"]),
+                    "status": summary["status"],
+                    "updated_at": summary["updated_at"],
+                    "project": summary["project"],
+                }
+            ]
+    # Rechecks access after decoding and refuses a page that spans a change.
     require_snapshot(workspace, identity, space_id, snapshot)
     return {
-        "items": results,
+        "entries": [entry for row in page for entry in entries.get(row["id"], [])],
         "snapshot": snapshot,
-        "scanned": min(25, len(rows)),
-        "next_cursor": rows[24]["cursor"] if len(rows) > 25 else None,
+        "scanned": len(page),
+        "next_cursor": page[-1]["cursor"] if len(corpus) > size else None,
+    }
+
+
+def search(workspace, identity, space_id, request: Search):
+    page = _page(workspace, identity, space_id, request.after, SEARCH_PAGE, request.snapshot)
+    needle = request.query.strip().casefold()
+    results = []
+    for entry in page["entries"]:
+        if request.project and ("project" not in entry or entry["project"] != str(request.project)):
+            continue
+        text = entry.pop("text")
+        entry.pop("project", None)
+        if needle and needle not in (entry["title"] + "\n" + text).casefold():
+            continue
+        start = max(0, text.casefold().find(needle) - 50) if needle else 0
+        results.append({**entry, "description": text[start : start + 180]})
+    return {
+        "items": results,
+        "snapshot": page["snapshot"],
+        "scanned": page["scanned"],
+        "next_cursor": page["next_cursor"],
+    }
+
+
+def index(workspace, identity, space_id, after: str | None = None):
+    """Every searchable entry with its plain text, so browsers can match as people type."""
+    page = _page(workspace, identity, space_id, after, INDEX_PAGE)
+    return {
+        "items": [{**entry, "text": entry["text"][:INDEX_TEXT]} for entry in page["entries"]],
+        "next_cursor": page["next_cursor"],
     }

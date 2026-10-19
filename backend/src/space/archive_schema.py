@@ -87,9 +87,10 @@ def upgrade_archive(archive):
     """Accept archives written by the hosted edition or before a permanent deletion.
 
     Parameters: one decoded archive, which this changes in place before validation.
-    What it does: renames the hosted edition's "decision" classification method to its
-    equivalent here, "typesafe", and drops source references to resources that are
-    absent from the archive because they were permanently deleted before the export.
+    What it does: renames the "typesafe" classification method written by earlier
+    versions of this edition to its current name, "decision", and drops source references
+    to resources that are absent from the archive because they were permanently deleted
+    before the export.
     Output: the number of dropped source references.
     """
     entries = archive.get("entries") if isinstance(archive, dict) else None
@@ -118,8 +119,8 @@ def upgrade_archive(archive):
         claims = memory.get("claims") if isinstance(memory, dict) else None
         for claim in claims if isinstance(claims, list) else []:
             classification = claim.get("classification") if isinstance(claim, dict) else None
-            if isinstance(classification, dict) and classification.get("method") == "decision":
-                classification["method"] = "typesafe"
+            if isinstance(classification, dict) and classification.get("method") == "typesafe":
+                classification["method"] = "decision"
     return dropped
 
 

@@ -49,6 +49,15 @@ EMPTY_RECALL_NOTES = {
         "the user there is nothing to resume and start fresh. Do not invent prior progress."
     ),
 }
+# A record that was found but cannot fit the caller's budget is not an absence of
+# memory, so it must never carry the empty-recall note above.
+BUDGET_NOTE = (
+    "Matching records were found, but even the first one does not fit max_chars. "
+    "Retry with a larger max_chars. This is not an absence of memory."
+)
+# Optional context on a ranked entry, shed in this order before the first ranked
+# answer loses its text. Each is recoverable from the cited revision.
+SHEDDABLE_CONTEXT = ("evidence_context", "classification", "creator", "author_agent")
 UPSTREAM_COMMIT = "dec3f8f2444eace7004fc084abe1be9f3d88270e"
 
 
@@ -137,7 +146,7 @@ class RememberMemory(Input):
     Long text is split losslessly into claims of at most 2,000 characters. On the
     explicit extraction-job endpoint, the same input is mined into generated claims.
     Output: the saved memory resource. Explicit links name existing memory nodes by ID,
-    with relation related or expands_on; they need no Jev approval. Retries reuse command ID.
+    with relation related or expands_on; they need no model approval. Retries reuse command ID.
     """
 
     command_id: UUID
@@ -250,7 +259,7 @@ class MemoryAssignment(Input):
 
 
 class MemoryClassification(MemoryAssignment):
-    method: Literal["manual", "typesafe", "unassigned"] = "unassigned"
+    method: Literal["manual", "decision", "unassigned"] = "unassigned"
     reason: Literal[
         "matched", "uncertain", "disabled", "unavailable", "catalog_limit", "input_limit"
     ] = "uncertain"
@@ -373,16 +382,44 @@ def document_text(text: str) -> str:
     )
 
 
+def first_match(text: str, query: str) -> int | None:
+    """Offset of the first query term in text, or None when no term occurs."""
+    terms = tokens(query)
+    if not terms:
+        return None
+    match = re.search("|".join(re.escape(t) for t in terms), text, re.IGNORECASE)
+    return match.start() if match else None
+
+
 def excerpt(body: str, query: str, maximum: int) -> tuple[str, bool]:
     text = document_text(body)
     start = 0
     if len(text) > maximum and query:
         # Offsets come from readable text; normalization may change string lengths.
-        match = re.search("|".join(re.escape(t) for t in tokens(query)), text, re.IGNORECASE)
-        if match:
-            start = max(0, match.start() - maximum // 4)
+        match = first_match(text, query)
+        if match is not None:
+            start = max(0, match - maximum // 4)
     value = text[start : start + maximum]
     return value, start > 0 or len(value) < len(body)
+
+
+def _shorten(entry: dict, query: str, length: int) -> None:
+    """Cut an entry's excerpt to length, keeping the first query match in view.
+
+    Parameters: a shaped entry, the caller query and the new excerpt length.
+    What it does: picks the window that shows the first matched term, or the start
+        when nothing matches, and moves a cited passage's offsets with the window so
+        the excerpt stays the exact cited span.
+    Output: none; the entry is changed in place and marked truncated.
+    """
+    text = entry["excerpt"]
+    match = first_match(text, query)
+    start = 0 if match is None else max(0, min(match - length // 4, len(text) - length))
+    entry["excerpt"] = text[start : start + length]
+    entry["truncated"] = True
+    if "passage" in entry:
+        entry["passage"]["start"] += start
+        entry["passage"]["end"] = entry["passage"]["start"] + len(entry["excerpt"])
 
 
 def _entry(item: dict, request: RecallRequest, source_url) -> dict:
@@ -456,8 +493,10 @@ def bounded_result(
         optionally cue-related records, which are a separate tier.
     What it does: keeps items in rank order until the output budget is exhausted, then
         appends related records under their own key and cap. Related records never
-        enter `items` and never displace a ranked result.
-    Output: the recall response, with has_more set when output was truncated.
+        enter `items` and never displace a ranked result. The first ranked item sheds
+        optional context, then text around its query match, before it is dropped.
+    Output: the recall response, with has_more set when output was truncated and the
+        budget note, never the empty-recall note, when even the first match cannot fit.
     """
     result = {
         "engine": engine,
@@ -471,32 +510,59 @@ def bounded_result(
     }
     if assessment is not None:
         result["assessment"] = assessment
+
     # The related tier is declared only after the ranked items have taken their
     # share of the budget. Declaring the key first put its JSON framing into every
     # overflow check, which could pop a ranked item that fitted without the flag and
     # return found=false with the empty-recall note while nothing had overflowed.
     # Measured at the boundary: a 1,989-character response survived without
     # include_related and was dropped entirely with it.
+    def overflow():
+        # Include JSON framing, citations and escaped text in the character budget.
+        return len(json.dumps(result, ensure_ascii=False)) - request.max_chars
+
+    # A memory entry's provenance alone can exceed the 2,000-character minimum
+    # budget (2,191 characters measured on a production claim with an empty
+    # excerpt). Dropping the first ranked answer then returned found=false with the
+    # empty-recall note, telling the caller nothing was stored. The first answer
+    # therefore sheds optional context, then text, before it can be dropped.
+    unfitted = False
     for item in items:
         if len(result["items"]) >= request.limit:
             result["has_more"] = True
             break
         entry = _entry(item, request, source_url)
         result["items"].append(entry)
-        # Include JSON framing, citations and escaped text in the character budget.
-        overflow = len(json.dumps(result, ensure_ascii=False)) - request.max_chars
-        if overflow > 0:
-            if len(entry["excerpt"]) > overflow + 200:
-                entry["excerpt"] = entry["excerpt"][: len(entry["excerpt"]) - overflow - 50]
-                entry["truncated"] = True
-                if "passage" in entry:
-                    entry["passage"]["end"] = entry["passage"]["start"] + len(entry["excerpt"])
+        if len(result["items"]) == 1:
+            for key in SHEDDABLE_CONTEXT:
+                if overflow() <= 0:
+                    break
+                entry.pop(key, None)
+            if overflow() <= 0:
+                continue
+            # An escaped character costs more than one budget character, so one cut
+            # sized in characters can overshoot to nothing. Halving steps keep the
+            # most text that fits.
+            while overflow() > 0 and entry["excerpt"]:
+                cut = overflow() // 2 + 25
+                _shorten(entry, request.query, max(0, len(entry["excerpt"]) - cut))
+            if overflow() > 0:
+                result["items"].pop()
+                unfitted = True
+        else:
+            excess = overflow()
+            if excess <= 0:
+                continue
+            if len(entry["excerpt"]) > excess + 200:
+                _shorten(entry, request.query, len(entry["excerpt"]) - excess - 50)
             else:
                 result["items"].pop()
-            result["has_more"] = True
-            break
+        result["has_more"] = True
+        break
     result["found"] = bool(result["items"])
-    if not result["found"]:
+    if unfitted:
+        result["note"] = BUDGET_NOTE
+    elif not result["found"]:
         result["note"] = EMPTY_RECALL_NOTES.get(request.mode, EMPTY_RECALL_NOTES["search"])
     if request.include_related and related:
         result["related"] = []

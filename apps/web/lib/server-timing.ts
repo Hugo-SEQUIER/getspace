@@ -1,7 +1,7 @@
 const backendStages = new Set([
   "api_total", "db_pool", "db_transaction", "db_read", "db_recheck", "space_key", "object_queue", "object_get", "decode",
   "recall_total", "recall_sources", "recall_vector", "recall_lexical", "recall_context", "recall_assessment", "recall_auth",
-  "embedding", "jev", "chat",
+  "embedding", "decision", "chat",
 ]);
 
 export function serverTiming(authMs: number, backendMs?: number, upstream = "") {

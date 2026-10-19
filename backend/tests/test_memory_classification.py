@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from space import memory_classification as classifier
 from space import memory_pipeline
 from space.memory import ChangeMemory, MemoryAssignment
-from space.model_provider import TYPESAFE_MODEL, ModelError, TypeSafeError
+from space.model_provider import DecisionError, ModelError
 
 
 def catalog():
@@ -35,7 +35,7 @@ def catalog():
 
 def response(payload, scores=None):
     return {
-        "model": TYPESAFE_MODEL,
+        "model": "typesafe/jev-1.13",
         "usage": {"input_tokens": 10, "output_tokens": 10},
         "answers": {
             key: {"type": "noul", "noul": (scores or {}).get(key, 0.01)}
@@ -89,17 +89,15 @@ def test_malformed_probabilities_abstain(bad):
     def evaluate(payload):
         return response(payload, {"global": bad})
 
-    result = classifier.classify(
-        {"index": "x", "value": "y"}, [], SimpleNamespace(evaluate_typesafe=evaluate)
-    )
+    result = classifier.classify({"index": "x", "value": "y"}, [], SimpleNamespace(decide=evaluate))
     assert result["reason"] == "unavailable" and result["scope"] == "unassigned"
 
 
 def test_size_catalog_and_provider_failures_leave_memory_unassigned():
     def fail(payload):
-        raise TypeSafeError("Unavailable")
+        raise DecisionError("Unavailable")
 
-    model = SimpleNamespace(evaluate_typesafe=fail)
+    model = SimpleNamespace(decide=fail)
     claim = {"index": "x", "value": "y"}
     assert classifier.classify(claim, None, model)["reason"] == "catalog_limit"
     assert (
@@ -112,7 +110,7 @@ def test_size_catalog_and_provider_failures_leave_memory_unassigned():
         raise ModelError("Quota exhausted")
 
     with pytest.raises(ModelError, match="Quota"):
-        classifier.classify(claim, [], SimpleNamespace(evaluate_typesafe=fatal))
+        classifier.classify(claim, [], SimpleNamespace(decide=fatal))
 
 
 def test_rebuild_keeps_manual_assignments_and_forgetting_still_wins():
@@ -165,18 +163,22 @@ def test_classification_processor_is_disclosed_without_changing_embedding_identi
         "memory_provider_url": "https://primary.invalid",
         "memory_text_model": "text",
         "memory_embedding_model": "embedding",
-        "memory_classification_provider": "typesafe",
+        "memory_classification_provider": "decision",
     }
     with pytest.raises(ValidationError):
         Settings(**config)
-    models = MemoryModels(Settings(**config, typesafe_api_key="test-only"))
+    models = MemoryModels(
+        Settings(
+            **config, memory_decision_model="typesafe/jev-1.13", memory_decision_api_key="test-only"
+        )
+    )
     disabled = MemoryModels(
         models.settings.model_copy(update={"memory_classification_provider": "disabled"})
     )
     assert models.chat_fingerprint == disabled.chat_fingerprint
     assert models.embedding_fingerprint == disabled.embedding_fingerprint
-    assert models.info()["classification_provider"] == "typesafe"
-    assert models.info()["typesafe_model"] == TYPESAFE_MODEL
+    assert models.info()["classification_provider"] == "decision"
+    assert models.info()["decision_model"] == "typesafe/jev-1.13"
     assert "Memory writes also send each claim" in provider_line(models)
 
 
@@ -193,7 +195,7 @@ def test_sections_are_never_asked_and_come_only_from_matched_projects():
         }
         return response(payload, scores)
 
-    model = SimpleNamespace(evaluate_typesafe=evaluate)
+    model = SimpleNamespace(decide=evaluate)
     claim = {"index": "Work habit", "value": "Work on code reviews every morning"}
     result = classifier.classify(claim, items, model)
     assert all(item["kind"] != "section" for item in seen[0]["state"]["catalog"])

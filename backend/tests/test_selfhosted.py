@@ -150,7 +150,7 @@ def document(title, body):
 def test_install_migrates_to_head_and_follows_configured_passwords(server):
     with server.admin() as connection:
         head = connection.execute("SELECT version_num FROM space.alembic_version").fetchone()[0]
-        assert head == "0036_oauth_server"
+        assert head == "0040_webhook_inbox"
         assert connection.execute(
             "SELECT count(*) FROM pg_roles WHERE rolname = ANY(%s)", (list(LOGINS),)
         ).fetchone()[0] == len(LOGINS)

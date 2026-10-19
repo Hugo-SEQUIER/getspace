@@ -399,7 +399,7 @@ def test_runtime_rows_are_readable_and_team_writer_has_only_filters(commands, mo
         filters = connection.execute(
             "SELECT * FROM space.active_webhook_subscriptions(%s)", (board.item_id,)
         ).fetchall()
-        assert set(filters[0]) == {"id", "revision", "key_id", "encrypted_filter"}
+        assert set(filters[0]) == {"id", "revision", "key_id", "encrypted_filter", "delivery"}
         assert created["signing_secret"].encode() not in bytes(filters[0]["encrypted_filter"])
     with (
         pytest.raises(psycopg.errors.InsufficientPrivilege),

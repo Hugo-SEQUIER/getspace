@@ -137,6 +137,7 @@ function OnboardingState({ storageKey, base }: { storageKey: string; base: strin
   if (!open) return null;
   return <Modal title="Get started with Space" className={`sp-onboarding${busy ? " is-saving" : ""}`} onClose={close}>
     <div className="sp-onboarding-content">
+      {(progress.step === 0 || createdId) && <div className="sp-onboarding-valley" aria-hidden="true" />}
       <ol className="sp-onboarding-steps" aria-label="Setup progress">
         {["Welcome", "Your focus", "First page"].map((label, step) => <li key={label} className={step < progress.step || createdId ? "is-complete" : step === progress.step ? "is-current" : ""} aria-current={step === progress.step && !createdId ? "step" : undefined}>
           <span className="sp-onboarding-sr">{label}{step < progress.step || createdId ? ", done" : ""}</span>

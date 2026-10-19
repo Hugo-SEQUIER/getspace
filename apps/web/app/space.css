@@ -2187,6 +2187,22 @@ a svg {
   font-size: var(--text-meta);
   margin-top: 10px;
 }
+/* Memory extraction that is still running: a quiet status line, not an alert. */
+.sp-memory-jobs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+.sp-memory-jobs .sp-loading-orbit {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
 .sp-toast {
   position: fixed;
   bottom: 25px;
@@ -2351,23 +2367,6 @@ kbd {
 .sp-mobile-bar,
 .sp-sidebar-backdrop {
   display: none;
-}
-.sp-compact .sp-table td {
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-.sp-compact .sp-resume-row {
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-.sp-compact .sp-task-row {
-  min-height: 35px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-}
-.sp-compact .sp-memory-list-row {
-  padding-top: 10px;
-  padding-bottom: 10px;
 }
 @media (min-width: 1700px) {
   .sp-app {
@@ -3026,9 +3025,11 @@ kbd {
 }
 
 /* User-defined memory organization. */
-.sp-organization-list { list-style: none; padding: 0; max-height: 280px; overflow: auto; }
+.sp-organization-list { list-style: none; padding: 0; max-height: min(480px, 50dvh); overflow: auto; }
 .sp-organization-list li { padding: 12px 0; border-bottom: 1px solid var(--sp-border, var(--color-border)); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
-.sp-organization-list li > div { min-width: 0; max-width: 100%; }
+/* Actions sit beside the description and only drop below it when the dialog is narrow. */
+.sp-organization-list li { align-items: center; }
+.sp-organization-list li > div { flex: 1 1 280px; min-width: 0; max-width: 100%; }
 .sp-organization-list p { margin: 4px 0; font-size: 13px; }
 .sp-memory-organization { padding: 16px 0; border-bottom: 1px solid var(--sp-border, var(--color-border)); margin-bottom: 16px; }
 .sp-memory-organization h3 { margin: 0 0 12px; font-size: 14px; }

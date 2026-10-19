@@ -14,6 +14,8 @@ from uuid import UUID
 
 from psycopg.pq import TransactionStatus
 
+from space import content_changes
+
 # Referential order: children first, one entry per Space-owned table. Every statement is
 # written out rather than built: this module deletes rows, and a constructed query string
 # has no place where data is destroyed.
@@ -122,6 +124,13 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "DELETE FROM space.memory_claims WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) AS rows FROM space.memory_claims WHERE organization_id=%s AND space_id=%s",
     ),
+    # After memory_claims: deleting a claim keeps its vector here.
+    (
+        "retired_claim_vectors",
+        "DELETE FROM space.retired_claim_vectors WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) AS rows FROM space.retired_claim_vectors "
+        "WHERE organization_id=%s AND space_id=%s",
+    ),
     (
         "resource_terms",
         "DELETE FROM space.resource_terms WHERE organization_id=%s AND space_id=%s",
@@ -158,6 +167,11 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "agent_identities",
         "DELETE FROM space.agent_identities WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) FROM space.agent_identities WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
+        "profile_images",
+        "DELETE FROM space.profile_images WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) FROM space.profile_images WHERE organization_id=%s AND space_id=%s",
     ),
     (
         "usage_limits",
@@ -332,9 +346,11 @@ def purge_space(
                     )
                 if not account:
                     connection.execute(
-                        "UPDATE space.spaces SET content_revision=content_revision+1 "
+                        "UPDATE space.spaces SET content_revision=content_revision+1,"
+                        "change_revisions=change_revisions||(SELECT "
+                        "jsonb_object_agg(kind,content_revision+1) FROM unnest(%s::text[]) kind) "
                         "WHERE organization_id=%s AND id=%s",
-                        parameters,
+                        (list(content_changes.KINDS), *parameters),
                     )
             for table, delete, count in STEPS:
                 if table == "collections" and not account:

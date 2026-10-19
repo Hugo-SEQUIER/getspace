@@ -164,6 +164,18 @@ def apply_foundation(
             sql.SQL("COMMENT ON SCHEMA space IS {}").format(sql.Literal(SCHEMA_MARKER)).as_string()
         )
     if connection_limit is not None:
+        # The deployed pools are sized against the current allowance, and the API refuses to
+        # start when it falls short. A stale operator config once lowered it during a release
+        # and took the API down, so setup only raises it; lowering stays a deliberate change.
+        current = connection.exec_driver_sql(
+            "SELECT rolconnlimit FROM pg_roles WHERE rolname = 'space_app'"
+        ).scalar_one()
+        if current == -1 or current > connection_limit:
+            raise DatabaseSetupError(
+                f"SPACE_DATABASE_CONNECTION_LIMIT={connection_limit} would lower the space_app "
+                f"allowance from {'unlimited' if current == -1 else current}; no changes made. "
+                "Raise or remove the setting, or lower the role by hand."
+            )
         connection.exec_driver_sql(
             sql.SQL("ALTER ROLE space_app CONNECTION LIMIT {}")
             .format(sql.Literal(connection_limit))

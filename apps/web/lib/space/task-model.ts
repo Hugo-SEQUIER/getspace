@@ -1,18 +1,34 @@
 import { statuses, type Resource, type Status, type TaskColumn } from "./types.ts";
 
+// Parameters: a status value, such as "in_review".
+// What it does: names it the way the API labels a status it saves as a new column.
+// Output: a readable label, such as "In review".
+export function statusLabel(value: string): string {
+  const words = value.replaceAll("_", " ").replaceAll("-", " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// Parameters: columns and a column to place before Done.
+// What it does: inserts it before Done, or at the end when there is no Done column.
+// Output: nothing; `columns` is changed in place.
+export function insertBeforeDone(columns: TaskColumn[], column: TaskColumn) {
+  const done = columns.findIndex(item => item.value === "done");
+  if (done >= 0) columns.splice(done, 0, column);
+  else columns.push(column);
+}
+
 // Parameters: saved columns and the tasks currently available in the workspace.
-// What it does: keeps built-in and unknown task statuses visible without duplicates. A
-// built-in status that is not a stored column, such as needs_you, appears before Done
-// with its own label while a task carries it.
+// What it does: always shows the built-in Needs you column before Done, even when empty, so
+// the board keeps one shape. A status a task carries that is not yet a saved column (the
+// API saves it as one) shows under the label the API gives it.
 // Output: the ordered columns to display.
 export function taskColumnsWithResources(columns: TaskColumn[], resources: Resource[]): TaskColumn[] {
   const result = [...columns];
+  for (const builtIn of statuses)
+    if (!result.some(item => item.value === builtIn.value)) insertBeforeDone(result, builtIn);
   for (const task of resources) {
     if (task.kind !== "task" || result.some(item => item.value === task.status)) continue;
-    const builtIn = statuses.find(status => status.value === task.status);
-    const done = result.findIndex(item => item.value === "done");
-    if (builtIn && done >= 0) result.splice(done, 0, builtIn);
-    else result.push(builtIn ?? { value: task.status, label: task.status.replaceAll("_", " ") });
+    insertBeforeDone(result, { value: task.status, label: statusLabel(task.status) });
   }
   return result;
 }

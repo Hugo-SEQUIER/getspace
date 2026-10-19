@@ -24,6 +24,7 @@ Every content request also names the agent identity in the `X-Space-Agent-ID` he
 |---|---|
 | Discovery | `server_info`, `workspace_info`, `identify_agent`, `list_agent_identities`, `get_space_map` |
 | Documents and tasks | `list_resources`, `get_resource`, `save_resource`, `task_columns`, `add_task_column`, `set_task_status`, `delete_task` |
+| Agent inbox | `pull_events`, `ack_events` |
 | Projects, folders, sections, categories and databases | `list_workspace_items`, `get_workspace_item`, `save_workspace_item`, `set_workspace_item_deleted`, `query_database` |
 | Search and recall | `search_workspace`, `get_context` |
 | Memory | `memory_info`, `list_memories`, `remember`, `remember_claims`, `extract_memory`, `memory_job`, `build_memory`, `change_memory`, `delete_memory`, `save_handoff`, `set_memory_links`, `get_memory_links` |
@@ -31,6 +32,8 @@ Every content request also names the agent identity in the `X-Space-Agent-ID` he
 The tool schemas served by the endpoint are authoritative for arguments and types. Tools that can send content to a model provider are marked as open-world.
 
 `save_resource` accepts a `change` object with `command_id`, `expected_revision`, `kind`, `title`, `body`, an optional task `status`, and `resource_id` for updates. New resources use revision zero. Read results include the resource ID, revision, timestamp and human or agent attribution, and historical revisions can be read explicitly. Documents and tasks are the same records the website and the REST API use. `save_resource` also accepts `recall` metadata for ordinary sources and handoffs (category, topics, source references, exclusion); leaving it out preserves it during edits. Generated memory documents use the dedicated memory tools.
+
+`pull_events(space_id, request)` and `ack_events(space_id, request)` drain the Space's agent inbox: database change events queued by an inbox subscription that the owner created under Settings → Webhooks. A pull leases up to 50 waiting events for ten minutes and returns the same payload a webhook receiver would get; an acknowledgement marks them delivered. Both need a write grant. Nothing pushes to the agent, so an agent polls on a schedule or a loop. See [database webhooks](WEBHOOKS.md#agent-inbox-delivery).
 
 `delete_task(space_id, resource_id, expected_revision)` permanently removes one task with every revision. It needs a write grant and an identified agent, rejects a stale revision and treats an absent task as a success. Separately saved memories remain. Agents cannot delete documents: the owner removes them on the website or through the REST API.
 

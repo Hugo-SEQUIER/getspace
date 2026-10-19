@@ -96,6 +96,10 @@ export function WorkspaceExport() {
           ? `Preparing export… ${count} entries`
           : "Export complete Space"}
       </button>
+      <p className="sp-muted sp-export-hint">
+        A large Space can take several minutes to export. Keep this page open
+        until the download starts.
+      </p>
     </section>
   );
 }

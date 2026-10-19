@@ -69,7 +69,7 @@ In private mode agents need no token: `claude mcp add --transport http space htt
 
 ## Memory with a model provider
 
-Documents, tasks, databases, handoffs and word search work without any model. Automatic memory (extracting claims from text, embeddings and semantic recall) needs an OpenAI-compatible endpoint or Ollama; set `SPACE_MEMORY_PROVIDER` and the related settings in `.env`. Only the text an agent asks Space to process is sent to that provider. See [memory](docs/MEMORY.md).
+Documents, tasks, databases, handoffs and word search work without any model. Automatic memory (extracting claims from text, embeddings and semantic recall) needs an OpenAI-compatible endpoint or Ollama; set `SPACE_MEMORY_PROVIDER` and the related settings in `.env`. Only the text an agent asks Space to process is sent to that provider. A decision model on OpenRouter's Decisions API can also assess recall evidence, organize memories against your categories and projects, and link related memories; each of those is off until you turn it on. See [memory](docs/MEMORY.md).
 
 ## Back up and upgrade
 

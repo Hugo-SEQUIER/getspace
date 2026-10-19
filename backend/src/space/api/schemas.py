@@ -101,7 +101,7 @@ class Classification(Closed):
     category_ids: list[UUID]
     project_ids: list[UUID]
     section_ids: list[UUID]
-    method: str = Field(description="How the assignment was made, such as manual or typesafe.")
+    method: str = Field(description="How the assignment was made, such as manual or decision.")
     reason: str
 
 
@@ -193,6 +193,14 @@ class SpaceInfo(Closed):
 class ReadVersion(Closed):
     version: str = Field(
         description="Opaque. It changes whenever content, your role or visibility changes."
+    )
+    versions: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Opaque, one per kind of content (document, task, memory, project, folder, "
+            "database, category, section, columns). Each changes only when that kind "
+            "changes, or when your role or visibility changes."
+        ),
     )
 
 

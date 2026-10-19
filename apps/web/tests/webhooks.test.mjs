@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canRedeliver, webhookEndpoint, webhookPath, webhookProxyAllowed, webhookTransition } from "../lib/space/webhooks.ts";
+import { canRedeliver, canRotate, receiptOutcome, webhookDestination, webhookEndpoint, webhookPath, webhookProxyAllowed, webhookTransition } from "../lib/space/webhooks.ts";
 
 const space = "11111111-1111-4111-8111-111111111111";
 const subscriptionId = "22222222-2222-4222-8222-222222222222";
@@ -50,6 +50,23 @@ test("transitions use only current database select fields and their exact option
   assert.deepEqual(webhookTransition(database, "stage", "Won"), { field_id: "stage", to: "Won" });
   for (const [field, to] of [["contact", "Won"], ["missing", "Won"], ["stage", "won"], ["stage", ""], ["empty-select", "Won"]])
     assert.throws(() => webhookTransition(database, field, to), /current select field/);
+});
+
+test("an inbox subscription shows its destination, has no secret and reads receipts as pulls", () => {
+  const inbox = { delivery: "inbox", endpoint_url: null };
+  const endpoint = { delivery: "endpoint", endpoint_url: "https://receiver.example.com/events" };
+  assert.equal(webhookDestination(inbox), "Agent inbox");
+  assert.equal(webhookDestination(endpoint), "https://receiver.example.com/events");
+  assert.equal(canRotate(inbox), false);
+  assert.equal(canRotate(endpoint), true);
+  const leased = { finished_at: null, status_code: null, error_code: null };
+  const acknowledged = { finished_at: "2026-10-14T10:00:00Z", status_code: null, error_code: null };
+  const expired = { finished_at: "2026-10-14T10:00:00Z", status_code: null, error_code: "worker_lost" };
+  assert.equal(receiptOutcome(inbox, leased), "Leased to an agent");
+  assert.equal(receiptOutcome(inbox, acknowledged), "Acknowledged");
+  assert.equal(receiptOutcome(inbox, expired), "Lease expired");
+  assert.equal(receiptOutcome(endpoint, leased), "No response");
+  assert.equal(receiptOutcome(endpoint, { ...acknowledged, status_code: 202 }), "202");
 });
 
 test("redelivery requires an active subscription and a terminal delivery status", () => {

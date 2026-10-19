@@ -4,6 +4,11 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+/* Labelled actions are pills, like the rest of the workspace (refined-workspace.css). */
+.actions > :is(button, a) {
+  border-radius: 999px;
+  padding-inline: 14px;
+}
 .agentForm .profile {
   margin: 0 0 20px;
 }

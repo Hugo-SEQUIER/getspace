@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import select
 import shutil
 import subprocess
 import time
@@ -212,8 +213,13 @@ def test_runtime_pool_replaces_a_connection_terminated_while_idle(database):
     try:
         with runtime.pool.connection() as connection:
             old_pid = connection.info.backend_pid
+            pooled = connection
         with connect_as(admin=True) as administrator:
             administrator.execute("SELECT pg_terminate_backend(%s)", (old_pid,))
+        # Termination returns before the backend writes its notice and closes. The pool
+        # trusts a recently used connection until that notice makes its socket readable.
+        readable, _, _ = select.select([pooled.fileno()], [], [], 10)
+        assert readable, "the terminated backend's notice reached the pooled connection"
         with runtime.pool.connection() as connection:
             assert connection.info.backend_pid != old_pid
             assert connection.execute("SELECT 1 AS alive").fetchone() == {"alive": 1}
@@ -367,7 +373,29 @@ def test_explicit_connection_allowance_is_preserved_and_runtime_checks_actual_ro
             runtime._configure_budget(connection)
     finally:
         with engine.begin() as connection:
-            apply_foundation(connection, password, connection_limit=5)
+            connection.exec_driver_sql("ALTER ROLE space_app CONNECTION LIMIT 5")
+
+
+def test_setup_never_lowers_an_existing_connection_allowance(database):
+    connect_as, engine, _, _, password = database
+    try:
+        with engine.begin() as connection:
+            apply_foundation(connection, password, connection_limit=20)
+        with pytest.raises(DatabaseSetupError, match="would lower the space_app allowance from 20"):
+            with engine.begin() as connection:
+                apply_foundation(connection, password, connection_limit=18)
+        with engine.begin() as connection:
+            apply_foundation(connection, password, connection_limit=20)
+        with connect_as(runtime=True) as connection:
+            assert (
+                connection.execute(
+                    "SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user"
+                ).fetchone()[0]
+                == 20
+            )
+    finally:
+        with engine.begin() as connection:
+            connection.exec_driver_sql("ALTER ROLE space_app CONNECTION LIMIT 5")
 
 
 def test_setup_refuses_an_unrelated_role_without_adopting_it(database):
@@ -434,6 +462,7 @@ def test_command_retention_removes_only_rows_past_the_window(database):
             "events": 1,
             "commands": 1,
             "activity_events": 0,
+            "retired_claim_vectors": 0,
         }
     with connect_as(admin=True) as connection:
         commands = connection.execute(

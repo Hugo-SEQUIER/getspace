@@ -1,5 +1,5 @@
 import { scopedAgentPath, selectedSpaceKey } from "./space/teams";
-import { ReadCache, ReadScheduler, type ReadOptions } from "./read-cache";
+import { ReadCache, ReadScheduler, type ReadOptions, type SpaceVersions } from "./read-cache";
 import { isTimeout, READ_TIMEOUT_MS, timeoutMessage } from "./request-timeouts";
 import { PersistentReads, erasePersistentReads } from "./persistent-reads";
 import { affectedReads } from "./read-invalidation";
@@ -7,7 +7,9 @@ import { ApiError, sendBrowserRequest } from "./browser-http";
 
 export { ApiError } from "./browser-http";
 
-const reads = new ReadScheduler(2);
+// Six reads in flight: the workspace opens with about a dozen independent lists, and
+// HTTP/2 multiplexes them on one connection. Selected documents still go first.
+const reads = new ReadScheduler(6);
 let readCache: ReadCache | undefined;
 let cacheAccount: string | null = null;
 let cacheEpoch = 0;
@@ -21,11 +23,13 @@ function browserReadCache() {
   return readCache ??= new ReadCache((path, signal) => api(path, "GET", undefined, signal));
 }
 
-async function readVersion(spaceId: string, signal: AbortSignal) {
-  const result = await api<{ version: string }>(`spaces/${spaceId}/read-version`, "GET", undefined, signal);
+async function readVersion(spaceId: string, signal: AbortSignal): Promise<SpaceVersions> {
+  const result = await api<SpaceVersions>(`spaces/${spaceId}/read-version`, "GET", undefined, signal);
   if (typeof result.version !== "string" || !result.version)
     throw new Error("Could not check for changes. Try again.");
-  return result.version;
+  // Older backends send only the Space-wide version; every read then compares that.
+  const versions = result.versions && typeof result.versions === "object" ? result.versions : undefined;
+  return { version: result.version, versions };
 }
 
 export function getReadQueryClient() {
@@ -136,7 +140,8 @@ export async function api<T>(
 ): Promise<T> {
   path = scopedPath(path);
   const mutation = method !== "GET" && !/\/(search|context|export|preview)$/.test(path);
-  const auth = path.startsWith("auth/");
+  // Signing in or out changes the account; renaming the profile keeps the session and its cache.
+  const auth = path.startsWith("auth/") && path !== "auth/profile";
   const affected = affectedReads(path);
   if (mutation && auth) { resetReadCache(0, "", true); await optionalStorage(diskCleanup); }
   else if (mutation && path !== "workspace" && readCache)

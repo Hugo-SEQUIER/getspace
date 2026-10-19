@@ -171,6 +171,8 @@ test('a dragged card moves at once, stays movable while saving, and rolls back o
 });
 
 test('custom columns persist, and cards move by title drag and by keyboard', async ({ app, screen, browser, space }) => {
+  // Five columns with Needs you: wide enough that dragging needs no sideways scroll.
+  await browser.setViewport({ width: 1700, height: 900 });
   await app.open('/app/tasks');
   const cardLink = screen.getByRole('link', 'Keep task content');
   await screen.getByRole('button', 'Add column').tap();
@@ -388,6 +390,7 @@ test('task creation shows progress, keeps the draft on failure, and retries with
   await expect(createDialog.getByRole('status')).toHaveText('Creating task…');
   await expect(createDialog.getByRole('button', 'Save')).toBeDisabled();
   await expect(createDialog.getByLabel('Title')).toBeDisabled();
+  await expect(createDialog.getByLabel('Priority')).toBeDisabled();
   await browser.keyboard.press('Escape');
   await expect(createDialog).toBeVisible();
   await expect.poll(() => firstCreate.arrivals).toBe(1);

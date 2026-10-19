@@ -7,6 +7,25 @@
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
+.empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+.empty > svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.empty strong {
+  color: var(--color-ink);
+  font-weight: 550;
+}
 .form,
 .access {
   border: 0;

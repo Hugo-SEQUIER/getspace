@@ -90,7 +90,7 @@ def test_image_candidates_use_stripped_model_inputs_without_invalid_raw_passage_
     original.pop("entry_id")
     snapshot = deepcopy(original)
     model = Assessor([{"candidate": 0, "relevance": "direct"}])
-    model.settings = SimpleNamespace(memory_relevance_provider="typesafe")
+    model.settings = SimpleNamespace(memory_relevance_provider="decision")
     diagnostics = {}
     selected = relevance.select([original], "milestone", model, diagnostics=diagnostics)
     assert model.calls[0]["candidates"][0]["text"] == readable
@@ -139,12 +139,38 @@ def test_workspace_search_matches_readable_source_text_and_never_shows_encoded_s
     body += ") milestone complete."
     original = resource("Notes", body)
     snapshot = deepcopy(original)
-    row = {"cursor": "r:" + original["id"], "id": original["id"], "revision": 1}
-    connection = SimpleNamespace(execute=lambda *args: SimpleNamespace(fetchall=lambda: [row]))
+    resource_id = uuid4()
+    row = {"cursor": f"r:{resource_id}", "id": resource_id, "revision": 1}
+    version = {
+        "resource_id": resource_id,
+        "revision": 1,
+        "kind": "document",
+        "key_id": "key",
+        "wrapping_provider": "test",
+        "wrapping_key_reference": "test",
+        "wrapped_key": b"",
+        "object_key": None,
+        "encrypted_record": b"",
+        "created_at": datetime.now(UTC),
+        "author_client_id": None,
+        "author_principal_id": None,
+    }
+    results = {
+        workspace_search.CORPUS: [row],
+        workspace_search.RESOURCES: [version],
+    }
+    connection = SimpleNamespace(
+        execute=lambda sql, *args: SimpleNamespace(
+            fetchall=lambda: results[sql], fetchone=lambda: {"content_revision": 7}
+        )
+    )
     workspace = SimpleNamespace(
         db=SimpleNamespace(transaction=lambda identity: nullcontext(connection)),
-        _scope=lambda *args: None,
-        get_resource=lambda *args: original,
+        _scope=lambda *args: {"organization_id": None, "space_id": None, "principal_id": None},
+        _key_rows=Workspace._key_rows,
+        _unwrap_key=lambda *args: None,
+        _unpack=lambda *args: original,
+        _summary=Workspace._summary,
     )
     monkeypatch.setattr(workspace_search, "require_snapshot", lambda *args: 7)
     result = workspace_search.search(workspace, None, None, workspace_search.Search(query=query))

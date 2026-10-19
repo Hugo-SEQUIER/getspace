@@ -27,9 +27,9 @@ const date = (value: string) =>
     timeZone: "UTC",
   });
 const series = [
-  { key: "retrievals", label: "Retrievals", color: "#8052be" },
-  { key: "memories_created", label: "Memories added", color: "#258677" },
-  { key: "document_writes", label: "Document saves", color: "#8093b1" },
+  { key: "retrievals", label: "Retrievals", color: "#5b6fb5" },
+  { key: "memories_created", label: "Memories added", color: "#6f8a4a" },
+  { key: "document_writes", label: "Document saves", color: "#d9825a" },
 ] as const;
 
 function Metric({
@@ -295,19 +295,19 @@ function Retrieval({ value }: { value: Overview }) {
             <i
               style={{
                 width: `${(s.with_results / s.retrievals) * 100}%`,
-                background: "#258677",
+                background: "#6f8a4a",
               }}
             />
             <i
               style={{
                 width: `${(s.empty / s.retrievals) * 100}%`,
-                background: "#c8c3ce",
+                background: "#cfd6d0",
               }}
             />
             <i
               style={{
                 width: `${(s.errors / s.retrievals) * 100}%`,
-                background: "#cb795d",
+                background: "#d9825a",
               }}
             />
           </>

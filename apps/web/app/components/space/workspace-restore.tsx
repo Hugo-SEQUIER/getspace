@@ -4,6 +4,7 @@ import { useFeedback } from "@web/app/components/notifications";
 import { api, message } from "../../../lib/client";
 import { readArchive } from "../../../lib/space/archive-zip";
 import { useSpace } from "./provider";
+import { Icon } from "./ui-icon";
 
 type Choices = Record<string, "keep" | "copy" | "replace">;
 type Review = {
@@ -51,6 +52,7 @@ export function WorkspaceRestore() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [pending, setPending] = useState<{ id: string; state: string }[]>([]);
   const upload = useRef<Upload | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   useFeedback({
     error,
     notice,
@@ -147,10 +149,17 @@ export function WorkspaceRestore() {
         the archive’s latest version current. Existing history is retained.
         Existing memory edits and forget choices are preserved.
       </p>
-      <label className="sp-field">
-        Space archive
+      <div className="sp-restore-picker">
+        <button type="button" disabled={busy} onClick={() => fileInput.current?.click()}>
+          <Icon name="upload" size={15} />
+          Choose an archive
+        </button>
+        <span className="sp-muted">The ZIP or JSON file from Export your Space.</span>
         <input
+          ref={fileInput}
           type="file"
+          hidden
+          aria-label="Space archive"
           accept=".zip,.json,application/zip,application/json"
           disabled={busy}
           onChange={async (e) => {
@@ -199,7 +208,7 @@ export function WorkspaceRestore() {
             }
           }}
         />
-      </label>
+      </div>
       {upload.current && !busy && (
         <button onClick={() => void sendUpload()}>
           Retry upload and review

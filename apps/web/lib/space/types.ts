@@ -52,7 +52,7 @@ export type MemoryAssignment = {
   section_ids: string[];
 };
 export type MemoryClassification = MemoryAssignment & {
-  method: "manual" | "typesafe" | "unassigned";
+  method: "manual" | "decision" | "unassigned";
   reason: "matched" | "uncertain" | "disabled" | "unavailable" | "catalog_limit" | "input_limit";
 };
 export type Project = {
@@ -102,10 +102,12 @@ export type Provider = {
   endpoint: string | null;
   text_model: string | null;
   relevance_model?: string | null;
-  relevance_provider?: "model" | "typesafe";
-  classification_provider?: "disabled" | "typesafe";
-  typesafe_model?: string | null;
-  typesafe_endpoint?: string | null;
+  relevance_provider?: "model" | "decision";
+  classification_provider?: "disabled" | "decision";
+  relationship_provider?: "disabled" | "decision";
+  // The decision model and where it is reached, when any memory feature asks it.
+  decision_model?: string | null;
+  decision_endpoint?: string | null;
   embedding_model: string | null;
   embedding_dim: number;
   index: {
@@ -153,9 +155,11 @@ export const statuses: { value: Status; label: string }[] = [
 ];
 /** The revision of a document or task the owner last opened. */
 export type ResourceView = { resource_id: string; seen_revision: number; seen_at: string };
+// Category and creator colours come from the public site's evening valley: dusk blue,
+// apricot, olive hills and plum cloud first (categoryPalette in memory-view.tsx).
 export const categoryColors: Record<string, string> = {
-  Product: "#885dff",
-  Design: "#f27391",
-  Engineering: "#5795ef",
-  Research: "#38bba8",
+  Product: "#5b6fb5",
+  Design: "#d9825a",
+  Engineering: "#6f8a4a",
+  Research: "#a8668f",
 };

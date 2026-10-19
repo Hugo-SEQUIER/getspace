@@ -8,7 +8,7 @@ import secrets
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from space import workspace_items
 from space.memory import Input
@@ -26,13 +26,24 @@ class Transition(Input):
 class CreateSubscription(Input):
     command_id: UUID
     database_id: UUID
-    endpoint_url: str = Field(min_length=1, max_length=2048)
+    # endpoint: Space POSTs signed notifications to endpoint_url.
+    # inbox: the owner's agents pull and acknowledge the same deliveries over MCP.
+    delivery: Literal["endpoint", "inbox"] = "endpoint"
+    endpoint_url: str | None = Field(default=None, min_length=1, max_length=2048)
     transition: Transition | None = None
 
     @field_validator("endpoint_url")
     @classmethod
     def endpoint(cls, value):
-        return validate_endpoint(value)
+        return None if value is None else validate_endpoint(value)
+
+    @model_validator(mode="after")
+    def destination(self):
+        if self.delivery == "endpoint" and not self.endpoint_url:
+            raise ValueError("Choose an HTTPS receiver or inbox delivery")
+        if self.delivery == "inbox" and self.endpoint_url is not None:
+            raise ValueError("Inbox delivery has no receiver endpoint")
+        return self
 
 
 class ChangeSubscription(Input):
@@ -87,7 +98,8 @@ def public_subscription(row, config):
         "database_id": str(row["database_id"]),
         "revision": row["revision"],
         "paused": row["paused"],
-        "endpoint_url": config.get("endpoint_url", ""),
+        "delivery": row["delivery"],
+        "endpoint_url": config.get("endpoint_url"),
         "transition": config.get("transition"),
         "removed_at": row["removed_at"].isoformat() if row["removed_at"] else None,
         "created_at": row["created_at"].isoformat(),
@@ -101,7 +113,7 @@ def subscription_response(row, config, *, include_secret=False):
     Output: public subscription data and, only when requested, its signing secret.
     """
     result = {"subscription": public_subscription(row, config)}
-    if include_secret:
+    if include_secret and row["delivery"] == "endpoint":
         result["signing_secret"] = config["signing_secret"]
     return result
 
@@ -193,7 +205,7 @@ def create(workspace, identity, space_id, request: CreateSubscription):
     with workspace.db.transaction(identity) as connection:
         owner_scope(workspace, connection, identity, space_id)
         previous = previous_command(connection, request.command_id, digest)
-    if not previous:
+    if not previous and request.delivery == "endpoint":
         try:
             resolve_endpoint(request.endpoint_url)
         except ValueError:
@@ -223,20 +235,20 @@ def create(workspace, identity, space_id, request: CreateSubscription):
         ).fetchone()["n"]
         if count >= MAX_SUBSCRIPTIONS:
             raise CommandError("Remove a subscription before creating another; limit is 20", 409)
-        config = {
-            "endpoint_url": request.endpoint_url,
-            "transition": transition,
-            "signing_secret": secrets.token_urlsafe(32),
-        }
+        config = {"transition": transition}
+        if request.delivery == "endpoint":
+            config["endpoint_url"] = request.endpoint_url
+            config["signing_secret"] = secrets.token_urlsafe(32)
         row = connection.execute(
             "INSERT INTO space.webhook_subscriptions (organization_id,space_id,id,database_id,"
-            "revision,key_id,encrypted_configuration,encrypted_filter,created_by,issuer,subject) "
-            "VALUES (%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s) RETURNING *",
+            "delivery,revision,key_id,encrypted_configuration,encrypted_filter,created_by,"
+            "issuer,subject) VALUES (%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s) RETURNING *",
             (
                 scope["organization_id"],
                 space_id,
                 request.command_id,
                 request.database_id,
+                request.delivery,
                 key.key.key_id,
                 workspace._pack(
                     key,
@@ -300,6 +312,8 @@ def change(workspace, identity, space_id, subscription_id, request: ChangeSubscr
             raise CommandError("This webhook subscription was removed", 409)
         if row["revision"] != request.expected_revision:
             raise CommandError("This subscription changed. Refresh before saving.", 409)
+        if request.action == "rotate" and row["delivery"] != "endpoint":
+            raise CommandError("An inbox subscription has no signing secret to rotate", 409)
         if request.action == "resume":
             active_database(workspace, connection, scope, row["database_id"], key)
         if request.action == "rotate":

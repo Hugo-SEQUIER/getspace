@@ -4,7 +4,7 @@ import hmac
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from space import brain, memory_link_index, memory_routing, tasks
+from space import brain, content_changes, memory_link_index, memory_routing, tasks
 from space.terms import resource_fingerprints, term_key
 from space.workspace import CommandError
 
@@ -345,7 +345,7 @@ def publish(
                         row["revision"],
                         row["value"].get("_memory", {}).get("claims", []),
                     )
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection)
             connection.execute(
                 "UPDATE space.restore_sessions SET state='committed',encrypted_result=%s,"
                 "lease_until=NULL WHERE id=%s AND lease_id=%s",

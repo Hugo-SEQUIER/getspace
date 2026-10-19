@@ -7,6 +7,7 @@ import {
   validateField,
   validateRecord,
   queryRecords,
+  keepRecordOrder,
   isWorkspaceDatabase,
 } from "../lib/space/databases.ts";
 import { makeDemoDatabases } from "./support/sample-workspace.ts";
@@ -147,4 +148,13 @@ test("date added uses creation time, not edits, and keeps legacy unknown dates l
   assert.ok(isWorkspaceDatabase(db));
   db.records[0].createdAt = "invalid";
   assert.equal(isWorkspaceDatabase(db), false);
+});
+
+test("edited rows keep their place while new rows take their sorted position", () => {
+  const rows = (...ids) => ids.map((id) => ({ id }));
+  const ids = (list) => list.map((row) => row.id);
+  // "b" was just edited, so a fresh "Last edited" sort moves it first.
+  assert.deepEqual(ids(keepRecordOrder(["a", "b", "c"], rows("b", "a", "c"))), ["a", "b", "c"]);
+  assert.deepEqual(ids(keepRecordOrder(["a", "b", "c"], rows("new", "b", "a", "c"))), ["new", "a", "b", "c"]);
+  assert.deepEqual(ids(keepRecordOrder(["a", "b", "c"], rows("a", "c", "last"))), ["a", "c", "last"]);
 });

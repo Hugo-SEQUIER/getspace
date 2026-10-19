@@ -185,15 +185,15 @@ function drawGraph(
   ctx.lineJoin = "round";
   const active = style.active,
     connected = active ? style.neighbors.get(active) : undefined;
-  const activeColor = (active && style.colors.get(active)) || "#885dff";
+  const activeColor = (active && style.colors.get(active)) || "#5b6fb5";
 
   for (const group of geometry.groups) {
     ctx.beginPath();
     ctx.arc(group.x, group.y, group.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#8292b8";
+    ctx.fillStyle = "#8a978d";
     ctx.globalAlpha = 0.07;
     ctx.fill();
-    ctx.strokeStyle = "#8292b8";
+    ctx.strokeStyle = "#8a978d";
     ctx.globalAlpha = 0.22;
     ctx.lineWidth = 1 / k;
     ctx.stroke();
@@ -213,7 +213,7 @@ function drawGraph(
     const sourceColor = style.colors.get(link.source.id),
       targetColor = style.colors.get(link.target.id);
     const color =
-      sourceColor && sourceColor === targetColor ? sourceColor : "#9da9b9";
+      sourceColor && sourceColor === targetColor ? sourceColor : "#a7b0a9";
     const trunk = link.source.degree > 3 && link.target.degree > 3;
     const key = color + trunk;
     let group = edgeGroups.get(key);
@@ -251,7 +251,7 @@ function drawGraph(
     const x = origin.x + node.x * k,
       y = origin.y + node.y * k;
     if (x < -30 || x > width + 30 || y < -30 || y > height + 30) continue;
-    const color = style.colors.get(node.id) ?? "#8791a5";
+    const color = style.colors.get(node.id) ?? "#939a95";
     const alpha =
       active && node.id !== active && !connected?.has(node.id) ? 0.25 : 1;
     const cells = node.degree > 3;
@@ -327,7 +327,7 @@ function drawGraph(
     ctx.beginPath();
     circle(ctx, selected, (nodeScreenRadius(selected, k) + 4) / k);
     ctx.globalAlpha = 0.7;
-    ctx.strokeStyle = style.colors.get(selected.id) ?? "#885dff";
+    ctx.strokeStyle = style.colors.get(selected.id) ?? "#5b6fb5";
     ctx.lineWidth = 1.2 / k;
     ctx.stroke();
   }
@@ -347,7 +347,7 @@ function drawGraphLabels(
   const { k } = camera;
   const active = style.active;
   const connected = active ? style.neighbors.get(active) : undefined;
-  const activeColor = (active && style.colors.get(active)) || "#885dff";
+  const activeColor = (active && style.colors.get(active)) || "#5b6fb5";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   for (const group of k >= 0.4 ? geometry.groups : []) {
     const point = nodeScreenPoint(group, camera, width, height);
@@ -355,7 +355,7 @@ function drawGraphLabels(
     const y = point.y - group.radius * k + 25;
     if (x > width || y > height || x < -250 || y < 0) continue;
     ctx.font = '600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    ctx.fillStyle = "#48546b";
+    ctx.fillStyle = "#515b56";
     ctx.fillText(`${group.name} · ${group.count}`, x, y, Math.max(90, group.radius * k * 2 - 28));
   }
   const boxes: { x: number; y: number; width: number; height: number }[] = [];
@@ -406,14 +406,14 @@ function drawGraphLabels(
       ctx.beginPath();
       ctx.arc(x + 2, y - 2.5, 2.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#383a48";
+      ctx.fillStyle = "#202522";
       ctx.fillText(title, x + 12, y + 1);
     } else {
       ctx.globalAlpha = active && !connected?.has(id) ? 0.25 : 1;
       ctx.lineWidth = 4;
       ctx.strokeStyle = "white";
       ctx.strokeText(title, x, y);
-      ctx.fillStyle = "#747986";
+      ctx.fillStyle = "#68716b";
       ctx.fillText(title, x, y);
     }
   }

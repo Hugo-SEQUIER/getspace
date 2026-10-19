@@ -23,20 +23,25 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Tasks: create, detail, status | `workspace`, `projects` | `tasks` | |
 | Tasks: board drag, keyboard moves, columns, bulk actions, view-only | | `tasks` | |
 | Tasks board: database rows planned for today | | `today-plan` | |
-| Search | `workspace` | | Type tabs not yet asserted |
+| Search: titles answer before the index, body matches after one index read, type tabs, the palette reuses the index | `workspace` | `search` | |
 | Projects: create, rename, task filter, linked databases | `projects` | `project-databases` | Trash and sections: not yet |
 | Databases: create, records, reload, record panel | `databases` | `database-record-panel` | Properties, board view and import are not covered |
-| Webhooks: create with signing secret | `databases` | | Rotate, remove and deliveries: not yet |
+| Databases: row selection | | `database-row-selection` | The checkbox cell selects a record; while any record is selected, a click on a row selects or clears it instead of editing or opening it, while the keyboard and the row menu keep their actions |
+| Databases: set a select value on selected rows | | `database-bulk-option` | The selection bar's menu lists only select properties; choosing an option or the empty choice saves every selected record at once and leaves unselected and unchanged records' edit times alone |
+| Databases: an edited row keeps its place | | `database-row-order` | Saving a cell no longer moves the row to the top under Last edited |
+| Webhooks: create with signing secret, inbox subscription without a secret, inbox receipts | `databases` | `webhooks` | Rotate and remove: not yet |
 | Agents: create identity | `agents` | | |
 | Agents: connect an agent with a token | | `agent-tokens` | The token is shown once with client setups |
 | Agents: connector address for apps that sign in | | `agent-tokens` | Key mode only; absent in private mode |
 | Device-code connection | | `connect-code` | Includes unlocking before reviewing the code |
 | App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token |
-| Memory page renders | `surfaces` | | Memory needs a model provider; browsing and editing memory are not covered |
+| Memory page renders, extraction status only while a job runs | `surfaces` | `settings` | Memory needs a model provider; browsing and editing memory are not covered |
 | Overview renders | `surfaces` | | |
-| Settings: account density | `agents` | | |
+| Settings: account profile, picture upload and removal | | `settings` | The name comes from `SPACE_OWNER_NAME` |
 | Settings: API keys create, copy, revoke | `attention` (create) | `api-keys` | |
-| Settings: security, processing, data render | `surfaces` | | Export download and restore: not yet |
+| Settings: security, processing, data render | `surfaces` | `settings` (processing loads by itself, export hint, restore picker) | Export download and restore: not yet |
+| Workspace polish: Home waits for agents and seen marks, dialog widths on valley pages, agents connected never created, search close button, project overview columns, wide categories dialog, Needs you always a column | | `workspace-polish` | |
+| Design: evening strip on Home, engraved valley on first-use empty states, the setup dialog, the connection and not-found pages and the foot of lighter pages, pill actions, status pills, the floating top bar | | `app-design` | Desktop and phone widths |
 
 ## Adding a surface
 

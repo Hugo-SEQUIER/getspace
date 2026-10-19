@@ -1,9 +1,12 @@
 /* Home and first-run setup: open space, light rules, and one ink action at a time. */
 .sp-app .sp-home-v2 { width: 100%; max-width: 920px; margin: 0 auto; padding: 56px 48px 72px; color: var(--color-text); }
 .sp-app .sp-home-v2 :is(ul, li) { margin: 0; padding: 0; list-style: none; }
+/* Home opens on a strip of the public site's evening valley, drawn at exactly half its pixel
+   width (960 CSS px for 1920 px) so the dots stay crisp; the strip crops it, never scales it. */
+.sp-app .sp-home-band { height: 180px; margin: 0 0 28px; border-radius: var(--radius-lg); background: #8c94ba url("/design/home-evening-1920.78b45f97.webp") 30% 50% / 960px 180px no-repeat; box-shadow: inset 0 0 0 1px rgb(32 37 34 / 6%); }
 .sp-app .sp-home-v2-heading { display: block; height: auto; padding: 0; margin: 0 0 20px; border: 0; background: transparent; }
 .sp-app .sp-home-v2-date { margin: 0 0 4px; color: var(--color-muted); font-size: 14px; font-weight: 500; }
-.sp-app .sp-home-v2-heading h1 { margin: 0; font-size: 34px; line-height: 1.15; font-weight: 700; letter-spacing: -.8px; }
+.sp-app .sp-home-v2-heading h1 { margin: 0; font-size: 34px; line-height: 1.15; font-weight: 600; letter-spacing: -.9px; }
 
 .sp-app .sp-home-v2-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; }
 .sp-app .sp-home-v2-actions button { gap: 8px; min-height: 32px; padding: 5px 12px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text); font-size: 14px; }
@@ -83,16 +86,19 @@
 
 /* Setup dialog: compact, centered copy, fits a 720px-tall laptop screen. */
 .sp-app .sp-onboarding { width: 480px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; overflow: auto; position: fixed; font-size: 15px; line-height: 1.5; color: var(--color-text); }
-.sp-app .sp-onboarding > .sp-modal-head { position: absolute; top: 10px; right: 10px; min-height: 0; padding: 0; border: none; background: transparent; z-index: 1; }
+/* Outranks the shared modal head (modals.css), so the close button floats over the valley. */
+.sp-app .sp-modal.sp-onboarding:not(.sp-refined-command) > .sp-modal-head { position: absolute; top: 10px; right: 10px; min-height: 0; padding: 0; border: none; background: transparent; z-index: 1; }
 .sp-app .sp-onboarding > .sp-modal-head h2,
 .sp-app .sp-onboarding-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .sp-app .sp-onboarding.is-saving > .sp-modal-head > button { visibility: hidden; }
 .sp-app .sp-onboarding-content { padding: 28px 32px 24px; }
+/* The welcome and finish screens open on the public site's engraved valley, faded into the dialog. */
+.sp-app .sp-onboarding-valley { height: 92px; margin: -28px -32px 14px; background: url("/design/footer-engraving-1920.a05e5f14.webp") 70% 58% / 600px auto no-repeat; background-image: image-set(url("/design/footer-engraving-1920.a05e5f14.webp") 1x, url("/design/footer-engraving-3840.bc563351.webp") 2x); -webkit-mask-image: linear-gradient(transparent, #000 45%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 45%, #000 70%, transparent); }
 .sp-app .sp-onboarding-steps { display: flex; gap: 6px; width: 96px; margin: 0 auto 28px; padding: 0; list-style: none; }
 .sp-app .sp-onboarding-steps li { flex: 1; height: 4px; border-radius: 999px; background: var(--color-hover); }
 .sp-app .sp-onboarding-steps :is(.is-current, .is-complete) { background: var(--color-accent); }
 .sp-app .sp-onboarding-heading { text-align: center; margin-bottom: 24px; }
-.sp-app .sp-onboarding-heading h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -.5px; outline: none; color: var(--color-ink); }
+.sp-app .sp-onboarding-heading h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 600; letter-spacing: -.5px; outline: none; color: var(--color-ink); }
 .sp-app .sp-onboarding-heading p { margin: 8px auto 0; max-width: 360px; color: var(--color-muted); font-size: 15px; }
 .sp-app .sp-onboarding-welcome { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .sp-app .sp-onboarding-welcome li { display: flex; align-items: flex-start; gap: 14px; padding: 10px 4px; }
@@ -134,6 +140,7 @@
 }
 @media (max-width: 760px) {
   .sp-app .sp-home-v2 { padding: 24px 16px 40px; }
+  .sp-app .sp-home-band { height: 120px; margin-bottom: 22px; background-position: 30% 62%; }
   .sp-app .sp-home-v2-heading h1 { font-size: 28px; letter-spacing: -.6px; }
   .sp-app .sp-home-v2-actions { margin-bottom: 32px; }
   .sp-app .sp-home-v2-actions button { min-height: 40px; }

@@ -1,5 +1,5 @@
 .PHONY: setup backend web memory-worker webhook-worker install check check-database api-reference \
-	check-memory-models benchmark-memory evaluate-retrieval up up-source down logs backup upgrade
+	check-memory-models benchmark-memory benchmark-decisions evaluate-retrieval up up-source down logs backup upgrade
 
 BACKEND_PORT ?= 8000
 BACKEND_WORKERS ?= 1
@@ -74,6 +74,11 @@ check-memory-models:
 
 benchmark-memory:
 	uv run --directory backend --locked python scripts/benchmark_memory.py
+
+# Costs provider usage. Example: make benchmark-decisions MODELS=perplexity/pplx-decider-v1.1-27b,typesafe/jev-1.13
+benchmark-decisions:
+	uv run --directory backend --locked python scripts/benchmark_decisions.py \
+		--models "$(or $(MODELS),perplexity/pplx-decider-v1.1-27b)" $(ARGS)
 
 evaluate-retrieval:
 	uv run --directory backend --locked python scripts/evaluate_retrieval.py \

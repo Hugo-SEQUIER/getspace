@@ -24,9 +24,13 @@ const digest = async (value: string) => Array.from(new Uint8Array(
   await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
 ), byte => byte.toString(16).padStart(2, "0")).join("");
 
-/** Only successfully authorized content reads are eligible; credentials/jobs/search are excluded. */
+/**
+ * Only successfully authorized content reads are eligible; credentials, jobs and search
+ * queries are excluded. The search index is Space content like a document list, and
+ * keeping it lets search answer right after a reload instead of re-reading every body.
+ */
 export function persistableRead(path: string, spaces: ReadonlySet<string>) {
-  const match = /^spaces\/([a-f0-9-]{36})\/(resources(?:\/[a-f0-9-]{36})?|items|memories)(?:\?|$)/i.exec(path);
+  const match = /^spaces\/([a-f0-9-]{36})\/(resources(?:\/[a-f0-9-]{36})?|items|memories|search\/index)(?:\?|$)/i.exec(path);
   if (!match || !spaces.has(match[1])) return false;
   const url = new URL(path, "https://cache.invalid");
   return [...url.searchParams.keys()].every(key => ["kind", "deleted", "limit", "after", "revision"].includes(key));

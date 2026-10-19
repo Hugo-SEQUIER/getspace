@@ -121,9 +121,9 @@ OPERATIONS = {
     ("post", "/v1/spaces/{space_id}/export"): Operation(
         s.ExportPage,
         "Exports everything in the Space, including history, one page at a time. Send the "
-        "first page's `snapshot` with `after` on the next pages; a 409 means the Space "
-        "changed, so start again.",
-        (*READ, 409, 422),
+        "first page's `snapshot` with `after` on the next pages. The archive is the Space as it "
+        "was at the first page: writes made meanwhile never interrupt it and are left out.",
+        (*READ, 422),
     ),
     ("post", "/v1/spaces/{space_id}/search"): Operation(
         s.SearchPage,

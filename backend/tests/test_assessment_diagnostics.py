@@ -7,13 +7,14 @@ Output: unchanged routing/evidence assertions, never real-model quality claims.
 import json
 
 import pytest
+from test_decision_relevance import configured, fallback_response, session
 from test_evidence_passages import source
 from test_relevance import item
-from test_typesafe_relevance import configured, fallback_response, session
 
-from space import read_timing, relevance, typesafe_relevance
-from space.model_provider import TYPESAFE_ENDPOINT, ModelError
+from space import decision_relevance, read_timing, relevance
+from space.model_provider import ModelError
 from space.read_timing import collect_read_timings
+from space.settings import DECISIONS_URL
 
 
 @pytest.mark.parametrize(
@@ -36,7 +37,7 @@ def test_size_fallback_reports_the_exact_guard_without_dropping_candidates(
     assert diagnostics["fallback_observed"] == observed
     assert diagnostics["fallback_limit"] == limit
     assert diagnostics["candidate_count"] == diagnostics["assessed_units"] == 2
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     submitted = json.loads(requests[0][1]["messages"][1]["content"])["candidates"]
     assert len(submitted) == 2 and submitted[1]["text"] == records[1]["body"]
     assert "fallback_" not in json.dumps(submitted)
@@ -47,7 +48,7 @@ def test_serialized_state_size_is_measured_with_metadata_and_json_escaping(monke
     model, _ = session(monkeypatch)
     diagnostics = {}
     relevance.select([record], "facts", model, diagnostics=diagnostics)
-    payload = typesafe_relevance.payload_for([relevance.candidate(record, 0)], "facts")
+    payload = decision_relevance.payload_for([relevance.candidate(record, 0)], "facts")
     assert diagnostics["fallback_detail"] == "state_too_large"
     assert diagnostics["fallback_observed"] == len(json.dumps(payload["state"], ensure_ascii=False))
     assert diagnostics["fallback_limit"] == 12000
@@ -59,7 +60,7 @@ def test_size_details_do_not_leak_into_later_jev_or_empty_results(monkeypatch):
     relevance.select([item(body="x" * 501)], "facts", model, diagnostics=diagnostics)
     assert diagnostics["fallback_detail"] == "authored_claim_too_long"
     relevance.select([item()], "facts", model, diagnostics=diagnostics)
-    assert diagnostics["route"] == "jev"
+    assert diagnostics["route"] == "decision"
     assert not any(
         key in diagnostics for key in ("fallback_detail", "fallback_limit", "fallback_observed")
     )
@@ -78,13 +79,13 @@ def test_size_details_do_not_leak_into_later_jev_or_empty_results(monkeypatch):
 )
 def test_direct_jev_guards_remain_fail_closed_with_precise_details(changes, count, detail):
     class NoProvider:
-        def evaluate_typesafe(self, payload):
-            pytest.fail("Invalid evidence must not reach Jev")
+        def decide(self, payload):
+            pytest.fail("Invalid evidence must not reach the decision model")
 
     evidence = [(relevance.candidate(item(), 0) | changes)] * count
     diagnostics = {}
     assert (
-        typesafe_relevance.assess(evidence, "facts", NoProvider(), diagnostics=diagnostics) is None
+        decision_relevance.assess(evidence, "facts", NoProvider(), diagnostics=diagnostics) is None
     )
     assert diagnostics["fallback_reason"] == "size" and diagnostics["fallback_detail"] == detail
 

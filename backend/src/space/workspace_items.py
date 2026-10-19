@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from space import agents
+from space import agents, content_changes
 from space.memory import Input
 
 MAX_DATABASE_RECORDS = 1000
@@ -222,17 +222,18 @@ PLACEMENT = {
 }
 
 ROW = (
-    "SELECT i.id,i.kind,v.revision,v.key_id,v.encrypted_payload,v.deleted,v.created_at "
+    "SELECT i.id,i.kind,v.revision,v.key_id,v.encrypted_payload,v.deleted,v.created_at,"
+    "k.wrapping_provider,k.wrapping_key_reference,k.wrapped_key "
     "FROM space.workspace_items i JOIN space.workspace_item_revisions v "
     "ON (v.organization_id,v.space_id,v.item_id)=(i.organization_id,i.space_id,i.id) "
+    "JOIN space.space_keys k ON (k.organization_id,k.space_id,k.id)="
+    "(v.organization_id,v.space_id,v.key_id) "
 )
 
 
 def item_keys(workspace, connection, scope, rows):
-    return {
-        key_id: workspace._key_row(connection, scope, key_id)
-        for key_id in {row["key_id"] for row in rows}
-    }
+    """The wrapping keys of a page, already carried by ROW; no further query is needed."""
+    return workspace._key_rows(rows)
 
 
 def decode(workspace, identity, space_id, scope, rows, key_rows):
@@ -421,7 +422,7 @@ def save(workspace, identity, space_id, change: SaveItem, *, deleted=False, emit
                     fingerprint,
                 ),
             )
-            connection.execute("UPDATE space.spaces SET content_revision=content_revision+1")
+            content_changes.changed(connection, (change.kind,))
     return get(workspace, identity, space_id, change.item_id, revision)
 
 

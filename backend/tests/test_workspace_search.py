@@ -10,7 +10,7 @@ from test_workspace_items import database_data, project
 
 from space import workspace_items
 from space.workspace import CommandError
-from space.workspace_search import Search, search
+from space.workspace_search import INDEX_PAGE, Search, index, search
 
 database = database_fixture
 command_database = command_database_fixture
@@ -105,13 +105,51 @@ def test_search_detects_changes_during_reads_and_rechecks_revocation(commands, m
     with pytest.raises(CommandError, match="Space changed"):
         search(service, owner, space, Search(snapshot=first["snapshot"]))
     actor = delegated(service, owner)
-    original = service.get_resource
+    original = service._unpack
 
     def revoke_before_return(*args, **kwargs):
         result = original(*args, **kwargs)
         service.revoke(owner, UUID(actor.client_id))
         return result
 
-    monkeypatch.setattr(service, "get_resource", revoke_before_return)
+    monkeypatch.setattr(service, "_unpack", revoke_before_return)
     with pytest.raises(CommandError):
         search(service, actor, space, Search())
+    with pytest.raises(CommandError):
+        index(service, actor, space)
+
+
+def test_index_pages_full_text_in_batched_reads(commands, monkeypatch):
+    service, owner, space, _ = commands
+    ids = {
+        service.save(
+            owner, space, change().model_copy(update={"title": f"Source {n}", "body": f"body {n}"})
+        )["id"]
+        for n in range(INDEX_PAGE + 2)
+    }
+    saved = workspace_items.save(
+        service,
+        owner,
+        space,
+        workspace_items.SaveItem(
+            command_id=uuid4(),
+            item_id=uuid4(),
+            expected_revision=0,
+            kind="database",
+            data=database_data(),
+        ),
+    )
+    reads = []
+    monkeypatch.setattr(service, "get_resource", lambda *a, **k: reads.append(a))
+    first = index(service, owner, space)
+    assert len(first["items"]) == INDEX_PAGE and first["next_cursor"]
+    second = index(service, owner, space, first["next_cursor"])
+    assert second["next_cursor"] is None
+    entries = {item["id"]: item for item in first["items"] + second["items"]}
+    assert ids <= entries.keys() and reads == []
+    assert "PRIVATE CLIENT 915" in entries[saved["id"]]["text"]
+    assert any(entry["text"] == "body 0" for entry in entries.values())
+    other = replace(owner, subject=str(uuid4()))
+    service.bootstrap(other)
+    with pytest.raises(CommandError):
+        index(service, other, space)

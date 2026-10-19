@@ -5,6 +5,7 @@ import {
   deleteDatabaseRecords,
   duplicateDatabaseRecord,
   duplicateDatabaseRecords,
+  setDatabaseRecordsOption,
 } from "../lib/space/database-record-actions.ts";
 
 const now = "2026-09-24T12:00:00.000Z";
@@ -337,5 +338,49 @@ test("TSV refuses any missing selected ID instead of silently copying a partial 
   const before = structuredClone(db);
   for (const ids of [["missing"], ["first", "missing"], ["first", "first", "missing"], [""]])
     assert.throws(() => databaseRecordsTSV(db, ids), /no longer exists/);
+  assert.deepEqual(db, before);
+});
+
+function withStage(db) {
+  db.fields.push({ id: "stage", name: "Stage", type: "select", options: ["Open", "Won", "Lost"] });
+  db.records[0].values.stage = "Open";
+  db.records[1].values.stage = "Won";
+  return db;
+}
+
+test("setting an option changes only the selected rows' select value and leaves other values and rows alone", () => {
+  const db = withStage(database());
+  const before = structuredClone(db);
+  freezeDatabase(db);
+  const next = setDatabaseRecordsOption(db, ["first", "third", "first"], "stage", "Lost", now);
+  assert.deepEqual(next.records.map((row) => row.values.stage), ["Lost", "Won", "Lost"]);
+  assert.deepEqual(next.records[0], { ...before.records[0], values: { ...before.records[0].values, stage: "Lost" }, updatedAt: now });
+  assert.deepEqual(next.records[2], { ...before.records[2], values: { stage: "Lost" }, updatedAt: now });
+  assert.equal(next.records[1], db.records[1]);
+  assert.equal(next.fields, db.fields);
+  assert.equal(next.revision, db.revision);
+  assert.deepEqual(db, before);
+});
+
+test("setting an option keeps the edit time of rows that already hold it and can clear the property", () => {
+  const db = freezeDatabase(withStage(database()));
+  const same = setDatabaseRecordsOption(db, ["first", "second"], "stage", "Won", now);
+  assert.equal(same.records[1], db.records[1]);
+  assert.equal(same.records[0].updatedAt, now);
+  const cleared = setDatabaseRecordsOption(db, ["first", "third"], "stage", null, now);
+  assert.deepEqual(cleared.records.map((row) => row.values.stage ?? null), [null, "Won", null]);
+  assert.equal(cleared.records[0].updatedAt, now);
+  assert.equal(cleared.records[2], db.records[2]);
+  assert.equal(setDatabaseRecordsOption(db, [], "stage", "Won", now).records.every((row, index) => row === db.records[index]), true);
+});
+
+test("setting an option refuses non-select or missing properties, unknown options and missing rows atomically", () => {
+  const db = freezeDatabase(withStage(database()));
+  const before = structuredClone(db);
+  for (const field of ["asset", "price", "closed", "missing-field"])
+    assert.throws(() => setDatabaseRecordsOption(db, ["first"], field, "Won", now), /property changed/);
+  for (const option of ["Pending", "won", ""])
+    assert.throws(() => setDatabaseRecordsOption(db, ["first"], "stage", option || 1, now), /Choose an option|must be text/);
+  assert.throws(() => setDatabaseRecordsOption(db, ["first", "missing"], "stage", "Won", now), /no longer exists/);
   assert.deepEqual(db, before);
 });
