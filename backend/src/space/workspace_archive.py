@@ -22,8 +22,8 @@ PAGE_ROWS = 50
 # Keeps pages under gateway response limits: a page stops before the entry that would
 # take it past this size, and always holds at least one entry.
 PAGE_BYTES = 3_000_000
-# Each entry is decrypted and downloaded on its own, about a second apiece on the hosted
-# stack, while the website gives a request 45 seconds. A page stops taking entries after
+# Each entry is read and decoded on its own, which can take a while on a slow server,
+# while the website gives a request 45 seconds. A page stops taking entries after
 # this long; the browser continues from its cursor.
 PAGE_SECONDS = 20
 # Revisions stamped after the snapshot did not exist yet. Each "current" flag marks the
@@ -146,7 +146,7 @@ def export_page(workspace, identity, space_id, request: ExportPage):
         taken += 1
         if entry:
             entries.append(entry)
-    content_revision(workspace, identity, space_id)  # Rechecks access after decryption.
+    content_revision(workspace, identity, space_id)  # Rechecks access after reading.
     return {
         **({"task_columns": task_columns} if task_columns is not None else {}),
         "format": FORMAT,

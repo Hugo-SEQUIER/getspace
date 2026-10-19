@@ -1,7 +1,7 @@
 """Bounded full-content search, with explicit continuation and snapshot consistency.
 
-Content is encrypted, so matching happens after decryption. Each page is read in one
-transaction and decrypted together, then authorization and the snapshot are rechecked
+Matching happens in the application after each page is decoded. Each page is read in
+one transaction and decoded together, then authorization and the snapshot are rechecked
 once: a page costs a fixed handful of statements however many items it holds.
 """
 
@@ -195,7 +195,7 @@ def _page(workspace, identity, space_id, after, size, expected=None):
                     "project": summary["project"],
                 }
             ]
-    # Rechecks access after decryption and refuses a page that spans a change.
+    # Rechecks access after decoding and refuses a page that spans a change.
     require_snapshot(workspace, identity, space_id, snapshot)
     return {
         "entries": [entry for row in page for entry in entries.get(row["id"], [])],
