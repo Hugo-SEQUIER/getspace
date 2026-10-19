@@ -269,7 +269,7 @@
 
 /* Command palette */
 .sp-app .sp-refined-command { width: 640px; max-width: calc(100vw - 32px); }
-.sp-app .sp-refined-command .sp-modal-head { position: absolute; right: 12px; top: 12px; padding: 0; border: 0; background: transparent; z-index: 1; }
+.sp-app .sp-refined-command .sp-modal-head { position: absolute; right: 10px; top: 10px; min-height: 0; padding: 0; border: 0; background: transparent; z-index: 1; }
 .sp-app .sp-refined-command .sp-modal-head h2 { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .sp-app .sp-refined-command .sp-command { padding: 0; }
 .sp-app .sp-refined-command .sp-command-input { margin: 0; padding: 0 48px 0 18px; height: 56px; min-height: 56px; background: transparent; border: 0; border-bottom: 1px solid var(--color-rule); border-radius: 0; box-shadow: none; }
@@ -383,8 +383,9 @@
    still reaches the window's foot) and its own stacking context (so the valley sits above the paper
    but below every block of content). At the end of a long page the valley rests in its own space. */
 .sp-app .sp-main:has(> .sp-valley-footer) { display: flex; flex-direction: column; min-height: 100dvh; isolation: isolate; }
-/* Children keep their block widths: a flex item with auto margins would otherwise shrink to fit. */
-.sp-app .sp-main:has(> .sp-valley-footer) > * { flex-shrink: 0; width: 100%; }
+/* Children keep their block widths: a flex item with auto margins would otherwise shrink to fit.
+   Dialogs rendered in the column keep their own modal widths. */
+.sp-app .sp-main:has(> .sp-valley-footer) > :not(dialog) { flex-shrink: 0; width: 100%; }
 /* The footer grows into any free space (so pages whose blocks use auto margins keep their
    positions) and draws the valley in a fixed-height layer at its base. */
 .sp-app .sp-valley-footer { --valley-height: clamp(150px, 17vw, 220px); position: sticky; bottom: 0; z-index: -1; flex: 1 0 var(--valley-height); pointer-events: none; }

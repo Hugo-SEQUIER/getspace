@@ -57,6 +57,7 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
     loading: busy ? "Updating memory…" : searching ? "Searching memory…" : data.memoryLoading || data.memoryMoreLoading ? "Loading memory…" : null,
     clearError: () => setError(""),
   });
+  const activeJobs = data.memoryJobs.filter(job => job.status === "queued" || job.status === "processing").length;
   const completedJobs = data.memoryJobs.filter(job => job.status === "ready")
     .map(job => `${job.id}:${job.result?.revision}`).sort().join(",");
   const searchRequest = useRef(0);
@@ -288,15 +289,11 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
           </button>
         </div>
       </div>
-      {(data.memoryJobs.length > 0 || data.jobError) && (
-        <details className="sp-alert">
-          <summary>Memory extraction · {data.memoryJobs.filter(job => ["queued", "processing"].includes(job.status)).length} in progress</summary>
-          <ul>
-            {data.memoryJobs.map(job => <li key={job.id}>
-              {job.id.slice(0, 8)} · {job.status === "ready" ? "Ready to recall" : job.status === "processing" ? "Processing" : job.status === "queued" ? "Queued" : "Failed. Submit again after checking the source and access"}
-            </li>)}
-          </ul>
-        </details>
+      {activeJobs > 0 && (
+        <p className="sp-memory-jobs" role="status">
+          <span className="sp-loading-orbit" aria-hidden="true" />
+          Memory extraction · {activeJobs} in progress
+        </p>
       )}
       {data.memoryError && (
         <div>

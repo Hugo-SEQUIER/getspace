@@ -8,7 +8,7 @@ import {
 import type { Space } from "../../../lib/space/types";
 import { docsLinks } from "../../../lib/docs-links";
 import { useSpace } from "./provider";
-import { ConfirmModal, Empty, relativeDate } from "./ui";
+import { ConfirmModal, relativeDate } from "./ui";
 import { Icon } from "./ui-icon";
 import styles from "./api-key-settings.module.css";
 
@@ -202,7 +202,7 @@ function SpaceApiKeys({ space }: { space: Space }) {
           <h2>Your keys</h2>
           {keys === null && !loading && <button type="button" disabled={disabled} onClick={() => void run("Loading API keys…", load)}>Try again</button>}
         </div>
-        {!loading && keys?.length === 0 && <Empty icon="code" title="No API keys yet">Keys you create in {space.name} appear here.</Empty>}
+        {!loading && keys?.length === 0 && <p className={styles.empty}><Icon name="code" size={16} /><span><strong>No API keys yet.</strong> Keys you create in {space.name} appear here.</span></p>}
         {!loading && keys === null && <p>API keys could not be loaded. Use Try again to reload them.</p>}
         <ul className={styles.list}>
           {keys?.map(key => (

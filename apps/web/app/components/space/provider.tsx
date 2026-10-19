@@ -83,6 +83,9 @@ function useData() {
   const [accessMode, setAccessMode] = useState<AccessMode | null>(null);
   const [profile, setProfile] = useState<Profile>({ displayName: "", avatarUrl: null });
   const [space, setSpace] = useState<Space | null>(null);
+  // A picture the owner chose on the website; without one the avatar shows initials.
+  const accountPhoto = useRef<string | null>(null);
+  const [ownPhoto, setOwnPhoto] = useState(false);
   const [workspaces, setWorkspaces] = useState<Space[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   // Which revision of each document or task the owner last opened.
@@ -90,6 +93,8 @@ function useData() {
   const latestViews = useRef(views);
   latestViews.current = views;
   const [viewsReady, setViewsReady] = useState(false);
+  // Set once the seen marks loaded or failed, so the home page stops waiting for them.
+  const [viewsSettled, setViewsSettled] = useState(false);
   const [taskColumnState, setTaskColumnState] = useState<TaskColumns>({ columns: statuses, revision: 1 });
   const [taskColumnsReady, setTaskColumnsReady] = useState(false);
   const [taskColumnsError, setTaskColumnsError] = useState("");
@@ -109,6 +114,8 @@ function useData() {
   const knownJobs = useRef(new Map<string, string>());
   const [grants, setGrants] = useState<Grant[]>([]);
   const [agents, setAgents] = useState<AgentIdentity[]>([]);
+  // Set once both agent lists loaded or failed, so the home page stops waiting for them.
+  const [agentsReady, setAgentsReady] = useState(false);
   const [databases, setDatabases] = useState<WorkspaceDatabase[]>([]);
   const [trashedItems, setTrashedItems] = useState<
     ((Project | WorkspaceDatabase) & { kind: "project" | "database" })[]
@@ -122,7 +129,6 @@ function useData() {
   const [error, setError] = useState("");
   const [memoryError, setMemoryError] = useState("");
   const [notice, setNotice] = useState("");
-  const [compact, setCompact] = useState(false);
   const generation = useRef(0);
   const pending = useRef(new Map<string, string>());
   const memoryRequests = useRef(0);
@@ -143,7 +149,6 @@ function useData() {
           window.location.pathname + window.location.search,
         );
       }
-      setCompact(localStorage.getItem("space-density") === "compact");
     } catch {
       /* An unavailable browser store must not block the workspace. */
     }
@@ -182,14 +187,27 @@ function useData() {
   const watchAgents = useCallback(() => {
     if (!space) return () => {};
     const current = generation.current;
-    const failed = (e: unknown) => { if (current === generation.current) setError(message(e)); };
+    const settled = new Set<string>();
+    const settle = (list: string) => {
+      settled.add(list);
+      if (settled.size === 2) setAgentsReady(true);
+    };
+    const failed = (list: string) => (e: unknown) => {
+      if (current !== generation.current) return;
+      setError(message(e));
+      settle(list);
+    };
     const stops = [
       watchApi<{ items: Grant[] }>(`agents?workspace_id=${space.id}`, page => {
-        if (current === generation.current) setGrants(page.items);
-      }, failed),
+        if (current !== generation.current) return;
+        setGrants(page.items);
+        settle("grants");
+      }, failed("grants")),
       watchApi<{ items: AgentIdentity[] }>(`agent-identities?workspace_id=${space.id}`, page => {
-        if (current === generation.current) setAgents(page.items);
-      }, failed),
+        if (current !== generation.current) return;
+        setAgents(page.items);
+        settle("agents");
+      }, failed("agents")),
     ];
     return () => stops.forEach(stop => stop());
   }, [space]);
@@ -204,6 +222,7 @@ function useData() {
     if (current !== generation.current) throw new Error("Your workspace changed. Refresh connections again.");
     setGrants(connections.items);
     setAgents(identities.items);
+    setAgentsReady(true);
     return connections.items;
   }, [space]);
 
@@ -230,11 +249,19 @@ function useData() {
       setAccountId(user.id);
       setAccessMode(mode === "private" ? "private" : "key");
       setProfile(accountProfile ?? { displayName: "", avatarUrl: null });
+      accountPhoto.current = accountProfile?.avatarUrl ?? null;
+      setOwnPhoto(false);
       const available = await api<{ items: Space[] }>("workspaces");
       if (current !== generation.current) return;
       await configureReadCache(user.id, browserCacheKey, [...available.items.map(item => item.id), value.id], readVersionSupported === true);
       if (current !== generation.current) return;
       setWorkspaces(available.items);
+      // A picture the person chose replaces the sign-in photo. It never delays the workspace.
+      void api<{ image: string | null }>("profile/image").then(({ image }) => {
+        if (current !== generation.current || !image) return;
+        setProfile((value) => ({ ...value, avatarUrl: image }));
+        setOwnPhoto(true);
+      }).catch(() => {});
       let requested = new URLSearchParams(window.location.search).get(
         "workspace",
       );
@@ -392,6 +419,15 @@ function useData() {
     }
   }, [space, resources]);
 
+  // What it does: reads only the memory processor's settings, without a page of memories.
+  // Output: resolves once the settings are shown; rejects when they cannot be read.
+  const loadProvider = useCallback(async () => {
+    if (!space) return;
+    const current = generation.current;
+    const value = await cachedApi<Provider>(`spaces/${space.id}/memory/provider`);
+    if (current === generation.current) setProvider(value);
+  }, [space]);
+
   const watchMemories = useCallback(() => {
     if (!space) return () => {};
     const current = generation.current;
@@ -431,7 +467,15 @@ function useData() {
           (job) =>
             job.status === "ready" && knownJobs.current.get(job.id) !== "ready",
         );
+        // Only a job seen running in this session reports its failure; older failures stay quiet.
+        const becameFailed = value.items.some(
+          (job) =>
+            job.status === "failed" &&
+            ["queued", "processing"].includes(knownJobs.current.get(job.id) ?? ""),
+        );
         value.items.forEach((job) => knownJobs.current.set(job.id, job.status));
+        if (becameFailed)
+          setError("A memory extraction failed. Check the source and its access, then build it again.");
         setMemoryJobs(value.items);
         setJobError("");
         if (becameReady) invalidateReads(`spaces/${space!.id}/memories`);
@@ -539,8 +583,10 @@ function useData() {
       if (current !== generation.current) return;
       setViews(seenRevisions(value.items));
       setViewsReady(true);
+      setViewsSettled(true);
     }, () => {
       // Seen marks are a convenience; without them the home page simply shows no "new" list.
+      if (current === generation.current) setViewsSettled(true);
     });
   }, [space]);
   // Parameters: the documents or tasks the person just opened, at the revision they saw.
@@ -776,6 +822,7 @@ function useData() {
           }
         : {}),
     });
+    knownJobs.current.set(job.id, job.status);
     setMemoryJobs((old) => [job, ...old.filter((item) => item.id !== job.id)]);
     setJobPollVersion((version) => version + 1);
     setNotice(
@@ -851,6 +898,14 @@ function useData() {
     await refreshAgents();
     setNotice("Agent access revoked");
   }
+  // Parameters: a PNG, JPEG or WebP data URL, or null to remove the picture.
+  // What it does: saves the owner's own picture in their Space.
+  // Output: resolves once the picture shows everywhere.
+  async function saveProfilePhoto(image: string | null) {
+    const saved = await api<{ image: string | null }>("profile/image", image ? "POST" : "DELETE", image ? { image } : undefined);
+    setProfile((current) => ({ ...current, avatarUrl: saved.image ?? accountPhoto.current }));
+    setOwnPhoto(!!saved.image);
+  }
   // Parameters: none. What it does: forgets this browser's session, so the access key is
   // needed again here; other unlocked browsers stay unlocked. Output: nothing.
   async function lock() {
@@ -871,6 +926,7 @@ function useData() {
     setViews({});
     latestViews.current = {};
     setViewsReady(false);
+    setViewsSettled(false);
     setProvider(null);
     setCursors({});
     setLoadedReads({});
@@ -886,6 +942,8 @@ function useData() {
     setAccountId(null);
     setWorkspaces([]);
     setProfile({ displayName: "", avatarUrl: null });
+    accountPhoto.current = null;
+    setOwnPhoto(false);
     setSpace(null);
     setResources([]);
     setMemories([]);
@@ -894,6 +952,7 @@ function useData() {
     knownJobs.current.clear();
     setGrants([]);
     setAgents([]);
+    setAgentsReady(false);
     setProjects([]);
     setFolders([]);
     setOrganizationItems([]);
@@ -1059,12 +1118,6 @@ function useData() {
     if (!database) throw new Error("Database not found.");
     await setItemDeleted({ ...database, kind: "database" }, true);
   }
-  function setDensity(value: boolean) {
-    setCompact(value);
-    try {
-      localStorage.setItem("space-density", value ? "compact" : "comfortable");
-    } catch {}
-  }
   function switchWorkspace(id: string, destination = "/app") {
     resetReadCache(0, "", false, true);
     // A fresh page also discards editors, searches and pending response handlers
@@ -1098,6 +1151,7 @@ function useData() {
     resources: resources.map(resource => optimisticTask(resource, pendingTaskStatuses)),
     views,
     viewsReady,
+    viewsSettled,
     watchViews,
     markSeen,
     resourcesReady: !!loadedReads.document && !!loadedReads.task,
@@ -1140,8 +1194,6 @@ function useData() {
     memoryError,
     error: error || (pageError || dismissedReadError === backgroundError ? "" : backgroundError) || "",
     notice,
-    compact,
-    setDensity,
     setError: (value: string) => {
       setError(value);
       if (!value) setDismissedReadError(backgroundError ?? "");
@@ -1150,6 +1202,7 @@ function useData() {
     initialize,
     loadMore,
     loadMemories,
+    loadProvider,
     loadMoreMemories,
     searchMemories,
     readResource,
@@ -1161,6 +1214,8 @@ function useData() {
     jobError,
     revoke,
     lock,
+    saveProfilePhoto,
+    ownPhoto,
     saveProject,
     saveFolder,
     archiveFolder,
@@ -1173,6 +1228,7 @@ function useData() {
     refreshItems,
     watchItems,
     watchAgents,
+    agentsReady,
     refreshAgents,
     watchMemories,
     watchResource,

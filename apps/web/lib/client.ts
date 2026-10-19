@@ -140,7 +140,8 @@ export async function api<T>(
 ): Promise<T> {
   path = scopedPath(path);
   const mutation = method !== "GET" && !/\/(search|context|export|preview)$/.test(path);
-  const auth = path.startsWith("auth/");
+  // Signing in or out changes the account; renaming the profile keeps the session and its cache.
+  const auth = path.startsWith("auth/") && path !== "auth/profile";
   const affected = affectedReads(path);
   if (mutation && auth) { resetReadCache(0, "", true); await optionalStorage(diskCleanup); }
   else if (mutation && path !== "workspace" && readCache)

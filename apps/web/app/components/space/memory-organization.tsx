@@ -19,12 +19,12 @@ export function OrganizationCatalog({ onClose }: { onClose: () => void }) {
   function clear() {
     setEditing(undefined); setName(""); setDescription(""); setNewId(crypto.randomUUID());
   }
-  if (!data.organizationReady) return <Modal title="Organize memory" onClose={onClose}>
+  if (!data.organizationReady) return <Modal title="Organize memory" size="wide" onClose={onClose}>
     <div className="sp-modal-content">
       {data.organizationError && <button onClick={data.retryOrganization}>Try again</button>}
     </div>
   </Modal>;
-  return <Modal title="Organize memory" onClose={onClose}>
+  return <Modal title="Organize memory" size="wide" onClose={onClose}>
     <div className="sp-modal-content">
       <p><strong>Categories describe a topic</strong>, such as Engineering or Finance. A memory can have several categories.</p>
       <p>{data.provider?.classification_provider === "typesafe"

@@ -181,7 +181,7 @@ export function SpaceApp({
 
   return (
     <div
-      className={`sp-app ${data.compact ? "sp-compact" : ""} ${sidebarCollapsed ? "sp-sidebar-collapsed" : ""}`}
+      className={`sp-app ${sidebarCollapsed ? "sp-sidebar-collapsed" : ""}`}
     >
       <ConfirmProvider>
       <a className="sp-skip-link" href="#main-content">

@@ -14,8 +14,8 @@ from space.memory import Input
 from space.providers import key_operation
 
 Status = Annotated[str, Field(min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9_-]*$")]
-# needs_you is accepted everywhere without being a stored column: the board shows it
-# only while a task carries it, and the home page lists such tasks as waiting on the person.
+# needs_you is accepted everywhere without being a stored column: the board always shows
+# it, and the home page lists such tasks as waiting on the person.
 DEFAULT_LABELS = {
     "todo": "To do",
     "in_progress": "In progress",
@@ -85,14 +85,68 @@ def columns(workspace, identity, space_id):
     return result
 
 
-def require_status(workspace, identity, space_id, status):
+def _label(status):
+    """A readable column label for a status slug, such as "in_review" -> "In review"."""
+    words = status.replace("_", " ").replace("-", " ").strip()
+    return words[:1].upper() + words[1:]
+
+
+@key_operation
+def ensure_status(workspace, identity, space_id, status):
+    """Parameters: an authorized writer and a valid status value.
+    What it does: keeps default statuses as they are and saves any other new status as a
+    column labelled from its value, so the board shows it whether or not a task carries it.
+    Output: None; raises when the column cannot be added.
+    """
     from space.workspace import CommandError
 
-    # Default values are permanent. A custom value must belong to this Space.
-    if status not in DEFAULT_LABELS and status not in {
-        column["value"] for column in columns(workspace, identity, space_id)["columns"]
-    }:
-        raise CommandError("Choose a configured task status", 400)
+    if status in DEFAULT_LABELS:
+        return
+    with workspace.db.transaction(identity) as connection:
+        scope = workspace._scope(connection, identity, space_id, write=True)
+        row, key_row = _collection(workspace, connection, scope)
+    key = workspace._unwrap_key(scope["organization_id"], space_id, key_row)
+    if status in _schema(workspace, scope, row, key)["fields"]["status"]:
+        return
+    label = _label(status)
+    with workspace.db.transaction(identity) as connection:
+        scope = workspace._scope(connection, identity, space_id, write=True)
+        connection.execute("SELECT id FROM space.spaces FOR UPDATE")
+        current = connection.execute(
+            "SELECT id,key_id,encrypted_schema FROM space.collections WHERE id=%s FOR UPDATE",
+            (row["id"],),
+        ).fetchone()
+        if current is None or current["key_id"] != row["key_id"]:
+            raise CommandError("Task columns changed. Refresh before saving.", 409)
+        schema = _schema(workspace, scope, current, key)
+        # Another writer may have added it since the first read.
+        if status in schema["fields"]["status"]:
+            return
+        existing = _columns(schema)["columns"]
+        if len(existing) >= MAX_COLUMNS:
+            raise CommandError(
+                f"Tasks support at most {MAX_COLUMNS} status columns; use an existing status",
+                400,
+            )
+        clash = next(
+            (column for column in existing if column["label"].casefold() == label.casefold()),
+            None,
+        )
+        if clash:
+            raise CommandError(
+                f"A task column named {clash['label']} already exists; "
+                f"use its status value {clash['value']}",
+                409,
+            )
+        schema["fields"]["status"].append(status)
+        schema.setdefault("status_labels", {})[status] = label
+        schema["column_revision"] = schema.get("column_revision", 1) + 1
+        encrypted = workspace._pack(key, scope, row["id"], 1, "schema", schema)
+        connection.execute(
+            "UPDATE space.collections SET encrypted_schema=%s WHERE id=%s",
+            (encrypted, row["id"]),
+        )
+        content_changes.changed(connection, ("columns",))
 
 
 @key_operation
@@ -194,7 +248,6 @@ def set_status(workspace, identity, space_id, resource_id, change: SetStatus):
         previous = connection.execute(
             "SELECT * FROM space.commands WHERE id=%s", (change.command_id,)
         ).fetchone()
-        collection, schema_key_row = _collection(workspace, connection, scope)
     key = workspace._unwrap_key(scope["organization_id"], space_id, key_row)
     fingerprint = hmac.digest(
         key.key.material,
@@ -215,10 +268,7 @@ def set_status(workspace, identity, space_id, resource_id, change: SetStatus):
         )
     if row["revision"] != change.expected_revision:
         raise CommandError("This task changed. Reload its latest revision before saving.", 409)
-    schema_key = workspace._unwrap_key(scope["organization_id"], space_id, schema_key_row)
-    schema = _schema(workspace, scope, collection, schema_key)
-    if change.status not in schema["fields"]["status"]:
-        raise CommandError("Choose a configured task status", 400)
+    ensure_status(workspace, identity, space_id, change.status)
     content = workspace._unpack(
         key, scope, resource_id, row["revision"], "record", row["encrypted_record"]
     )

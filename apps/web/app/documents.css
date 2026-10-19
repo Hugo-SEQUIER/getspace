@@ -1035,11 +1035,6 @@
 .sp-doc-mobile-panel .sp-doc-rail .sp-inspector-head {
   display: none;
 }
-.sp-compact .sp-doc-table td {
-  height: 49px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
 @media (max-width: 1200px) {
   .sp-doc-library {
     padding: 34px 30px 60px;

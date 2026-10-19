@@ -45,6 +45,9 @@ export function HomeView({ base, onSearch, searchShortcut }: {
     .filter(group => group.connections.length);
   const name = data.profile.displayName.split(" ")[0];
   const now = new Date();
+  // The checklist depends on agent connections and the "new" list on seen marks. Wait for both,
+  // so the page opens in its final layout instead of reshuffling as they arrive.
+  const ready = data.resourcesReady && data.agentsReady && data.viewsSettled;
   return <div className="sp-home-v2">
     <div className="sp-home-band" aria-hidden="true" />
     <header className="sp-home-v2-heading">
@@ -56,6 +59,7 @@ export function HomeView({ base, onSearch, searchShortcut }: {
       <button type="button" disabled={!data.canWrite} onClick={() => setCreate("task")}><Icon name="tasks" size={16} />New task</button>
       <button type="button" onClick={onSearch}><Icon name="search" size={16} />Search<kbd aria-hidden="true">{searchShortcut}</kbd></button>
     </div>
+    {!ready ? <div role="status" aria-label="Loading home"><div className="sp-skeleton" /></div> : <>
     <Checklist base={base} steps={gettingStartedSteps(data.resources, connections.length)} onCreate={setCreate} />
     {attention.needsYou.length > 0 && <section className="sp-home-v2-section sp-home-attention" aria-label="Needs you">
       <div className="sp-home-v2-section-head">
@@ -136,6 +140,7 @@ export function HomeView({ base, onSearch, searchShortcut }: {
         </div>}
       </section>
     </div>
+    </>}
     <Onboarding base={base} />
     {create && <Suspense fallback={<Modal title={`New ${create}`} onClose={() => setCreate(null)}><p role="status" className="sp-modal-content">Opening editor…</p></Modal>}>
       <ResourceForm kind={create} onClose={() => setCreate(null)} onSaved={resource => {

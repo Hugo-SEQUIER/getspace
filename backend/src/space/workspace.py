@@ -837,7 +837,7 @@ class Workspace:
                 identity, space_id, previous["resource_id"], previous["revision"]
             )
         if request.kind == "task":
-            tasks.require_status(self, identity, space_id, request.status)
+            tasks.ensure_status(self, identity, space_id, request.status)
         resource_id = request.resource_id or new_id or uuid4()
         revision = request.expected_revision + 1
         recall = request.recall

@@ -171,6 +171,8 @@ test('a dragged card moves at once, stays movable while saving, and rolls back o
 });
 
 test('custom columns persist, and cards move by title drag and by keyboard', async ({ app, screen, browser, space }) => {
+  // Five columns with Needs you: wide enough that dragging needs no sideways scroll.
+  await browser.setViewport({ width: 1700, height: 900 });
   await app.open('/app/tasks');
   const cardLink = screen.getByRole('link', 'Keep task content');
   await screen.getByRole('button', 'Add column').tap();

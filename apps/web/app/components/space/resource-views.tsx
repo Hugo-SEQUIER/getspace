@@ -10,7 +10,7 @@ import { useSpace } from "./provider";
 import { DocumentMarkdown } from "./document-markdown";
 import { TaskBoard } from "./task-board";
 import { AddFromDatabases, rowKey, useTaskRowChanges } from "./today-plan";
-import { boardRows, localDay, rowColumn, statusForColumn } from "../../../lib/space/today";
+import { boardRows, columnsWithRows, localDay, rowColumn, statusForColumn } from "../../../lib/space/today";
 import { PageIcon } from "./sidebar-preferences";
 import {
   formatDocument,
@@ -556,12 +556,14 @@ export function TasksView({ base, id }: { base: string; id?: string }) {
   const today = localDay();
   const rowChanges = useTaskRowChanges();
   const [picking, setPicking] = useState(false);
-  const rows = board ? boardRows(data.databases, today)
-    .map((row) => ({ key: rowKey(row), row, column: rowColumn(row, data.taskColumns) }))
+  const plannedRows = board ? boardRows(data.databases, today) : [];
+  const boardColumns = columnsWithRows(data.taskColumns, plannedRows);
+  const rows = plannedRows
+    .map((row) => ({ key: rowKey(row), row, column: rowColumn(row, boardColumns) }))
     .filter(({ row, column }) =>
       (!filter || column === filter) &&
       (!projectFilter || row.database.project_id === projectFilter) &&
-      row.record.name.toLowerCase().includes(query.toLowerCase())) : [];
+      row.record.name.toLowerCase().includes(query.toLowerCase()));
   // Only tasks that are still listed under the current filters take part in bulk actions.
   const checkedTasks = tasks.filter(task => checkedIds.has(task.id));
   const allChecked = tasks.length > 0 && checkedTasks.length === tasks.length;
@@ -773,7 +775,7 @@ export function TasksView({ base, id }: { base: string; id?: string }) {
               projects={data.projects}
               selectedId={selected?.id}
               disabled={!data.canWrite}
-              columns={data.taskColumns}
+              columns={boardColumns}
               pending={data.pendingTaskStatuses}
               selection={selection}
               changeStatus={(task, status) => void changeStatus(task, status)}

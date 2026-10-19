@@ -474,8 +474,9 @@ def create_mcp(
             A project must name an existing project in this Space. Kind cannot change.
             Tasks cannot carry recall.category="handoff". Generated memory is never
             edited here: use remember, remember_claims, extract_memory or change_memory.
-            Task statuses must exist in task_columns; add_task_column adds a status and
-            set_task_status moves a task without resending its body. Set status
+            Prefer a status from task_columns; a new status value is saved as a column
+            labelled from it (add_task_column picks the label), and set_task_status moves
+            a task without resending its body. Set status
             "needs_you" on a task or document when the work cannot continue without the
             person's decision, approval or merge: it stays on their home page until they
             change it, so never write a separate "blocked" document instead. Stay within
@@ -522,8 +523,9 @@ def create_mcp(
             change: tasks.SetStatus,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Parameters: task ID, current revision, configured status and command ID.
+            """Parameters: task ID, current revision, status and command ID.
             What it does: atomically changes only task status, preserving all other content.
+            Prefer a status from task_columns; a new value is saved as a column.
             Use "needs_you" when the task now waits on the person's decision, approval
             or merge; the person moves it on from their home page.
             Output: the saved task. Reuse command_id unchanged on retry; stale revisions fail.

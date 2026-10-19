@@ -9,11 +9,12 @@ test("task column commands only invalidate the same Space's column catalog", () 
     assert.equal(affected(path), false, path);
 });
 
-test("status commands refresh resources, memory and overview without reloading catalogs", () => {
+test("status commands refresh resources, memory, overview and task columns without reloading catalogs", () => {
   const affected = affectedReads("spaces/one/tasks/task-id/status");
-  for (const path of ["spaces/one/resources?kind=task", "spaces/one/resources/task-id", "spaces/one/memories?limit=50", "spaces/one/overview"])
+  // A new status becomes a task column, so the columns are read again.
+  for (const path of ["spaces/one/resources?kind=task", "spaces/one/resources/task-id", "spaces/one/memories?limit=50", "spaces/one/overview", "spaces/one/tasks/columns"])
     assert.equal(affected(path), true, path);
-  for (const path of ["spaces/two/resources?kind=task", "spaces/one/tasks/columns", "spaces/one/items?kind=project", "spaces/one/memory/jobs", "agents?workspace_id=one"])
+  for (const path of ["spaces/two/resources?kind=task", "spaces/two/tasks/columns", "spaces/one/items?kind=project", "spaces/one/memory/jobs", "agents?workspace_id=one"])
     assert.equal(affected(path), false, path);
 });
 

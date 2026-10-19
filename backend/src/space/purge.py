@@ -169,6 +169,11 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "SELECT count(*) FROM space.agent_identities WHERE organization_id=%s AND space_id=%s",
     ),
     (
+        "profile_images",
+        "DELETE FROM space.profile_images WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) FROM space.profile_images WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
         "usage_limits",
         "DELETE FROM space.usage_limits WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) FROM space.usage_limits WHERE organization_id=%s AND space_id=%s",

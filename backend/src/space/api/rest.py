@@ -16,6 +16,7 @@ from space import (
     memora_jobs,
     oauth_server,
     overview,
+    profile_images,
     quotas,
     read_version,
     resource_views,
@@ -546,6 +547,19 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     @router.get("/workspaces")
     def workspaces(session=auth):
         return teams.listing(workspace, session[0])
+
+    # The signed-in person's own picture, kept in their personal Space whichever Space is open.
+    @router.get("/profile/image")
+    def profile_image(session=auth):
+        return profile_images.get(workspace, session[0])
+
+    @router.post("/profile/image")
+    def save_profile_image(body: profile_images.SaveImage, session=auth):
+        return profile_images.save(workspace, session[0], body)
+
+    @router.delete("/profile/image")
+    def delete_profile_image(session=auth):
+        return profile_images.delete(workspace, session[0])
 
     @router.post("/organizations")
     def create_organization(body: teams.CreateTeam, session=auth):

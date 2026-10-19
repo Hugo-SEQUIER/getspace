@@ -88,6 +88,9 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     tokenRequests: [] as Record<string, unknown>[],
     /** The revision of each resource the signed-in person last opened. */
     views: [] as SeenMark[],
+    memoryJobs: [] as { id: string; status: string; attempts: number; error_code: string | null; result: null }[],
+    profileImage: null as string | null,
+    profileImageCommands: [] as string[],
     seenCommands: [] as SeenCommand[],
     columns: { columns: [...defaultColumns], revision: 1 },
     statusCommands: [] as StatusCommand[],
@@ -109,7 +112,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** Requests the app sent that the website's /api proxy would answer with 404. */
     unproxied: [] as string[],
     gates: new Map<string, Gate>(),
-    /** Holds `status:<id>`, `create`, `detail:<id>` or `index` requests until the gate is released. */
+    /** Holds `status:<id>`, `create`, `detail:<id>`, `index` or `agents` requests until the gate is released. */
     hold(key: string) {
       const gate = new Gate();
       state.gates.set(key, gate);
@@ -153,6 +156,12 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     if (path === 'workspace')
       return send({ ...state.space, user: { id: 'owner', email: null }, profile: { displayName: state.ownerName, avatarUrl: null }, access_mode: state.access.mode });
     if (path === 'workspaces') return send({ items: [state.space] });
+    if (path === 'profile/image') {
+      if (method !== 'GET') state.profileImageCommands.push(method);
+      if (method === 'POST') state.profileImage = body.image;
+      if (method === 'DELETE') state.profileImage = null;
+      return send({ image: state.profileImage });
+    }
     if (path.endsWith('/views')) {
       if (method === 'POST') {
         state.seenCommands.push(body);
@@ -289,13 +298,20 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     }
     if (path.endsWith('/restores')) return send({ items: [] });
     if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: { enabled: false } });
+    if (path.endsWith('/memory/provider')) return send({ enabled: false });
     if (path === 'agent-identities' && method === 'POST') {
       const agent = { id: createdAgentId, name: body.name, harness: body.harness, revision: 1 };
       state.agents = [...state.agents.filter(item => item.id !== agent.id), agent];
       return send(agent);
     }
-    if (path === 'agent-identities') return send({ items: state.agents });
-    if (path === 'agents') return send({ items: state.connections });
+    if (path === 'agent-identities') {
+      await pass('agents');
+      return send({ items: state.agents });
+    }
+    if (path === 'agents') {
+      await pass('agents');
+      return send({ items: state.connections });
+    }
     if (path === 'agent-tokens' && method === 'POST') {
       state.tokenRequests.push(body);
       const connection = { id: '77777777-0000-4000-8000-000000000002', client_id: createdClientId, agent_id: body.agent_id, name: body.name, harness: body.harness, can_write: body.can_write, revoked_at: null };
@@ -309,7 +325,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       state.connections = state.connections.map(item => item.client_id === connection[1] ? { ...item, revoked_at: '2026-10-09T00:00:00Z' } : item);
       return send({ revoked: true });
     }
-    if (path.endsWith('/memory/jobs')) return send({ items: [] });
+    if (path.endsWith('/memory/jobs')) return send({ items: state.memoryJobs });
     state.unexpected.push(`${method} ${path}`);
     return send({ error: `Unexpected fixture request: ${path}` }, 500);
   });

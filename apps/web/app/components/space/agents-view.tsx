@@ -20,7 +20,7 @@ export function AgentsView() {
   useEffect(() => data.watchAgents(), [data.watchAgents]);
   const groups = groupAgentConnections(data.agents, data.grants);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<AgentIdentity | "new" | null>(null);
+  const [editing, setEditing] = useState<AgentIdentity | null>(null);
   const [name, setName] = useState("");
   const [harness, setHarness] = useState("codex");
   // Open with the agent to preselect, if any.
@@ -70,10 +70,10 @@ export function AgentsView() {
     } catch {}
   }
   const selected = groups.find((g) => g.id === selectedId);
-  function edit(agent: AgentIdentity | "new") {
+  function edit(agent: AgentIdentity) {
     setEditing(agent);
-    setName(agent === "new" ? "" : agent.name);
-    setHarness(agent === "new" ? "codex" : agent.harness);
+    setName(agent.name);
+    setHarness(agent.harness);
     setError("");
   }
   async function copy(value: string) {
@@ -96,7 +96,6 @@ export function AgentsView() {
           </div>
           <div className={styles.actions}>
             <button onClick={() => setSetupOpen(true)}>Set up agent memory</button>
-            <button onClick={() => edit("new")}>New agent</button>
             <button className="sp-primary" onClick={() => setConnectFor({})}>
               <Icon name="plus" size={16} />
               Connect an agent
@@ -276,7 +275,6 @@ export function AgentsView() {
                     </select>
                   </label>
                   <div className={styles.actions}>
-                    <button onClick={() => edit("new")}>New agent</button>
                     <button
                       className="sp-primary"
                       disabled={
@@ -395,7 +393,7 @@ export function AgentsView() {
       </div>
       {editing && (
         <Modal
-          title={editing === "new" ? "Name your agent" : "Edit agent"}
+          title="Edit agent"
           onClose={() => {
             if (!busy) setEditing(null);
           }}
@@ -407,10 +405,7 @@ export function AgentsView() {
               setBusy(true);
               setError("");
               try {
-                const saved = await data.saveAgent(
-                  { name, harness },
-                  editing === "new" ? undefined : editing,
-                );
+                const saved = await data.saveAgent({ name, harness }, editing);
                 setSelectedId(saved.id);
                 setEditing(null);
               } catch (e) {

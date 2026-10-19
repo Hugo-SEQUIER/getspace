@@ -170,6 +170,23 @@
 .sp-projects-view .sp-project-resource { min-height: 56px; font-size: 14px; }
 .sp-projects-view .sp-project-resource > svg { color: var(--color-muted); flex-shrink: 0; }
 .sp-projects-view .sp-project-resource > span:last-child { flex-shrink: 0; }
+/* Overview: the description on the left, the project's documents, tasks and databases on the
+   right. The right side splits into as many columns as fit, and short sections stack under each
+   other. Below 880px of content width everything sits in one column under the description. */
+.sp-projects-view .sp-project-body:has(> .sp-project-overview) { max-width: none; container-type: inline-size; }
+.sp-projects-view .sp-project-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.sp-projects-view .sp-project-overview-main { min-width: 0; max-width: 760px; }
+.sp-projects-view .sp-project-overview-side { min-width: 0; column-width: 280px; column-gap: 48px; }
+.sp-projects-view .sp-project-overview-side > .sp-home-section { break-inside: avoid; }
+.sp-projects-view .sp-project-overview-side .sp-home-section h2 { margin-bottom: 4px; font-size: 15px; }
+.sp-projects-view .sp-project-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+@container (min-width: 880px) {
+  .sp-projects-view .sp-project-overview { grid-template-columns: minmax(0, 1fr) 340px; gap: 56px; align-items: start; }
+  .sp-projects-view .sp-project-overview-side { padding-left: 32px; border-left: 1px solid var(--color-rule); }
+}
+@container (min-width: 1300px) {
+  .sp-projects-view .sp-project-overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+}
 .sp-settings-view { padding: 40px; }
 .sp-settings-view .sp-settings-layout { grid-template-columns: 210px minmax(0, 1fr); align-items: start; gap: 32px; padding: 0; }
 .sp-settings-view .sp-settings-layout > nav { gap: 5px; padding-top: 4px; }
@@ -195,6 +212,16 @@
 .sp-settings-view .sp-properties { font-size: 14px; }
 .sp-settings-view .sp-profile { gap: 14px; }
 .sp-settings-view .sp-profile .sp-avatar { width: 44px; height: 44px; font-size: 16px; }
+.sp-settings-view .sp-profile > div { flex: 1; min-width: 0; }
+.sp-settings-view .sp-profile { flex-wrap: wrap; }
+.sp-settings-view .sp-profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sp-settings-view .sp-profile-form { max-width: 440px; margin-top: 16px; }
+.sp-settings-view .sp-export-hint { margin: 10px 0 0; font-size: 13px; }
+.sp-settings-view .sp-restore-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 16px 0; }
+.sp-settings-view .sp-restore-picker > button { display: inline-flex; align-items: center; gap: 8px; }
+.sp-settings-view .sp-restore-picker > span { font-size: 13px; }
+.sp-settings-view .sp-profile-form .sp-field { margin: 0 0 8px; }
+.sp-settings-view .sp-profile-form .sp-actions { justify-content: flex-start; margin-top: 12px; }
 .sp-settings-view .sp-profile strong { font-size: 15px; font-weight: 550; }
 .sp-settings-view .sp-profile p,
 .sp-settings-view .sp-profile-caption { font-size: 13px; }

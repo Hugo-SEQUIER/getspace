@@ -7,6 +7,7 @@ import { WorkspaceRestore } from "./workspace-restore";
 import { WorkspaceExport } from "./workspace-export";
 import { teamsAvailable } from "../../../lib/features";
 import { docsLinks, sourceCode } from "../../../lib/docs-links";
+import { profilePhoto } from "../../../lib/space/profile-photo";
 
 import Link from "@web/lib/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -164,6 +165,83 @@ export function ProjectsView({ base, id }: { base: string; id?: string }) {
   const matchingProjects = data.projects.filter((project) =>
     project.name.toLowerCase().includes(query.toLowerCase()),
   );
+  const tasks = relatedResources.filter((r) => r.kind === "task");
+  const relatedReady = !related.loading && !related.error;
+  // Parameters: whether the section sits in the overview's side column.
+  // What it does: lists the project's documents; the side column uses a short empty line
+  // instead of the full empty state.
+  // Output: the documents section.
+  function documentsSection(compact: boolean) {
+    return (
+      <section className="sp-home-section" aria-labelledby="project-documents-title">
+        <h2 id="project-documents-title">{compact ? "Documents" : "Related documents"}</h2>
+        {documents.map((r) => (
+          <Link
+            className="sp-project-resource"
+            key={r.id}
+            href={`${base}/documents/${r.id}`}
+          >
+            <Icon name="document" size={18} />
+            {r.title}
+            <span>
+              {r.updated_at ? relativeDate(r.updated_at) : ""}
+            </span>
+          </Link>
+        ))}
+        {!documents.length && relatedReady && (compact ? (
+          <p className="sp-muted sp-project-empty">
+            No documents yet.
+            {data.canWrite && (
+              <button type="button" className="sp-text-button" onClick={() => setCreateDocument(true)}>
+                <Icon name="plus" size={15} />
+                New document
+              </button>
+            )}
+          </p>
+        ) : (
+          <Empty icon="document" title="No documents yet">
+            <p>Keep this project’s notes and plans here.</p>
+            {data.canWrite && (
+              <button
+                className="sp-primary"
+                onClick={() => setCreateDocument(true)}
+              >
+                <Icon name="plus" size={15} />
+                New document
+              </button>
+            )}
+          </Empty>
+        ))}
+      </section>
+    );
+  }
+  // What it does: lists the project's tasks with their status.
+  // Output: the tasks section.
+  function tasksSection() {
+    return (
+      <section className="sp-home-section" aria-labelledby="project-tasks-title">
+        <h2 id="project-tasks-title">Tasks</h2>
+        {tasks.map((r) => (
+          <Link
+            className="sp-project-resource"
+            key={r.id}
+            href={`${base}/tasks/${r.id}`}
+          >
+            <StatusDot status={r.status ?? "todo"} />
+            {r.title}
+            <span>
+              {
+                statuses.find(
+                  (s) => s.value === (r.status ?? "todo"),
+                )?.label
+              }
+            </span>
+          </Link>
+        ))}
+        {!tasks.length && relatedReady && <p className="sp-muted sp-project-empty">No tasks yet.</p>}
+      </section>
+    );
+  }
   function newProject() {
     setEditing(null);
     setName("");
@@ -275,74 +353,27 @@ export function ProjectsView({ base, id }: { base: string; id?: string }) {
                 </p>
               )}
               {tab === "Overview" && (
-                <>
-                  <h2>Overview</h2>
-                  <div className="sp-project-description">
-                    {project.description.trim() ? (
-                      <DocumentMarkdown text={project.description} />
-                    ) : (
-                      <p className="sp-muted">Add a description to give this project some context.</p>
-                    )}
-                  </div>
-                </>
-              )}
-              {["Overview", "Documents"].includes(tab) && (
-                <section className="sp-home-section">
-                  <h2>Related documents</h2>
-                  {documents.map((r) => (
-                    <Link
-                      className="sp-project-resource"
-                      key={r.id}
-                      href={`${base}/documents/${r.id}`}
-                    >
-                      <Icon name="document" size={18} />
-                      {r.title}
-                      <span>
-                        {r.updated_at ? relativeDate(r.updated_at) : ""}
-                      </span>
-                    </Link>
-                  ))}
-                  {!documents.length && !related.loading && !related.error && (
-                    <Empty icon="document" title="No documents yet">
-                      <p>Keep this project’s notes and plans here.</p>
-                      {data.canWrite && (
-                        <button
-                          className="sp-primary"
-                          onClick={() => setCreateDocument(true)}
-                        >
-                          <Icon name="plus" size={15} />
-                          New document
-                        </button>
+                <div className="sp-project-overview">
+                  <article className="sp-project-overview-main" aria-labelledby="project-overview-title">
+                    <h2 id="project-overview-title">Overview</h2>
+                    <div className="sp-project-description">
+                      {project.description.trim() ? (
+                        <DocumentMarkdown text={project.description} />
+                      ) : (
+                        <p className="sp-muted">Add a description to give this project some context.</p>
                       )}
-                    </Empty>
-                  )}
-                </section>
+                    </div>
+                  </article>
+                  <aside className="sp-project-overview-side" aria-label="Project contents">
+                    {documentsSection(true)}
+                    {tasksSection()}
+                    <ProjectDatabases base={base} projectId={project.id} />
+                  </aside>
+                </div>
               )}
-              {["Overview", "Tasks"].includes(tab) && (
-                <section className="sp-home-section">
-                  <h2>Tasks</h2>
-                  {relatedResources
-                    .filter((r) => r.kind === "task")
-                    .map((r) => (
-                      <Link
-                        className="sp-project-resource"
-                        key={r.id}
-                        href={`${base}/tasks/${r.id}`}
-                      >
-                        <StatusDot status={r.status ?? "todo"} />
-                        {r.title}
-                        <span>
-                          {
-                            statuses.find(
-                              (s) => s.value === (r.status ?? "todo"),
-                            )?.label
-                          }
-                        </span>
-                      </Link>
-                    ))}
-                </section>
-              )}
-              {["Overview", "Databases"].includes(tab) && <ProjectDatabases base={base} projectId={project.id} />}
+              {tab === "Documents" && documentsSection(false)}
+              {tab === "Tasks" && tasksSection()}
+              {tab === "Databases" && <ProjectDatabases base={base} projectId={project.id} />}
             </div>
           </>
         ) : id ? (
@@ -525,6 +556,72 @@ export function ProjectsView({ base, id }: { base: string; id?: string }) {
 
 export { AgentsView } from "./agents-view";
 
+// What it does: shows the owner's name and picture and lets them choose their own picture.
+// The name comes from SPACE_OWNER_NAME, which the operator sets.
+// Output: the Profile section of the Account settings.
+function ProfileSettings() {
+  const data = useSpace();
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [error, setError] = useState("");
+  const photoInput = useRef<HTMLInputElement>(null);
+  useFeedback({
+    error,
+    loading: photoBusy ? "Saving your picture…" : null,
+    clearError: () => setError(""),
+  });
+  async function changePhoto(image: string | null | Promise<string>) {
+    setPhotoBusy(true);
+    setError("");
+    try {
+      await data.saveProfilePhoto(await image);
+      data.setNotice(image ? "Picture saved" : "Picture removed");
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+  return (
+    <section aria-labelledby="settings-profile-title">
+      <h2 id="settings-profile-title">Profile</h2>
+      <div className="sp-profile">
+        <Avatar name={data.profile.displayName || "You"} />
+        <div>
+          <strong>{data.profile.displayName || "Owner"}</strong>
+          <p>Owner of this Space</p>
+          <span className="sp-profile-caption">
+            {data.ownPhoto
+              ? "Picture you chose. The operator sets the name with SPACE_OWNER_NAME."
+              : "The operator sets this name with SPACE_OWNER_NAME."}
+          </span>
+        </div>
+        <div className="sp-profile-actions">
+          <button type="button" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+            Change picture
+          </button>
+          {data.ownPhoto && (
+            <button type="button" className="sp-text-button" disabled={photoBusy} onClick={() => void changePhoto(null)}>
+              Remove picture
+            </button>
+          )}
+        </div>
+        <input
+          ref={photoInput}
+          type="file"
+          hidden
+          aria-label="Choose a profile picture"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void changePhoto(profilePhoto(file));
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
 export function SettingsView({
   base,
   tab = "account",
@@ -533,7 +630,6 @@ export function SettingsView({
   tab?: string;
 }) {
   const data = useSpace();
-  const [help, setHelp] = useState(false);
   const pages = [
     ["account", "Account", "user"],
     ["security", "Security", "lock"],
@@ -547,7 +643,19 @@ export function SettingsView({
   ] as const;
   // A hidden or unknown tab's address opens Account instead.
   const shown = pages.some(([id]) => id === tab) ? tab : "account";
-  useFeedback({ error: shown === "processing" ? data.memoryError : null, loading: shown === "processing" && data.memoryLoading ? "Loading processing settings…" : null });
+  const [providerError, setProviderError] = useState("");
+  const [providerAttempt, setProviderAttempt] = useState(0);
+  const { loadProvider } = data;
+  useEffect(() => {
+    if (shown !== "processing") return;
+    setProviderError("");
+    loadProvider().catch((e) => setProviderError(message(e)));
+  }, [shown, loadProvider, providerAttempt]);
+  useFeedback({
+    error: shown === "processing" ? providerError : null,
+    loading: shown === "processing" && !data.provider && !providerError ? "Loading processing settings…" : null,
+    clearError: () => setProviderError(""),
+  });
   return (
     <>
       <div className="sp-work-view sp-settings-view">
@@ -579,61 +687,7 @@ export function SettingsView({
             <>
               <h1>Account</h1>
               <p className="sp-subtitle">Make yourself at home.</p>
-              <section>
-                <h2>Profile</h2>
-                <div className="sp-profile">
-                  <Avatar name={data.profile.displayName || "You"} />
-                  <div>
-                    <strong>{data.profile.displayName || "Owner"}</strong>
-                    <p>Owner of this Space</p>
-                    <span className="sp-profile-caption">
-                      The operator sets this name with SPACE_OWNER_NAME.
-                    </span>
-                  </div>
-                </div>
-              </section>
-              <section>
-                <h2>Appearance</h2>
-                <div className="sp-setting-row">
-                  <div>
-                    <strong>Display density</strong>
-                    <p>Choose how much room your workspace gives each item.</p>
-                  </div>
-                  <div className="sp-segment">
-                    <button
-                      className={!data.compact ? "selected" : ""}
-                      aria-pressed={!data.compact}
-                      onClick={() => data.setDensity(false)}
-                    >
-                      Comfortable
-                    </button>
-                    <button
-                      className={data.compact ? "selected" : ""}
-                      aria-pressed={data.compact}
-                      onClick={() => data.setDensity(true)}
-                    >
-                      Compact
-                    </button>
-                  </div>
-                </div>
-                <div className="sp-setting-row">
-                  <div>
-                    <strong>Theme</strong>
-                    <p>A quiet, light canvas for your work.</p>
-                  </div>
-                  <span className="sp-tag">Light</span>
-                </div>
-              </section>
-              <section>
-                <h2>Keyboard</h2>
-                <button
-                  className="sp-setting-link"
-                  onClick={() => setHelp(true)}
-                >
-                  View keyboard shortcuts
-                  <Icon name="chevron" size={16} />
-                </button>
-              </section>
+              <ProfileSettings />
               <section>
                 <h2>About</h2>
                 <p className="sp-muted">
@@ -750,7 +804,9 @@ export function SettingsView({
                   <div>
                     <dt>Processor</dt>
                     <dd>
-                      {data.provider?.provider ?? "Not loaded"}
+                      {data.provider
+                        ? data.provider.provider || "Not configured"
+                        : providerError ? "Not available" : "Loading…"}
                     </dd>
                   </div>
                   <div>
@@ -782,14 +838,11 @@ export function SettingsView({
                     {" "}through your configured processor.
                   </p>
                 )}
-                <button
-                  disabled={data.memoryLoading}
-                  onClick={() => void data.loadMemories()}
-                >
-                  {data.memoryLoading
-                    ? "Loading…"
-                    : "Load processing settings"}
-                </button>
+                {providerError && (
+                  <button onClick={() => setProviderAttempt((attempt) => attempt + 1)}>
+                    Try again
+                  </button>
+                )}
                 <p className="sp-muted">
                   Configuration is managed by your installation operator.
                 </p>
@@ -797,7 +850,8 @@ export function SettingsView({
               <section>
                 <h2>Source documents stay saved</h2>
                 <p>Document storage is independent of memory processing.</p>
-                <a className="sp-setting-link" href={docsLinks.memory} target="_blank" rel="noreferrer">
+                <a className="sp-setting-link" href={docsLinks.memory} target="_blank" rel="noreferrer"
+                  aria-label="Read the memory guide (opens in a new window)">
                   Read the memory guide
                   <Icon name="external" size={16} />
                 </a>
@@ -828,31 +882,6 @@ export function SettingsView({
         </div>
       </div>
       </div>
-      {help && (
-        <Modal title="Keyboard shortcuts" onClose={() => setHelp(false)}>
-          <div className="sp-modal-content sp-shortcuts">
-            <div>
-              Search your space<kbd>⌘ / Ctrl K</kbd>
-            </div>
-            <div>
-              Close a dialog<kbd>Esc</kbd>
-            </div>
-            <div>
-              Zoom vector map<kbd>+ / −</kbd>
-            </div>
-            <div>
-              Fit vector map<kbd>0</kbd>
-            </div>
-            <div>
-              Pan vector map<kbd>Arrow keys</kbd>
-            </div>
-            <p className="sp-muted">
-              Focus the vector canvas to use its shortcuts. List view provides
-              keyboard access to every memory.
-            </p>
-          </div>
-        </Modal>
-      )}
     </>
   );
 }
