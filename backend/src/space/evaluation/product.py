@@ -32,7 +32,7 @@ from psycopg_pool import ConnectionPool
 from space import memory_pipeline
 from space.memory import RecallMetadata, RecallRequest
 from space.memory_pipeline import BuildMemory
-from space.model_provider import MemoryModels, TypeSafeError
+from space.model_provider import DecisionError, MemoryModels
 from space.providers import ScopedKey
 from space.security.auth import Identity as AuthIdentity
 from space.security.payloads import SpaceKey
@@ -137,9 +137,9 @@ class CachedModels(MemoryModels):
         self._client = None
         self._client_lock = threading.Lock()
         self._closed = False
-        # relevance.select decides whether Jev assesses by reading `settings` from the
-        # session, which production sessions expose. Left unset, this harness keeps its
-        # historical behaviour: the configured text model assesses.
+        # relevance.select decides whether the decision model assesses by reading
+        # `settings` from the session, which production sessions expose. Left unset, this
+        # harness keeps its historical behaviour: the configured text model assesses.
         self.session_settings = None
 
     @property
@@ -225,16 +225,16 @@ class CachedModels(MemoryModels):
                 parent.calls.append(("embed", list(texts)))
                 return parent.embed(texts)
 
-            def evaluate_typesafe(self, payload):
-                """Delegate the short-passage assessment to the real relevance model.
+            def decide(self, payload):
+                """Delegate the decision to the real relevance model's session.
 
-                The shipped Jev path calls this directly on the session, so a harness that
-                omits it can never exercise Jev routing.
+                The shipped decision path calls this directly on the session, so a harness that
+                omits it can never exercise decision routing.
                 """
-                parent.calls.append(("typesafe", payload))
+                parent.calls.append(("decision", payload))
                 if parent.relevance_models is None:
-                    raise TypeSafeError("The product harness has no relevance model")
-                return parent.relevance_models.session(authorize).evaluate_typesafe(payload)
+                    raise DecisionError("The product harness has no relevance model")
+                return parent.relevance_models.session(authorize).decide(payload)
 
         return Session()
 

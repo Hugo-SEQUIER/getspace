@@ -27,7 +27,7 @@ export function OrganizationCatalog({ onClose }: { onClose: () => void }) {
   return <Modal title="Organize memory" size="wide" onClose={onClose}>
     <div className="sp-modal-content">
       <p><strong>Categories describe a topic</strong>, such as Engineering or Finance. A memory can have several categories.</p>
-      <p>{data.provider?.classification_provider === "typesafe"
+      <p>{data.provider?.classification_provider === "decision"
         ? "New and edited memories are classified automatically. Existing memories can be classified from their details."
         : "Manual organization is available. Automatic classification needs to be enabled by your Space operator."}</p>
       <ul className="sp-organization-list">{data.organizationItems.filter(i => i.kind === "category").map(item =>
@@ -93,7 +93,7 @@ export function MemoryOrganization({ memory, onUpdated }: { memory: MemoryVector
       <div><dt>Projects</dt><dd>{selected("project_ids") || "Unassigned"}</dd></div>
     </dl>
     {current?.method === "manual" && <p>Manual assignment · kept during automatic updates.</p>}
-    {current?.method === "typesafe" && <p>Automatically classified. You can correct any assignment.</p>}
+    {current?.method === "decision" && <p>Automatically classified. You can correct any assignment.</p>}
     {current?.reason === "unavailable" && <p>Automatic classification was unavailable. Your memory is saved.</p>}
     {current?.reason === "catalog_limit" && <p>The catalog exceeds the automatic classification limit. Use a manual assignment.</p>}
     {current?.reason === "input_limit" && <p>The catalog descriptions and memory exceed the automatic classification size limit.</p>}
@@ -105,7 +105,7 @@ export function MemoryOrganization({ memory, onUpdated }: { memory: MemoryVector
           section_ids: current?.section_ids ?? [],
         }); setEditing(true);
       }}>Edit organization</button>
-      {data.provider?.classification_provider === "typesafe" && current?.method !== "manual" &&
+      {data.provider?.classification_provider === "decision" && current?.method !== "manual" &&
         <button disabled={busy || !data.canWrite} onClick={() => void save()}>Classify now</button>}
     </div>
     {editing && <Modal title="Memory organization" onClose={() => setEditing(false)}>
@@ -127,7 +127,7 @@ export function MemoryOrganization({ memory, onUpdated }: { memory: MemoryVector
         })}
         <p className="sp-modal-hint">Saving pins these assignments during automatic updates.</p>
         <div className="sp-modal-footer">
-          {current?.method === "manual" && data.provider?.classification_provider === "typesafe" &&
+          {current?.method === "manual" && data.provider?.classification_provider === "decision" &&
             <button type="button" className="sp-text-button" disabled={busy} onClick={() => void save()}>Use automatic classification</button>}
           <div className="sp-actions">
             <button type="button" disabled={busy} onClick={() => setEditing(false)}>Cancel</button>

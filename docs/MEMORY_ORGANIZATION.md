@@ -1,6 +1,6 @@
-# Memory organization with Jev
+# Memory organization with a decision model
 
-Space can organize memories using categories and sections defined by the user, plus existing projects. This is a separate write-time operation from Jev's recall evidence assessment. The classifier never changes a claim's text, factual/procedural type, source or citation, and organizational labels do not grant access or restrict which memories can be recalled.
+Space can organize memories using categories and sections defined by the user, plus existing projects. This is a separate write-time operation from the decision model's recall evidence assessment. The classifier never changes a claim's text, factual/procedural type, source or citation, and organizational labels do not grant access or restrict which memories can be recalled.
 
 ## User workflow
 
@@ -20,25 +20,25 @@ Renaming a label keeps its ID and updates its displayed name. Archiving removes 
 Migration `0017_memory_organization` extends the `workspace_items.kind` check to allow `category` and `section`. Projects store an optional `section_id`. Categories and sections use the existing revision history, authorization, trash and restore, and idempotent commands.
 
 ```dotenv
-SPACE_MEMORY_CLASSIFICATION_PROVIDER=typesafe
-SPACE_TYPESAFE_API_KEY=...
+SPACE_MEMORY_CLASSIFICATION_PROVIDER=decision
+SPACE_MEMORY_DECISION_MODEL=perplexity/pplx-decider-v1.1-27b
 ```
 
-Classification defaults to `disabled` and requires an enabled memory provider plus the key of TypeSafe, an external service. It is independent of `SPACE_MEMORY_RELEVANCE_PROVIDER`. Configure it on both the API and the extraction worker: `compose.yaml` does not pass these two settings, so add them to the `api` and `worker` services. [Data and privacy](PRIVACY.md#what-leaves-the-server) lists what TypeSafe receives. Manual organization works without an enabled model provider. Enabling classification does not change the embedding fingerprint or require re-embedding existing memories.
+Classification defaults to `disabled` and requires an enabled memory provider and a decision model on OpenRouter's Decisions API, reached with `SPACE_MEMORY_API_KEY` or `SPACE_MEMORY_DECISION_API_KEY`. It is independent of `SPACE_MEMORY_RELEVANCE_PROVIDER`. Configure it on both the API and the extraction worker: `compose.yaml` passes `SPACE_MEMORY_CLASSIFICATION_PROVIDER` and the decision settings to both. [Data and privacy](PRIVACY.md#what-leaves-the-server) lists what the decision model receives. Manual organization works without an enabled model provider. Enabling classification does not change the embedding fingerprint or require re-embedding existing memories.
 
 REST and MCP share the same operations:
 
 - `/items` / `save_workspace_item`: `kind=category|section`, with `data={name, description}`; project data also accepts `section_id`.
-- `/memory/change` / `change_memory`: `action=classify` and a `classification` object pins a manual assignment. The object contains `scope`, `category_ids`, `project_ids` and `section_ids`. Omitting `classification` explicitly requests Jev classification. All changes require the memory resource, entry ID, expected revision and idempotent command ID.
-- Memory listing, resource reading and recall expose `classification` separately from `memory_type`. It records assignment IDs, `method` (`manual`, `typesafe`, `unassigned`) and a bounded status reason.
+- `/memory/change` / `change_memory`: `action=classify` and a `classification` object pins a manual assignment. The object contains `scope`, `category_ids`, `project_ids` and `section_ids`. Omitting `classification` explicitly requests automatic classification by the decision model. All changes require the memory resource, entry ID, expected revision and idempotent command ID.
+- Memory listing, resource reading and recall expose `classification` separately from `memory_type`. It records assignment IDs, `method` (`manual`, `decision`, `unassigned`) and a bounded status reason.
 
 Assignments live inside the memory revisions. Archive validation checks referenced item kinds, and restore-as-copy remaps category, project and section IDs, including project parents. Existing text edits and manual assignments retain their normal authority during a merge.
 
 ## Classifier behavior and boundaries
 
-`memory_classification.py` uses the existing bounded TypeSafe transport with model `jev-1.13.0`. Each claim generates one request containing its complete index/value and the complete eligible catalog's names, descriptions and kinds. Database IDs and citations are mapped in application code and are not sent as catalog identifiers. Memory text itself can still contain private data. Provider information and the served agent guide disclose this additional processing.
+`memory_classification.py` uses the bounded decision-model transport with the model named by `SPACE_MEMORY_DECISION_MODEL`. Each claim generates one request containing its complete index/value and the complete eligible catalog's names, descriptions and kinds. Database IDs and citations are mapped in application code and are not sent as catalog identifiers. Memory text itself can still contain private data. Provider information and the served agent guide disclose this additional processing.
 
-Each catalog item receives an independent Noul question with a structured task, target and rubric. Project questions require a specific identity and distinguish overlapping names; category and section questions assess substantive subject matter. A separate Noul question assesses cross-project applicability. This follows TypeSafe's recommendation to compose narrow independent judgments in application code. [TypeSafe primitives](https://docs.typesafe.ai/introduction)
+Each catalog item receives an independent Noul question with a structured task, target and rubric. Project questions require a specific identity and distinguish overlapping names; category and section questions assess substantive subject matter. A separate Noul question assesses cross-project applicability. This follows the decision-model vendors' recommendation to compose narrow independent judgments in application code. [TypeSafe primitives](https://docs.typesafe.ai/introduction)
 
 The application accepts category matches at 0.85, project matches at 0.85 and global scope at 0.90. The project threshold was lowered from 0.90 on 2 October 2026 after fresh-case runs showed wrong projects never scoring above 0.51 while correct ones were missed at 0.86-0.89; the category threshold stayed at 0.85 because a wrong category reached 0.80 (see [SPACE_MAP.md](SPACE_MAP.md#threshold-review-2-october-2026)). A selected project takes precedence over global and adds its active parent section. These thresholds are conservative operating choices, not measured guarantees. Responses must have the exact model, question keys and types, finite probabilities in range, and valid token usage. No model-produced ID is trusted.
 

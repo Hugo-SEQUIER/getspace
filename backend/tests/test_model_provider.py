@@ -316,7 +316,7 @@ def test_embedding_response_indices_preserve_text_vector_pairing(monkeypatch):
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500, 503])
-@pytest.mark.parametrize("operation", ["text generation", "embedding", "Jev assessment"])
+@pytest.mark.parametrize("operation", ["text generation", "embedding", "decision"])
 def test_failed_requests_identify_operation_and_status_without_provider_content(
     monkeypatch, status, operation
 ):
@@ -330,8 +330,8 @@ def test_failed_requests_identify_operation_and_status_without_provider_content(
     with pytest.raises(ModelError) as error:
         if operation == "embedding":
             session.embed(["Synthetic evidence"])
-        elif operation == "Jev assessment":
-            session.evaluate_typesafe({"state": "Synthetic evidence"})
+        elif operation == "decision":
+            session.decide({"state": "Synthetic evidence"})
         else:
             session.invoke("Synthetic evidence", response_format=Output)
     assert str(error.value) == (
@@ -431,7 +431,7 @@ def test_pool_initialization_is_thread_safe_and_jev_keeps_short_timeout(monkeypa
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(
             executor.map(
-                lambda i: provider.session(lambda: None).evaluate_typesafe({"state": str(i)}),
+                lambda i: provider.session(lambda: None).decide({"state": str(i)}),
                 range(4),
             )
         )

@@ -3550,7 +3550,9 @@
                   "$ref": "#/components/schemas/ProviderInfo"
                 },
                 "example": {
-                  "classification_provider": "typesafe",
+                  "classification_provider": "decision",
+                  "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
+                  "decision_model": "perplexity/pplx-decider-v1.1-27b",
                   "embedding_dim": 1536,
                   "embedding_endpoint": "https://models.example.com/v1",
                   "embedding_model": "fixture-embed",
@@ -3566,9 +3568,7 @@
                   "relationship_provider": "disabled",
                   "relevance_model": "fixture",
                   "relevance_provider": "model",
-                  "text_model": "fixture",
-                  "typesafe_endpoint": "https://api.typesafe.ai/v1/systemone",
-                  "typesafe_model": "jev-1.13.0"
+                  "text_model": "fixture"
                 }
               }
             }
@@ -3823,7 +3823,9 @@
                   ],
                   "next_cursor": null,
                   "provider": {
-                    "classification_provider": "typesafe",
+                    "classification_provider": "decision",
+                    "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
+                    "decision_model": "perplexity/pplx-decider-v1.1-27b",
                     "embedding_dim": 1536,
                     "embedding_endpoint": "https://models.example.com/v1",
                     "embedding_model": "fixture-embed",
@@ -3839,9 +3841,7 @@
                     "relationship_provider": "disabled",
                     "relevance_model": "fixture",
                     "relevance_provider": "model",
-                    "text_model": "fixture",
-                    "typesafe_endpoint": "https://api.typesafe.ai/v1/systemone",
-                    "typesafe_model": "jev-1.13.0"
+                    "text_model": "fixture"
                   }
                 }
               }
@@ -6137,7 +6137,7 @@
           "method": {
             "type": "string",
             "title": "Method",
-            "description": "How the assignment was made, such as manual or typesafe."
+            "description": "How the assignment was made, such as manual or decision."
           },
           "reason": {
             "type": "string",
@@ -8423,7 +8423,7 @@
           "text"
         ],
         "title": "RememberMemory",
-        "description": "Write durable memory directly, without a source document or human review.\n\nParameters: free text the agent wants to keep, optional topic labels and an\noptional originating resource revision.\nWhat it does: organizes, embeds and saves the supplied wording without generation.\nLong text is split losslessly into claims of at most 2,000 characters. On the\nexplicit extraction-job endpoint, the same input is mined into generated claims.\nOutput: the saved memory resource. Explicit links name existing memory nodes by ID,\nwith relation related or expands_on; they need no Jev approval. Retries reuse command ID."
+        "description": "Write durable memory directly, without a source document or human review.\n\nParameters: free text the agent wants to keep, optional topic labels and an\noptional originating resource revision.\nWhat it does: organizes, embeds and saves the supplied wording without generation.\nLong text is split losslessly into claims of at most 2,000 characters. On the\nexplicit extraction-job endpoint, the same input is mined into generated claims.\nOutput: the saved memory resource. Explicit links name existing memory nodes by ID,\nwith relation related or expands_on; they need no model approval. Retries reuse command ID."
       },
       "Resource": {
         "properties": {

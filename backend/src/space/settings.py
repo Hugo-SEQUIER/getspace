@@ -40,6 +40,10 @@ def _plain_url(value: str) -> bool:
     )
 
 
+# OpenRouter's Decisions API, which serves decision models such as TypeSafe's Jev.
+DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SPACE_", extra="ignore", hide_input_in_errors=True
@@ -72,10 +76,19 @@ class Settings(BaseSettings):
     memory_api_key: SecretStr | None = None
     memory_text_model: str | None = None
     memory_relevance_model: str | None = None
-    memory_relevance_provider: Literal["model", "typesafe"] = "model"
-    memory_classification_provider: Literal["disabled", "typesafe"] = "disabled"
-    memory_relationship_provider: Literal["disabled", "typesafe"] = "disabled"
-    typesafe_api_key: SecretStr | None = None
+    # Decision models answer typed questions with probabilities instead of text. They
+    # judge recall evidence, organize memories and link related ones, each when its
+    # provider is "decision"; "typesafe", the earlier name, still means the same. Any
+    # decision model on the endpoint can replace Jev (scripts/benchmark_decisions.py).
+    memory_relevance_provider: Literal["model", "decision", "typesafe"] = "model"
+    memory_classification_provider: Literal["disabled", "decision", "typesafe"] = "disabled"
+    memory_relationship_provider: Literal["disabled", "decision", "typesafe"] = "disabled"
+    memory_decision_model: str = "perplexity/pplx-decider-v1.1-27b"
+    memory_decision_url: str = DECISIONS_URL
+    # Unset uses SPACE_MEMORY_API_KEY, as when OpenRouter serves both text and decisions.
+    memory_decision_api_key: SecretStr | None = None
+    # A decision that takes longer falls back like any other decision failure.
+    memory_decision_timeout: float = Field(default=5, ge=1, le=60)
     memory_embedding_model: str | None = None
     # Embeddings may live on a different endpoint and key from the chat model, because
     # a provider can serve chat completions without an embedding route. Unset keeps
@@ -135,6 +148,25 @@ class Settings(BaseSettings):
     # states this policy, so agent behaviour cannot drift from the setting.
     mine_documents: bool = False
 
+    @property
+    def uses_decisions(self) -> bool:
+        """Whether any memory feature asks the decision model."""
+        return "decision" in (
+            self.memory_relevance_provider,
+            self.memory_classification_provider,
+            self.memory_relationship_provider,
+        )
+
+    @field_validator(
+        "memory_relevance_provider",
+        "memory_classification_provider",
+        "memory_relationship_provider",
+    )
+    @classmethod
+    def decision_provider(cls, value):
+        # Installations configured before decision models went through OpenRouter.
+        return "decision" if value == "typesafe" else value
+
     @field_validator("*", mode="before")
     @classmethod
     def blank_as_default(cls, value, info):
@@ -148,16 +180,20 @@ class Settings(BaseSettings):
     def validate_runtime(self):
         if self.access_mode == "key" and self.database_url and not self.access_key:
             raise ValueError("Key access requires SPACE_ACCESS_KEY of at least 32 characters")
-        if (
-            self.memory_relevance_provider == "typesafe"
-            or self.memory_classification_provider == "typesafe"
-            or self.memory_relationship_provider == "typesafe"
-        ) and (
-            self.memory_provider == "disabled"
-            or not self.typesafe_api_key
-            or not self.typesafe_api_key.get_secret_value().strip()
-        ):
-            raise ValueError("TypeSafe assessment requires its API key and a memory provider")
+        if self.uses_decisions:
+            key = self.memory_decision_api_key or self.memory_api_key
+            endpoint = urlsplit(self.memory_decision_url)
+            local = private_host(endpoint.hostname)
+            if (
+                self.memory_provider == "disabled"
+                or not self.memory_decision_model.strip()
+                or not (endpoint.scheme == "https" or (local and endpoint.scheme == "http"))
+                or not (local or (key and key.get_secret_value().strip()))
+            ):
+                raise ValueError(
+                    "Decision features require a memory provider, a decision model, an HTTPS "
+                    "decision endpoint and SPACE_MEMORY_DECISION_API_KEY or SPACE_MEMORY_API_KEY"
+                )
         if self.memory_provider != "disabled":
             if not all(
                 (self.memory_provider_url, self.memory_text_model, self.memory_embedding_model)

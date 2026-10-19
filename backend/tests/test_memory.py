@@ -131,7 +131,7 @@ def production_claim(body):
         creator={"agent": agent, "basis": "captured", "kind": "agent"},
         classification={
             "category_ids": [str(uuid4()), str(uuid4())],
-            "method": "typesafe",
+            "method": "decision",
             "project_ids": [str(uuid4())],
             "reason": "matched",
             "scope": "project",

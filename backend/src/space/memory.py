@@ -146,7 +146,7 @@ class RememberMemory(Input):
     Long text is split losslessly into claims of at most 2,000 characters. On the
     explicit extraction-job endpoint, the same input is mined into generated claims.
     Output: the saved memory resource. Explicit links name existing memory nodes by ID,
-    with relation related or expands_on; they need no Jev approval. Retries reuse command ID.
+    with relation related or expands_on; they need no model approval. Retries reuse command ID.
     """
 
     command_id: UUID
@@ -259,7 +259,7 @@ class MemoryAssignment(Input):
 
 
 class MemoryClassification(MemoryAssignment):
-    method: Literal["manual", "typesafe", "unassigned"] = "unassigned"
+    method: Literal["manual", "decision", "unassigned"] = "unassigned"
     reason: Literal[
         "matched", "uncertain", "disabled", "unavailable", "catalog_limit", "input_limit"
     ] = "uncertain"

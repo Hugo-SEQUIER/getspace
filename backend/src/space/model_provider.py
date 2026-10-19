@@ -18,12 +18,8 @@ class ModelError(Exception):
     """Content-free errors only; never expose upstream bodies or credentials."""
 
 
-class TypeSafeError(ModelError):
-    """Only a TypeSafe provider/protocol failure permits assessor fallback."""
-
-
-TYPESAFE_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
-TYPESAFE_MODEL = "jev-1.13.0"
+class DecisionError(ModelError):
+    """Only a decision-model transport or protocol failure permits a fallback."""
 
 
 class NoCookies(DefaultCookiePolicy):
@@ -119,21 +115,11 @@ class MemoryModels:
             "relevance_provider": self.settings.memory_relevance_provider,
             "classification_provider": self.settings.memory_classification_provider,
             "relationship_provider": self.settings.memory_relationship_provider,
-            "typesafe_endpoint": TYPESAFE_ENDPOINT
-            if "typesafe"
-            in (
-                self.settings.memory_relevance_provider,
-                self.settings.memory_classification_provider,
-                self.settings.memory_relationship_provider,
-            )
+            "decision_model": self.settings.memory_decision_model
+            if self.settings.uses_decisions
             else None,
-            "typesafe_model": TYPESAFE_MODEL
-            if "typesafe"
-            in (
-                self.settings.memory_relevance_provider,
-                self.settings.memory_classification_provider,
-                self.settings.memory_relationship_provider,
-            )
+            "decision_endpoint": self.settings.memory_decision_url
+            if self.settings.uses_decisions
             else None,
         }
 
@@ -204,16 +190,32 @@ class ModelSession:
             self.settings.memory_embedding_api_key or self.settings.memory_api_key,
         )
 
-    def evaluate_typesafe(self, payload):
+    def decide(self, payload):
+        """Parameters: a Decisions API payload of state and typed questions.
+
+        What it does: asks the configured decision model, within the session's budget.
+        Output: the provider response; the caller validates every answer.
+        """
         return self._request(
-            TYPESAFE_ENDPOINT,
-            payload,
-            self.settings.typesafe_api_key,
-            timeout=5,
-            failure=TypeSafeError,
+            self.settings.memory_decision_url,
+            {**payload, "model": self.settings.memory_decision_model},
+            self.settings.memory_decision_api_key or self.settings.memory_api_key,
+            timeout=self.settings.memory_decision_timeout,
+            failure=DecisionError,
+            stage="decision",
         )
 
-    def _request(self, url, payload, api_key, *, timeout=90, failure=ModelError, timing_stage=None):
+    def _request(
+        self,
+        url,
+        payload,
+        api_key,
+        *,
+        timeout=90,
+        failure=ModelError,
+        timing_stage=None,
+        stage=None,
+    ):
         if timing_stage not in (None, "chat_assessment", "chat_conflicts"):
             raise ValueError("Unknown provider timing stage")
         # Recheck both the grant and the source manifest before every disclosure.
@@ -239,11 +241,7 @@ class ModelSession:
             headers["Authorization"] = "Bearer " + api_key.get_secret_value()
         try:
             with self.client_context() as client:
-                stage = (
-                    "jev"
-                    if url == TYPESAFE_ENDPOINT
-                    else ("embedding" if "input" in payload else "chat")
-                )
+                stage = stage or ("embedding" if "input" in payload else "chat")
                 extra_timing = read_stage(timing_stage) if timing_stage else nullcontext()
                 with (
                     read_stage(stage),
@@ -258,8 +256,8 @@ class ModelSession:
                 ):
                     if not response.is_success:
                         operation = (
-                            "Jev assessment"
-                            if failure is TypeSafeError
+                            "decision"
+                            if failure is DecisionError
                             else ("embedding" if "input" in payload else "text generation")
                         )
                         raise failure(

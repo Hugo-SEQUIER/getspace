@@ -90,7 +90,7 @@ def test_image_candidates_use_stripped_model_inputs_without_invalid_raw_passage_
     original.pop("entry_id")
     snapshot = deepcopy(original)
     model = Assessor([{"candidate": 0, "relevance": "direct"}])
-    model.settings = SimpleNamespace(memory_relevance_provider="typesafe")
+    model.settings = SimpleNamespace(memory_relevance_provider="decision")
     diagnostics = {}
     selected = relevance.select([original], "milestone", model, diagnostics=diagnostics)
     assert model.calls[0]["candidates"][0]["text"] == readable

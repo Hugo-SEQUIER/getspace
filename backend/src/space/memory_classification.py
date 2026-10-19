@@ -3,9 +3,9 @@
 import json
 
 from space import brain, catalog_shortlist, memory_routing, workspace_items
+from space.decision_relevance import validate_response
 from space.memory import MemoryClassification
-from space.model_provider import TYPESAFE_MODEL, TypeSafeError
-from space.typesafe_relevance import validate_response
+from space.model_provider import DecisionError
 
 # A catalog this small is sent whole, exactly as evaluated; larger ones are shortlisted.
 MAX_CATALOG_ITEMS = 32
@@ -13,7 +13,7 @@ MAX_CATALOG_READ = 1000
 MAX_STATE_CHARS = 12_000
 # Sections reach a claim only through its project, so they need no semantic slots.
 CLASSIFICATION_NEIGHBORS = {"category": 6, "project": 10}
-VERSION = "jev-memory-organization-v2"
+VERSION = "decision-memory-organization-v3"
 MIN_LABEL = 0.85
 # Chosen on fresh cases on 2 October 2026: wrong projects never scored above 0.51,
 # while correct ones were missed at 0.86-0.89. Global scope keeps its stricter bar.
@@ -32,7 +32,7 @@ def enabled(workspace):
             "memory_classification_provider",
             "disabled",
         )
-        == "typesafe"
+        == "decision"
     )
 
 
@@ -88,14 +88,32 @@ def payload_for(claim, items, *, detect=False):
             "instructions": boundary + "Does the memory explicitly express a lasting personal "
             "preference or rule applicable across projects? A project-specific fact, a generic "
             "topic, a statement of uncertainty or a missing catalog match is NOT global.",
+            "criteria": {
+                "true": "A lasting personal preference or rule that applies across projects.",
+                "false": "A project-specific fact, a generic topic, uncertainty, or only a "
+                "missing catalog match.",
+            },
         },
     }
     if detect:
         # Asked in the same request, so routing detection adds no provider call.
-        questions["routing"] = {"type": "noul", "instructions": boundary + ROUTING_QUESTION}
+        questions["routing"] = {
+            "type": "noul",
+            "instructions": boundary + ROUTING_QUESTION,
+            "criteria": {
+                "true": "A rule about where a kind of content is stored, filed, logged or "
+                "looked up, or kept out of somewhere.",
+                "false": "A fact, a preference unrelated to placement, or a one-off action.",
+            },
+        }
     for n, item in enumerate(state["catalog"]):
         if item["kind"] == "project":
             task = "Does the memory make a substantive statement about this specific project?"
+            criteria = {
+                "true": "The memory makes a substantive statement about this project.",
+                "false": "The memory does not concern this project, or only shares a topic "
+                "with it.",
+            }
             rules = {
                 "positive": "The memory names this project or uniquely identifies it by its "
                 "codebase or distinctive description. A statement about several projects "
@@ -107,6 +125,10 @@ def payload_for(claim, items, *, detect=False):
             }
         else:
             task = f"Is this memory substantively about a subject covered by this {item['kind']}?"
+            criteria = {
+                "true": f"The memory is substantively about a subject this {item['kind']} covers.",
+                "false": f"The memory's subject is not covered by this {item['kind']}.",
+            }
             rules = {
                 "positive": "Any substantive semantic match to a subject in the name or "
                 "description counts. The memory need not say the category or section name. "
@@ -126,8 +148,9 @@ def payload_for(claim, items, *, detect=False):
                 "rules": rules,
                 "source_boundary": boundary,
             },
+            "criteria": criteria,
         }
-    return {"model": TYPESAFE_MODEL, "state": state, "questions": questions}
+    return {"state": state, "questions": questions}
 
 
 def select(answers, items, sections=None):
@@ -147,7 +170,7 @@ def select(answers, items, sections=None):
     elif answers["global"]["noul"] >= MIN_GLOBAL:
         result["scope"] = "global"
     if result["scope"] != "unassigned" or result["category_ids"] or result["section_ids"]:
-        result.update(method="typesafe", reason="matched")
+        result.update(method="decision", reason="matched")
     return MemoryClassification.model_validate(result).model_dump(mode="json")
 
 
@@ -184,8 +207,8 @@ def assess(claim, items, model, shortlisted=None, *, detect=False):
         if len(json.dumps(payload["state"], ensure_ascii=False)) > MAX_STATE_CHARS:
             return empty("input_limit"), None
     try:
-        answers = validate_response(payload, model.evaluate_typesafe(payload))
-    except TypeSafeError:
+        answers = validate_response(payload, model.decide(payload))
+    except DecisionError:
         # Quota, authorization and total request budgets remain fatal.
         return empty("unavailable"), None
     result = select(answers, asked, sections=items)

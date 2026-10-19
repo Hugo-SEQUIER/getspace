@@ -68,12 +68,16 @@ def test_handoff_guidance_does_not_save_at_session_end():
     assert "memory for a distinct durable fact, decision, lesson or preference" in full
 
 
-def test_typesafe_processor_and_fallback_are_disclosed_without_secrets():
+def test_decision_processor_and_fallback_are_disclosed_without_secrets():
     text = provider_line(
-        models(memory_relevance_provider="typesafe", typesafe_api_key="private-typesafe-canary")
+        models(
+            memory_relevance_provider="decision",
+            memory_decision_model="typesafe/jev-1.13",
+            memory_decision_api_key="private-decision-canary",
+        )
     )
-    assert "TypeSafe jev-1.13.0" in text
-    assert "https://api.typesafe.ai/v1/systemone" in text
+    assert "decision model typesafe/jev-1.13" in text
+    assert "https://openrouter.ai/api/alpha/decisions" in text
     assert "relevance model test at https://models.invalid/v1" in text
-    assert "TypeSafe requests have no store=false option" in text
-    assert "private-typesafe-canary" not in text and "test-secret-key" not in text
+    assert "Decision requests have no store=false option" in text
+    assert "private-decision-canary" not in text and "test-secret-key" not in text

@@ -52,7 +52,7 @@ export type MemoryAssignment = {
   section_ids: string[];
 };
 export type MemoryClassification = MemoryAssignment & {
-  method: "manual" | "typesafe" | "unassigned";
+  method: "manual" | "decision" | "unassigned";
   reason: "matched" | "uncertain" | "disabled" | "unavailable" | "catalog_limit" | "input_limit";
 };
 export type Project = {
@@ -102,10 +102,12 @@ export type Provider = {
   endpoint: string | null;
   text_model: string | null;
   relevance_model?: string | null;
-  relevance_provider?: "model" | "typesafe";
-  classification_provider?: "disabled" | "typesafe";
-  typesafe_model?: string | null;
-  typesafe_endpoint?: string | null;
+  relevance_provider?: "model" | "decision";
+  classification_provider?: "disabled" | "decision";
+  relationship_provider?: "disabled" | "decision";
+  // The decision model and where it is reached, when any memory feature asks it.
+  decision_model?: string | null;
+  decision_endpoint?: string | null;
   embedding_model: string | null;
   embedding_dim: number;
   index: {

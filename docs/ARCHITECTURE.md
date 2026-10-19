@@ -58,7 +58,7 @@ backend/src/space/
   memory_pipeline.py          Extraction with the vendored Memora runtime
   brain.py                    The pgvector claim index and its search SQL
   recall_candidates.py        Recall candidates: vector, keyword and linked claims, lexical sources
-  relevance.py                Evidence assessment after retrieval; typesafe_relevance.py is the TypeSafe route
+  relevance.py                Evidence assessment after retrieval; decision_relevance.py is the decision-model route
   memory_classification.py    Categories, sections and projects for each claim; catalog_shortlist.py for large catalogs
   memory_routing.py           Routing rules attached to containers; space_map.py builds the Space map
   memory_relationships.py     Inferred links between memories; memory_node_links.py and memory_link_index.py
@@ -70,7 +70,7 @@ backend/src/space/
   teams.py                    Organizations, members and shared Spaces (hidden in the website)
   agents.py                   Agent identities
   quotas.py                   Usage counters
-  model_provider.py           The bounded HTTP transport to the model provider and TypeSafe
+  model_provider.py           The bounded HTTP transport to the model provider and the decision model
   guide.py                    The operating guide served to agents
   retention.py, webhook_retention.py, purge.py
                               Operator maintenance commands

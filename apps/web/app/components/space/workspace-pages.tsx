@@ -820,19 +820,29 @@ export function SettingsView({
                   <div>
                     <dt>Evidence assessment</dt>
                     <dd>
-                      {data.provider?.relevance_provider === "typesafe"
-                        ? `TypeSafe · ${data.provider.typesafe_model}`
+                      {data.provider?.relevance_provider === "decision"
+                        ? `Decision model · ${data.provider.decision_model}`
                         : (data.provider?.relevance_model ??
                           data.provider?.text_model ?? "Not available")}
                     </dd>
                   </div>
+                  {data.provider?.decision_model && (
+                    <div>
+                      <dt>Decision model</dt>
+                      <dd>
+                        {data.provider.decision_model}
+                        {data.provider.decision_endpoint &&
+                          ` · ${data.provider.decision_endpoint}`}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
-                {data.provider?.classification_provider === "typesafe" && (
-                  <p className="sp-muted">Memory organization sends claims and your category and project names and descriptions to TypeSafe {data.provider.typesafe_model}. Manual assignments stay pinned.</p>
+                {data.provider?.classification_provider === "decision" && (
+                  <p className="sp-muted">Memory organization sends claims and your category and project names and descriptions to the decision model {data.provider.decision_model}. Manual assignments stay pinned.</p>
                 )}
-                {data.provider?.relevance_provider === "typesafe" && (
+                {data.provider?.relevance_provider === "decision" && (
                   <p className="sp-muted">
-                    TypeSafe receives queries and short candidate passages.
+                    The decision model receives queries and short candidate passages.
                     Longer passages, uncertain decisions and provider failures
                     use {data.provider.relevance_model ?? data.provider.text_model}
                     {" "}through your configured processor.

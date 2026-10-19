@@ -100,6 +100,8 @@ All settings live in `.env` next to `compose.yaml`. After changing one, apply it
 | `SPACE_MEMORY_RELEVANCE_MODEL` | Optional model that assesses recall evidence; defaults to the text model. |
 | `SPACE_MEMORY_EMBEDDING_URL`, `SPACE_MEMORY_EMBEDDING_API_KEY` | Optional separate endpoint and key for embeddings. |
 | `SPACE_MEMORY_REASONING_EFFORT`, `SPACE_MEMORY_RELEVANCE_REASONING_EFFORT` | `none`, `low`, `medium` or `high`, only for models that accept a reasoning effort. |
+| `SPACE_MEMORY_RELEVANCE_PROVIDER`, `SPACE_MEMORY_CLASSIFICATION_PROVIDER`, `SPACE_MEMORY_RELATIONSHIP_PROVIDER` | Set to `decision` to let a decision model assess recall passages, organize memories against your categories and projects, or link related memories. Off by default (`model`, `disabled`, `disabled`); each needs a memory provider. See [memory](MEMORY.md#decision-models). |
+| `SPACE_MEMORY_DECISION_MODEL`, `SPACE_MEMORY_DECISION_URL`, `SPACE_MEMORY_DECISION_API_KEY`, `SPACE_MEMORY_DECISION_TIMEOUT` | The decision model (default `perplexity/pplx-decider-v1.1-27b`) on OpenRouter's Decisions API, a different key when the Decisions API needs one (otherwise `SPACE_MEMORY_API_KEY`), and the seconds a decision may take before the text model answers instead (default 5). |
 
 The PostgreSQL superuser password is used only when the database volume is first created. To change it later, change it inside PostgreSQL as well (`ALTER ROLE postgres PASSWORD ...`) before editing `.env`.
 

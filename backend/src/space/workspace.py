@@ -2159,7 +2159,7 @@ class Workspace:
     def set_memory_links(self, identity, space_id, request: SetMemoryLinks):
         """Parameters: scoped writer, node revision and full replacement explicit links.
 
-        What it does: records intentional node connections without Jev, generation or
+        What it does: records intentional node connections without a decision model, generation or
         embedding. Empty links removes explicit edges; inferred judgments are unchanged.
         Output: saved memory revision; retries return the original committed result.
         """

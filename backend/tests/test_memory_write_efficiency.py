@@ -102,8 +102,9 @@ def provider(monkeypatch, *, match=False):
             memory_api_key="fixture-key",
             memory_text_model="fixture",
             memory_embedding_model="fixture-embed",
-            memory_classification_provider="typesafe",
-            typesafe_api_key="fixture-key",
+            memory_classification_provider="decision",
+            memory_decision_model="typesafe/jev-1.13",
+            memory_decision_api_key="fixture-key",
         )
     ), requests
 

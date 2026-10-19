@@ -101,7 +101,7 @@ class Classification(Closed):
     category_ids: list[UUID]
     project_ids: list[UUID]
     section_ids: list[UUID]
-    method: str = Field(description="How the assignment was made, such as manual or typesafe.")
+    method: str = Field(description="How the assignment was made, such as manual or decision.")
     reason: str
 
 

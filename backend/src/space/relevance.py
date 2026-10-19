@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from space.decision_relevance import assess as assess_decision
 from space.evidence_passages import shape
 from space.memory import excerpt
 from space.model_provider import ModelError
-from space.typesafe_relevance import assess as assess_typesafe
 
 VERSION = "evidence-v9"
 MAX_EVIDENCE = 50
@@ -117,7 +117,7 @@ def select(items, query, model, *, diagnostics=None):
     """Parameters: retrieved items, query, model, and optional mutable diagnostics.
 
     What it does: assesses lossless passage views or all original chat excerpts.
-    Invalid responses are errors; uncertain Jev responses use the chat assessor.
+    Invalid responses are errors; uncertain decision-model responses use the chat assessor.
     Output: exact assessed evidence with original identities and source citations.
     """
     if diagnostics is None:
@@ -136,12 +136,12 @@ def select(items, query, model, *, diagnostics=None):
     if len(items) > MAX_EVIDENCE:
         raise ModelError("Recall evidence exceeds its candidate budget")
     settings = getattr(model, "settings", None)
-    if settings is not None and settings.memory_relevance_provider == "typesafe":
+    if settings is not None and settings.memory_relevance_provider == "decision":
         views, reason = shape(items, max_units=MAX_EVIDENCE, diagnostics=diagnostics)
         diagnostics["fallback_reason"] = reason
         if views is not None:
             evidence = [candidate(item, index) for index, item in enumerate(views)]
-            labels = assess_typesafe(evidence, query, model, diagnostics=diagnostics)
+            labels = assess_decision(evidence, query, model, diagnostics=diagnostics)
             if labels is not None:
                 selected = [
                     item
@@ -153,7 +153,7 @@ def select(items, query, model, *, diagnostics=None):
                     if index in labels
                 ]
                 diagnostics.update(
-                    route="jev",
+                    route="decision",
                     assessed_units=len(views),
                     selected_units=len(selected),
                 )

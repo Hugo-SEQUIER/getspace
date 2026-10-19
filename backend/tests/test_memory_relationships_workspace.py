@@ -20,7 +20,7 @@ from test_workspace import commands as commands_fixture
 
 from space import brain
 from space.memory import RecallMetadata, RememberClaims, RememberMemory
-from space.model_provider import TypeSafeError
+from space.model_provider import DecisionError
 from space.resource_deletion import delete_memory
 from space.workspace import CommandError
 
@@ -33,8 +33,8 @@ class RelatingModels(Models):
     def __init__(self, *, classify=True, relate=True):
         super().__init__()
         self.settings = SimpleNamespace(
-            memory_classification_provider="typesafe" if classify else "disabled",
-            memory_relationship_provider="typesafe" if relate else "disabled",
+            memory_classification_provider="decision" if classify else "disabled",
+            memory_relationship_provider="decision" if relate else "disabled",
         )
         self.scores = None
         self.failure = False
@@ -54,7 +54,7 @@ class RelatingModels(Models):
             authorize()
             self.calls.append(("relate", deepcopy(payload)))
             if self.failure:
-                raise TypeSafeError("Unavailable")
+                raise DecisionError("Unavailable")
             scores = self.scores
             if scores is None:
                 scores = {key: 0.97 for key in payload["questions"] if key.startswith("r")}
@@ -62,7 +62,7 @@ class RelatingModels(Models):
             self.after_relate()
             return result
 
-        session.evaluate_typesafe = evaluate
+        session.decide = evaluate
         return session
 
 

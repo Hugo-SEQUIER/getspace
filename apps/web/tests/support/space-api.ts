@@ -76,6 +76,8 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     unlockAttempts: [] as string[],
     /** The owner's display name, as SPACE_OWNER_NAME sets it. */
     ownerName: 'Owner',
+    /** The memory processor the backend reports with the memory listing. */
+    memoryProvider: { enabled: false } as Record<string, unknown>,
     tasks: sampleTasks(),
     documents: [] as Document[],
     projects: [{ id: 'project-a', kind: 'project', name: 'Fixture project', description: '', status: 'todo', revision: 1 }] as Item[],
@@ -327,8 +329,8 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       })) });
     }
     if (path.endsWith('/restores')) return send({ items: [] });
-    if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: { enabled: false } });
-    if (path.endsWith('/memory/provider')) return send({ enabled: false });
+    if (path.endsWith('/memories')) return send({ items: [], next_cursor: null, provider: state.memoryProvider });
+    if (path.endsWith('/memory/provider')) return send(state.memoryProvider);
     if (path === 'agent-identities' && method === 'POST') {
       const agent = { id: createdAgentId, name: body.name, harness: body.harness, revision: 1 };
       state.agents = [...state.agents.filter(item => item.id !== agent.id), agent];

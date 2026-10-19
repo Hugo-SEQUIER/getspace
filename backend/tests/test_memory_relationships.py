@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from space import brain
 from space import memory_relationships as links
 from space.memory import MemoryRelationships
-from space.model_provider import TYPESAFE_MODEL, ModelError, TypeSafeError
+from space.model_provider import DecisionError, ModelError
 
 
 def claim(text="Atlas retries payment webhooks", **extra):
@@ -20,7 +20,7 @@ def candidate(text="Atlas webhook retries use idempotency keys"):
 
 def response(payload, scores):
     return {
-        "model": TYPESAFE_MODEL,
+        "model": "typesafe/jev-1.13",
         "usage": {"input_tokens": 10, "output_tokens": 5},
         "answers": {
             key: {"type": "noul", "noul": scores.get(key, 0.01)} for key in payload["questions"]
@@ -36,7 +36,7 @@ def test_confident_pairs_survive_an_uncertain_neighbor_without_generation():
         seen.append(payload)
         return response(payload, {"r0": 0.95, "r1": 0.6})
 
-    result = links.classify(claim(), candidates, SimpleNamespace(evaluate_typesafe=evaluate))
+    result = links.classify(claim(), candidates, SimpleNamespace(decide=evaluate))
     assert result["status"] == "matched"
     assert result["links"] == [
         {
@@ -67,9 +67,7 @@ def test_long_complete_claims_are_supported_and_candidate_count_is_bounded():
         return response(payload, {})
 
     candidates = [candidate("x" * 1600) for _ in range(20)]
-    result = links.classify(
-        claim("y" * 2000), candidates, SimpleNamespace(evaluate_typesafe=evaluate)
-    )
+    result = links.classify(claim("y" * 2000), candidates, SimpleNamespace(decide=evaluate))
     assert result == links.result("no_match")
     assert len(seen[0]["state"]["candidates"]) == 5
     assert seen[0]["state"]["memory"]["text"] == "y" * 2000
@@ -77,24 +75,24 @@ def test_long_complete_claims_are_supported_and_candidate_count_is_bounded():
 
 
 @pytest.mark.parametrize("bad", [True, float("nan"), float("inf"), -0.1, 1.1, "0.99"])
-def test_invalid_jev_response_is_unavailable_not_a_link(bad):
-    model = SimpleNamespace(evaluate_typesafe=lambda p: response(p, {"r0": bad}))
+def test_invalid_decision_response_is_unavailable_not_a_link(bad):
+    model = SimpleNamespace(decide=lambda p: response(p, {"r0": bad}))
     assert links.classify(claim(), [candidate()], model) == links.result("unavailable")
 
 
 def test_failure_is_visible_and_authorization_budget_failures_are_fatal():
     def fail(payload):
-        raise TypeSafeError("Unavailable")
+        raise DecisionError("Unavailable")
 
-    assert links.classify(
-        claim(), [candidate()], SimpleNamespace(evaluate_typesafe=fail)
-    ) == links.result("unavailable")
+    assert links.classify(claim(), [candidate()], SimpleNamespace(decide=fail)) == links.result(
+        "unavailable"
+    )
 
     def fatal(payload):
         raise ModelError("Quota exhausted")
 
     with pytest.raises(ModelError, match="Quota"):
-        links.classify(claim(), [candidate()], SimpleNamespace(evaluate_typesafe=fatal))
+        links.classify(claim(), [candidate()], SimpleNamespace(decide=fatal))
 
 
 def test_link_contract_requires_valid_targets_unique_links_and_matched_status():
@@ -120,20 +118,24 @@ def test_relationship_provider_requires_credentials_and_is_disclosed():
         memory_provider_url="https://example.invalid",
         memory_text_model="openai/gpt-6-luna",
         memory_embedding_model="fixture",
-        memory_relationship_provider="typesafe",
+        memory_relationship_provider="decision",
     )
     with pytest.raises(ValidationError):
         Settings(**values)
-    models = MemoryModels(Settings(**values, typesafe_api_key="test-only"))
-    assert models.info()["relationship_provider"] == "typesafe"
-    assert models.info()["typesafe_model"] == TYPESAFE_MODEL
+    models = MemoryModels(
+        Settings(
+            **values, memory_decision_model="typesafe/jev-1.13", memory_decision_api_key="test-only"
+        )
+    )
+    assert models.info()["relationship_provider"] == "decision"
+    assert models.info()["decision_model"] == "typesafe/jev-1.13"
     assert "up to five nearby stored claims" in provider_line(models)
 
 
 def test_inferred_detail_link_is_directional_and_bound_to_both_texts():
     incoming = claim("What I like in my work: helping clients build software")
     target = candidate("My work")
-    model = SimpleNamespace(evaluate_typesafe=lambda p: response(p, {"r0": 0.98, "e0": 0.95}))
+    model = SimpleNamespace(decide=lambda p: response(p, {"r0": 0.98, "e0": 0.95}))
     saved = links.classify(incoming, [target], model)
     edge = saved["links"][0]
     assert edge["relation"] == "expands_on"

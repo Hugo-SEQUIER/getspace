@@ -771,18 +771,18 @@ def create_mcp(
         async def remember(
             space_id: UUID, change: RememberMemory, agent_id: UUID | None = None
         ) -> dict[str, Any]:
-            """Save authored text directly: Jev organization, embedding and storage.
+            """Save authored text directly: model organization, embedding and storage.
 
             Memory is autonomous: it is indexed immediately and is available to every
             authorized agent without human review. This sends your text to the configured
-            embedding provider and Jev when configured, without text generation. Wording
-            is preserved; text over 2,000 characters is split into bounded claims. A write
-            fails while no memory provider is configured.
+            embedding provider and the decision model when configured, without text
+            generation. Wording is preserved; text over 2,000 characters is split into
+            bounded claims. A write fails while no memory provider is configured.
             `importance` is 0 to 3, where 0 means undeclared; use it for
             constraints, decisions and corrections you expect to matter later. Prefer
             save_handoff for session context with decisions and
             next actions, and extract_memory to mine documents or conversations.
-            Optional links connect this node to exact existing memory IDs without Jev approval;
+            Optional links connect this node to exact existing memory IDs without model approval;
             use expands_on for a detail-to-subject connection. When the user states where
             something belongs, pass routes_to with up to 8 exact container IDs from
             get_space_map. Reuse command_id unchanged on retry.
@@ -835,7 +835,7 @@ def create_mcp(
             remains in the previous immutable revision. classify pins manual assignments:
             scope, category_ids, project_ids and section_ids, each list holding at most 32
             unique IDs, and a project's active parent section is added automatically.
-            classify without classification replaces the assignments using Jev when
+            classify without classification replaces the assignments using the decision model when
             configured. Never replace a user correction without their request. Read
             list_memories first to get current entry IDs and values.
             """

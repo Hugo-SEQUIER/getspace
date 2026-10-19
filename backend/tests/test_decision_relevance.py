@@ -8,9 +8,9 @@ import httpx
 import pytest
 from test_relevance import item
 
-from space import relevance, typesafe_relevance
-from space.model_provider import TYPESAFE_ENDPOINT, TYPESAFE_MODEL, MemoryModels, ModelError
-from space.settings import Settings
+from space import decision_relevance, relevance
+from space.model_provider import MemoryModels, ModelError
+from space.settings import DECISIONS_URL, Settings
 
 
 def configured(**changes):
@@ -23,15 +23,16 @@ def configured(**changes):
                 "memory_api_key": "text-secret",
                 "memory_text_model": "openai/gpt-6-luna",
                 "memory_embedding_model": "fixture-embedding",
-                "memory_relevance_provider": "typesafe",
-                "typesafe_api_key": "typesafe-secret",
+                "memory_relevance_provider": "decision",
+                "memory_decision_model": "typesafe/jev-1.13",
+                "memory_decision_api_key": "decision-secret",
             }
             | changes
         )
     )
 
 
-def jev_response(payload, labels=None, *, answerable=0.95, temporal="unspecified"):
+def decision_response(payload, labels=None, *, answerable=0.95, temporal="unspecified"):
     answers = {}
     for key, question in payload["questions"].items():
         if question["type"] == "noul":
@@ -48,7 +49,7 @@ def jev_response(payload, labels=None, *, answerable=0.95, temporal="unspecified
             },
         }
     return {
-        "model": TYPESAFE_MODEL,
+        "model": "typesafe/jev-1.13",
         "answers": answers,
         "usage": {"input_tokens": 100, "output_tokens": 30},
     }
@@ -81,9 +82,9 @@ def session(monkeypatch, jev=None, *, settings=None, authorize=lambda: None, fal
     def handler(request):
         payload = json.loads(request.content)
         requests.append((str(request.url), payload))
-        if str(request.url) == TYPESAFE_ENDPOINT:
-            assert request.headers["Authorization"] == "Bearer typesafe-secret"
-            value = jev(request, payload) if jev else jev_response(payload)
+        if str(request.url) == DECISIONS_URL:
+            assert request.headers["Authorization"] == "Bearer decision-secret"
+            value = jev(request, payload) if jev else decision_response(payload)
             return value if isinstance(value, httpx.Response) else httpx.Response(200, json=value)
         assert request.headers["Authorization"] == "Bearer text-secret"
         assert str(request.url) == "https://models.invalid/v1/chat/completions"
@@ -116,7 +117,7 @@ def test_short_passage_keeps_exact_evidence_and_citations_with_one_authorized_re
 
 def test_confident_abstention_and_empty_candidates(monkeypatch):
     model, requests = session(
-        monkeypatch, lambda _, p: jev_response(p, {"c0": "irrelevant"}, answerable=0.05)
+        monkeypatch, lambda _, p: decision_response(p, {"c0": "irrelevant"}, answerable=0.05)
     )
     assert relevance.select([], "storage", model) == []
     assert requests == []
@@ -128,16 +129,16 @@ def test_confident_abstention_and_empty_candidates(monkeypatch):
 def test_long_truncated_or_blank_passages_skip_typesafe(monkeypatch, body):
     model, requests = session(monkeypatch)
     relevance.select([item(body=body)], "storage", model)
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
 
 
 def test_maximum_short_passage_and_total_context_limits(monkeypatch):
     model, requests = session(monkeypatch)
     assert relevance.select([item(body="x" * 500)], "storage", model)
-    assert requests[0][0] == TYPESAFE_ENDPOINT
+    assert requests[0][0] == DECISIONS_URL
     requests.clear()
     relevance.select([item(body="x" * 250)] * 50, "storage", model)
-    assert all(url != TYPESAFE_ENDPOINT for url, _ in requests)
+    assert all(url != DECISIONS_URL for url, _ in requests)
     before = len(requests)
     with pytest.raises(ModelError, match="candidate budget"):
         relevance.select([item()] * 51, "storage", model)
@@ -147,7 +148,7 @@ def test_maximum_short_passage_and_total_context_limits(monkeypatch):
 @pytest.mark.parametrize("case", ["uncertain", "uncertain_rejection", "inconsistent", "conflict"])
 def test_fallback_receives_every_original_candidate(monkeypatch, case):
     def jev(_, payload):
-        r = jev_response(payload, {"c0": "direct", "c1": "irrelevant"})
+        r = decision_response(payload, {"c0": "direct", "c1": "irrelevant"})
         if case == "uncertain":
             r["answers"]["answerable"]["noul"] = 0.5
         elif case == "uncertain_rejection":
@@ -160,7 +161,7 @@ def test_fallback_receives_every_original_candidate(monkeypatch, case):
         elif case == "inconsistent":
             r["answers"]["answerable"]["noul"] = 0.05
         else:
-            r = jev_response(payload, {"c0": "conflicting", "c1": "conflicting"})
+            r = decision_response(payload, {"c0": "conflicting", "c1": "conflicting"})
         return r
 
     model, requests = session(monkeypatch, jev)
@@ -175,7 +176,7 @@ def test_fallback_receives_every_original_candidate(monkeypatch, case):
 def test_conflict_fallback_preserves_both_sides(monkeypatch):
     model, _ = session(
         monkeypatch,
-        lambda _, p: jev_response(p, {"c0": "conflicting", "c1": "conflicting"}),
+        lambda _, p: decision_response(p, {"c0": "conflicting", "c1": "conflicting"}),
         fallback=lambda p: fallback_response(p, conflicts=True),
     )
     records = [item(), item(id="other", body="The service uses SQLite.")]
@@ -185,7 +186,7 @@ def test_conflict_fallback_preserves_both_sides(monkeypatch):
 
 
 def test_stale_evidence_needs_confident_historical_intent(monkeypatch):
-    model, requests = session(monkeypatch, lambda _, p: jev_response(p, temporal="historical"))
+    model, requests = session(monkeypatch, lambda _, p: decision_response(p, temporal="historical"))
     result = relevance.select([item(stale=True)], "Previous database?", model)
     assert result[0]["relevance"] == "historical" and len(requests) == 1
 
@@ -199,7 +200,7 @@ def test_stale_current_claim_falls_back_and_cannot_be_returned(monkeypatch):
 def corrupt(response, case):
     r = copy.deepcopy(response)
     if case == "model":
-        r["model"] = "unknown-model"
+        r["model"] = 42
     elif case == "missing":
         r["answers"].pop("c0")
     elif case == "extra":
@@ -243,11 +244,11 @@ def test_malformed_response_uses_fallback_instead_of_unfiltered_results(monkeypa
     model, requests = session(
         monkeypatch,
         lambda _, p: httpx.Response(
-            200, content=json.dumps(corrupt(jev_response(p), case)).encode()
+            200, content=json.dumps(corrupt(decision_response(p), case)).encode()
         ),
     )
     assert relevance.select([item()], "storage", model)
-    assert len(requests) == 2 and requests[1][0] != TYPESAFE_ENDPOINT
+    assert len(requests) == 2 and requests[1][0] != DECISIONS_URL
 
 
 @pytest.mark.parametrize("status", [302, 401, 422, 429, 529])
@@ -259,7 +260,7 @@ def test_provider_error_falls_back_without_retry_or_redirect(monkeypatch, status
         ),
     )
     assert relevance.select([item()], "storage", model)
-    assert len(requests) == 2 and sum(url == TYPESAFE_ENDPOINT for url, _ in requests) == 1
+    assert len(requests) == 2 and sum(url == DECISIONS_URL for url, _ in requests) == 1
 
 
 def test_timeout_falls_back_and_both_failures_stay_content_free(monkeypatch):
@@ -303,7 +304,7 @@ def test_revocation_after_typesafe_response_does_not_fallback_or_release(monkeyp
     def jev(_, p):
         nonlocal revoked
         revoked = True
-        return jev_response(p)
+        return decision_response(p)
 
     model, requests = session(monkeypatch, jev, authorize=authorize)
     with pytest.raises(PermissionError, match="revoked"):
@@ -311,27 +312,62 @@ def test_revocation_after_typesafe_response_does_not_fallback_or_release(monkeyp
     assert len(requests) == 1
 
 
-def test_typesafe_credential_and_mode_do_not_change_memory_fingerprint():
-    original = MemoryModels(configured(memory_relevance_provider="model", typesafe_api_key=None))
+def test_dated_model_names_partial_probabilities_and_cost_are_accepted(monkeypatch):
+    def answer(_, payload):
+        response = decision_response(payload)
+        response["model"] = "typesafe/jev-1.13-20261001"
+        response["usage"]["cost"] = 0.000019
+        for value in response["answers"].values():
+            if value["type"] == "choice":
+                value.pop("confidence")
+                # A model may list only the options it considered; the rest count as zero.
+                value["probabilities"] = {value["choice"]: 0.97}
+        return response
+
+    model, requests = session(monkeypatch, answer)
+    selected = relevance.select([item()], "Where is data kept?", model)
+    assert selected and selected[0]["relevance"] == "direct"
+    assert len(requests) == 1 and requests[0][0] == DECISIONS_URL
+    assert requests[0][1]["model"] == "typesafe/jev-1.13"
+
+
+def test_every_yes_no_question_says_what_yes_and_no_mean():
+    payload = decision_relevance.payload_for(
+        [{"text": "The service stores data in Paris.", "stale": False}], "storage"
+    )
+    for question in payload["questions"].values():
+        if question["type"] == "noul":
+            assert set(question["criteria"]) == {"true", "false"}
+    assert "model" not in payload
+
+
+def test_decision_credential_and_mode_do_not_change_memory_fingerprint():
+    original = MemoryModels(
+        configured(memory_relevance_provider="model", memory_decision_api_key=None)
+    )
     enabled = MemoryModels(configured())
     assert original.chat_fingerprint == enabled.chat_fingerprint
     assert original.embedding_fingerprint == enabled.embedding_fingerprint
-    assert enabled.info()["typesafe_model"] == TYPESAFE_MODEL
+    assert enabled.info()["decision_model"] == "typesafe/jev-1.13"
     assert "secret" not in json.dumps(enabled.info())
-    assert original.info()["typesafe_endpoint"] is None
-    with pytest.raises(ValueError, match="TypeSafe assessment requires"):
-        configured(typesafe_api_key=None)
+    assert original.info()["decision_endpoint"] is None
+    # A blank value means unset here, like an absent one, so a blank model is the default.
+    assert configured(memory_decision_model=" ").memory_decision_model.startswith("perplexity/")
+    with pytest.raises(ValueError, match="Decision features require"):
+        configured(memory_api_key=None, memory_decision_api_key=None)
+    with pytest.raises(ValueError, match="Decision features require"):
+        configured(memory_decision_url="http://decisions.example.com/v1")
 
 
 def test_model_mode_uses_only_existing_assessor(monkeypatch):
     model, requests = session(monkeypatch, settings=configured(memory_relevance_provider="model"))
     assert relevance.select([item()], "storage", model)
-    assert len(requests) == 1 and requests[0][0] != TYPESAFE_ENDPOINT
+    assert len(requests) == 1 and requests[0][0] != DECISIONS_URL
 
 
 def test_duplicate_response_keys_trigger_fallback(monkeypatch):
     def duplicate(_, payload):
-        text = json.dumps(jev_response(payload))
+        text = json.dumps(decision_response(payload))
         return httpx.Response(200, content=('{"model":"duplicate",' + text[1:]).encode())
 
     model, requests = session(monkeypatch, duplicate)
@@ -340,7 +376,7 @@ def test_duplicate_response_keys_trigger_fallback(monkeypatch):
 
 
 def test_fallback_shares_request_budget_and_disclosure_quota(monkeypatch):
-    model, requests = session(monkeypatch, lambda _, p: jev_response(p, answerable=0.5))
+    model, requests = session(monkeypatch, lambda _, p: decision_response(p, answerable=0.5))
     charges = []
     model.before_request = lambda: charges.append(True)
     assert relevance.select([item()], "storage", model)
@@ -362,7 +398,7 @@ def test_response_byte_budget_aborts_without_fallback(monkeypatch):
 
 def test_rounding_tolerance_accepts_realistic_distributions(monkeypatch):
     def rounded(_, payload):
-        response = jev_response(payload)
+        response = decision_response(payload)
         for answer in response["answers"].values():
             if answer["type"] == "choice":
                 answer["probabilities"] = {
@@ -379,4 +415,4 @@ def test_production_payload_matches_measured_structured_rubric():
     from pathlib import Path
 
     rubric = Path(__file__).parents[1] / "evaluations/typesafe/context-v2.json"
-    assert typesafe_relevance.RUBRIC == json.loads(rubric.read_text())
+    assert decision_relevance.RUBRIC == json.loads(rubric.read_text())

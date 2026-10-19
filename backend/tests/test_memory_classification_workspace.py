@@ -15,7 +15,7 @@ from test_workspace_archive import read_archive
 
 from space import archive_schema, memory_classification, restore_merge, workspace_items
 from space.memory import ChangeMemory, RecallRequest, RememberClaims
-from space.model_provider import MemoryModels, TypeSafeError
+from space.model_provider import DecisionError, MemoryModels
 from space.settings import Settings
 from space.workspace import CommandError
 
@@ -25,7 +25,7 @@ commands = commands_fixture
 
 
 class ClassifyingModels(Models):
-    settings = SimpleNamespace(memory_classification_provider="typesafe")
+    settings = SimpleNamespace(memory_classification_provider="decision")
 
     def __init__(self):
         super().__init__()
@@ -40,7 +40,7 @@ class ClassifyingModels(Models):
             authorize()
             self.calls.append(("classify", deepcopy(payload)))
             if self.failure:
-                raise TypeSafeError("Unavailable")
+                raise DecisionError("Unavailable")
             scores = {
                 f"i{n}": 0.99
                 for n, item in enumerate(payload["state"]["catalog"])
@@ -48,7 +48,7 @@ class ClassifyingModels(Models):
             }
             return response(payload, scores)
 
-        session.evaluate_typesafe = evaluate
+        session.decide = evaluate
         return session
 
 
@@ -144,7 +144,7 @@ def test_automatic_edit_and_explicit_reclassification(commands):
     automatic = service.change_memory(
         owner, space, assign(manual).model_copy(update={"classification": None})
     )
-    assert automatic["memory"]["claims"][0]["classification"]["method"] == "typesafe"
+    assert automatic["memory"]["claims"][0]["classification"]["method"] == "decision"
 
 
 def test_failed_explicit_reclassification_keeps_manual_assignment(commands):

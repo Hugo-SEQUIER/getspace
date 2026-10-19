@@ -9,7 +9,7 @@ from test_memora_workspace import command_database as command_database
 from test_memora_workspace import commands as commands
 from test_memora_workspace import database as database
 from test_memory_classification_workspace import assign, item
-from test_relevance_workspace import typesafe_wire, wire
+from test_relevance_workspace import decision_wire, wire
 from test_workspace import change
 
 from space import brain, workspace_items
@@ -230,9 +230,11 @@ def test_selected_source_passage_has_exact_offsets_citation_and_budgeted_diagnos
     source = service.save(
         owner, space, change().model_copy(update={"title": "Commute evidence", "body": body})
     )
-    requests = typesafe_wire(service, monkeypatch)
+    requests = decision_wire(service, monkeypatch)
     result = service.context(owner, space, RecallRequest(query="car", max_chars=2000))
-    assert len(requests) == 1 and requests[0][0].startswith("https://api.typesafe.ai/")
+    assert len(requests) == 1 and requests[0][0].startswith(
+        "https://openrouter.ai/api/alpha/decisions"
+    )
     units = requests[0][1]["state"]["candidates"]
     assert "".join(unit["text"] for unit in units) == body
     assert all(len(unit["text"]) <= 500 for unit in units)
@@ -257,14 +259,16 @@ def test_selected_source_passage_has_exact_offsets_citation_and_budgeted_diagnos
     assert diagnostic["fallback_reason"] is None
 
 
-def test_long_authored_claim_is_not_split_to_force_typesafe(workspace, monkeypatch):
+def test_long_authored_claim_is_not_split_to_force_decision(workspace, monkeypatch):
     service, owner, space = workspace
     text = "Mira travels by car. " * 35
     saved = remember(workspace, text)
     vector_pool(monkeypatch, saved)
-    requests = typesafe_wire(service, monkeypatch)
+    requests = decision_wire(service, monkeypatch)
     result = service.context(owner, space, RecallRequest(query="automobile", strategy="semantic"))
-    assert requests and all(not url.startswith("https://api.typesafe.ai/") for url, _ in requests)
+    assert requests and all(
+        not url.startswith("https://openrouter.ai/api/alpha/decisions") for url, _ in requests
+    )
     assert result["items"][0]["excerpt"] == text
     assert "passage" not in result["items"][0]
     assert result["assessment"]["candidate_count"] == 1
@@ -347,7 +351,7 @@ def test_context_or_authority_changes_during_assessment_deny_release(
                 ),
             )
 
-    requests = typesafe_wire(service, monkeypatch, race)
+    requests = decision_wire(service, monkeypatch, race)
     with pytest.raises(CommandError) as error:
         service.context(reader, space, RecallRequest(query="Atlas automobile"))
     assert error.value.status == (409 if mutation == "catalog" else 403)
@@ -411,9 +415,11 @@ def test_source_split_overflow_falls_back_without_dropping_short_claim(workspace
         space,
         change().model_copy(update={"title": "car archive", "body": "Archive car record. " * 1500}),
     )
-    requests = typesafe_wire(service, monkeypatch)
+    requests = decision_wire(service, monkeypatch)
     result = service.context(owner, space, RecallRequest(query="car"))
-    assert requests and all(not url.startswith("https://api.typesafe.ai/") for url, _ in requests)
+    assert requests and all(
+        not url.startswith("https://openrouter.ai/api/alpha/decisions") for url, _ in requests
+    )
     payload = json.loads(requests[0][1]["messages"][1]["content"])
     assert len(payload["candidates"]) == 2
     assert any(c["text"] == "Mira travels by car." for c in payload["candidates"])

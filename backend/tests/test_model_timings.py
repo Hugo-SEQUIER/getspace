@@ -6,9 +6,9 @@ import pytest
 from pydantic import SecretStr
 
 from space import model_provider, read_timing
-from space.model_provider import TYPESAFE_ENDPOINT, ModelError, ModelSession, TypeSafeError
+from space.model_provider import DecisionError, ModelError, ModelSession
 from space.read_timing import collect_read_timings, record_timing
-from space.settings import Settings
+from space.settings import DECISIONS_URL, Settings
 
 
 @pytest.fixture
@@ -27,7 +27,8 @@ def settings():
         memory_text_model="fixture-chat",
         memory_embedding_model="fixture-embedding",
         memory_api_key="CREDENTIAL_CANARY",
-        typesafe_api_key="CREDENTIAL_CANARY",
+        memory_decision_model="typesafe/jev-1.13",
+        memory_decision_api_key="CREDENTIAL_CANARY",
     )
 
 
@@ -43,7 +44,7 @@ def settings():
         "recall_assessment",
         "recall_auth",
         "embedding",
-        "jev",
+        "decision",
         "chat",
     ],
 )
@@ -60,7 +61,7 @@ def test_new_stages_accumulate_only_numeric_durations_in_current_request(stage):
 
 
 @pytest.mark.parametrize("provider", ["openai_compatible", "ollama"])
-@pytest.mark.parametrize("operation", ["embedding", "jev", "chat"])
+@pytest.mark.parametrize("operation", ["embedding", "decision", "chat"])
 @pytest.mark.parametrize("prepared", [False, True])
 def test_provider_roundtrip_excludes_auth_quota_client_setup_and_json_decode(
     clock, settings, monkeypatch, provider, operation, prepared
@@ -125,8 +126,8 @@ def test_provider_roundtrip_excludes_auth_quota_client_setup_and_json_decode(
             if operation == "embedding":
                 assert session.embed(["PRIVATE_QUERY"]) == [[1, 0]]
                 assert session.embed(["PRIVATE_QUERY"]) == [[1, 0]]
-            elif operation == "jev":
-                assert session.evaluate_typesafe({"input": "PRIVATE_QUERY"})["assessed"]
+            elif operation == "decision":
+                assert session.decide({"input": "PRIVATE_QUERY"})["assessed"]
             else:
                 assert session.invoke("PRIVATE_QUERY") == {"action": "STOP"}
         assert not client.is_closed
@@ -144,7 +145,7 @@ def test_provider_roundtrip_excludes_auth_quota_client_setup_and_json_decode(
             "embedding",
             ModelError,
         ),
-        (TYPESAFE_ENDPOINT, {"input": "PRIVATE_QUERY"}, "jev", TypeSafeError),
+        (DECISIONS_URL, {"input": "PRIVATE_QUERY"}, "decision", DecisionError),
         ("https://models.invalid/chat", {"messages": ["PRIVATE_QUERY"]}, "chat", ModelError),
     ],
 )
@@ -174,7 +175,13 @@ def test_failed_roundtrip_is_timed_without_retries_or_private_error_details(
             settings, lambda: checks.append("auth"), client_context=lambda: nullcontext(client)
         )
         with collect_read_timings() as timings, pytest.raises(failure) as error:
-            session._request(url, payload, SecretStr("CREDENTIAL_CANARY"), failure=failure)
+            session._request(
+                url,
+                payload,
+                SecretStr("CREDENTIAL_CANARY"),
+                failure=failure,
+                stage="decision" if failure is DecisionError else None,
+            )
     assert len(requests) == 1
     assert checks == ["auth"]
     assert timings.header() == f"{stage};dur={30 if problem == 'body' else 10}.0"

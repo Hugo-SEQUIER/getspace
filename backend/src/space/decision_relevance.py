@@ -1,17 +1,18 @@
-"""Bounded short-passage assessment; None always means use the full text assessor."""
+"""Bounded short-passage assessment by a decision model; None always means use the full
+text assessor."""
 
 import json
 import math
 from importlib.resources import files
 
-from space.model_provider import TYPESAFE_MODEL, TypeSafeError
+from space.model_provider import DecisionError
 
-VERSION = "jev-context-passages-v2"
+VERSION = "decision-context-passages-v3"
 MIN_PROBABILITY = 0.8
 MAX_PASSAGE_CHARS = 500
 MAX_EVIDENCE = 50
 MAX_STATE_CHARS = 12_000
-RUBRIC = json.loads(files("space").joinpath("typesafe_rubric.json").read_text())
+RUBRIC = json.loads(files("space").joinpath("decision_rubric.json").read_text())
 LABELS = {
     "direct": "Supplies an answer or a necessary part of it, with no unresolved contradiction.",
     "irrelevant": "Does not supply the requested information, or is stale for a current query.",
@@ -36,7 +37,8 @@ def payload_for(evidence, query):
     """Parameters: evidence records and query.
 
     What it does: combines the measured rubric with body and descriptive context.
-    Output: a Jev payload without private record identifiers.
+    Output: a Decisions API payload without private record identifiers; the session adds
+    the configured model.
     """
     questions = {
         "temporal": {
@@ -56,6 +58,11 @@ def payload_for(evidence, query):
                 "Unresolved conflicting values still supply evidence.",
                 RUBRIC,
             ),
+            "criteria": {
+                "true": "At least one candidate supplies the requested information or a "
+                "necessary part of it.",
+                "false": "No candidate supplies the requested information.",
+            },
         },
     }
     for index in range(len(evidence)):
@@ -68,7 +75,6 @@ def payload_for(evidence, query):
             "criteria": LABELS,
         }
     return {
-        "model": TYPESAFE_MODEL,
         "state": {
             "query": query,
             "candidates": [
@@ -87,37 +93,58 @@ def probability(value):
 
 
 def validate_response(payload, response):
+    """Parameters: the payload sent and the decision model's response.
+
+    What it does: checks every answer against its question, as the Decisions API defines
+    them: a yes/no probability, or a chosen option with the highest probability. Options a
+    model leaves out of its probabilities count as zero; confidence and cost are optional.
+    Output: the answers, each choice with a probability for every option, or DecisionError.
+    """
     try:
-        if response["model"] != TYPESAFE_MODEL:
+        if not isinstance(response.get("model", ""), str):
             raise ValueError
         answers = response["answers"]
         if not isinstance(answers, dict) or set(answers) != set(payload["questions"]):
             raise ValueError
+        checked = {}
         for key, question in payload["questions"].items():
             answer = answers[key]
             if answer["type"] != question["type"]:
                 raise ValueError
             if question["type"] == "noul":
                 probability(answer["noul"])
+                checked[key] = answer
                 continue
-            probabilities = answer["probabilities"]
-            if not isinstance(probabilities, dict) or set(probabilities) != set(
-                question["criteria"]
+            options = set(question["criteria"])
+            given = answer["probabilities"]
+            if not isinstance(given, dict) or not given or not set(given) <= options:
+                raise ValueError
+            values = {option: probability(given.get(option, 0)) for option in options}
+            # Providers round to two decimals; allow accumulated rounding only.
+            total = sum(values.values())
+            if total > 1 + len(values) * 0.005 + 1e-8 or (
+                set(given) == options and abs(total - 1) > len(values) * 0.005 + 1e-8
             ):
                 raise ValueError
-            values = [probability(p) for p in probabilities.values()]
-            # The API rounds to two decimals; allow accumulated rounding only.
-            if abs(sum(values) - 1) > len(values) * 0.005 + 1e-8:
+            if (
+                answer["choice"] not in options
+                or values[answer["choice"]] < max(values.values()) - 0.00001
+            ):
                 raise ValueError
-            if probabilities[answer["choice"]] < max(values) - 0.00001:
-                raise ValueError
-            probability(answer["confidence"])
+            if "confidence" in answer:
+                probability(answer["confidence"])
+            checked[key] = {**answer, "probabilities": values}
+        usage = response.get("usage", {})
         for key in ("input_tokens", "output_tokens"):
-            if type(response["usage"][key]) is not int or response["usage"][key] < 0:
+            if key in usage and (type(usage[key]) is not int or usage[key] < 0):
                 raise ValueError
-    except (KeyError, TypeError, ValueError, OverflowError):
-        raise TypeSafeError("TypeSafe returned an invalid assessment") from None
-    return answers
+        if "cost" in usage and (
+            type(usage["cost"]) not in (float, int) or not 0 <= usage["cost"] < math.inf
+        ):
+            raise ValueError
+    except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+        raise DecisionError("The decision model returned an invalid answer") from None
+    return checked
 
 
 def select_labels(evidence, answers, *, diagnostics=None):
@@ -166,7 +193,7 @@ def select_labels(evidence, answers, *, diagnostics=None):
 def assess(evidence, query, model, *, diagnostics=None):
     """Parameters: complete evidence units, query, model, and optional diagnostics.
 
-    What it does: enforces serialized-state bounds and confident Jev judgments.
+    What it does: enforces serialized-state bounds and confident decision-model judgments.
     Authorization, quota, deadline and request-budget errors propagate unchanged.
     Output: selected labels (including confident empty), or None for chat fallback.
     """
@@ -184,11 +211,8 @@ def assess(evidence, query, model, *, diagnostics=None):
         )
         return None
     for entry in evidence:
-        if (
-            entry["truncated"]
-            or not entry["text"].strip()
-            or len(entry["text"]) > MAX_PASSAGE_CHARS
-        ):
+        too_long = len(entry["text"]) > MAX_PASSAGE_CHARS
+        if entry["truncated"] or not entry["text"].strip() or too_long:
             detail = (
                 "truncated_evidence"
                 if entry["truncated"]
@@ -213,8 +237,8 @@ def assess(evidence, query, model, *, diagnostics=None):
         )
         return None
     try:
-        answers = validate_response(payload, model.evaluate_typesafe(payload))
-    except TypeSafeError:
+        answers = validate_response(payload, model.decide(payload))
+    except DecisionError:
         diagnostics["fallback_reason"] = "provider"
         return None
     return select_labels(evidence, answers, diagnostics=diagnostics)
