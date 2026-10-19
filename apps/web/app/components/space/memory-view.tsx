@@ -191,18 +191,19 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
     ? `/resources/${selected.sourceId}?space_id=${data.space?.id}&revision=${selected.sourceRevision}`
     : null;
   const creatorColor = (name: string | null) =>
-    name === "Codex" ? "#885dff" : name === "You" ? "#38bba8" : "#d28b39";
-  const categoryPalette = ["#885dff", "#38bba8", "#df7a5c", "#508ad1", "#c361a0", "#a18b34", "#69a25e", "#b36c44"];
+    name === "Codex" ? "#5b6fb5" : name === "You" ? "#6f8a4a" : "#d9825a";
+  // The evening valley: dusk blue, apricot, olive, plum, ochre, slate teal, lavender, umber.
+  const categoryPalette = ["#5b6fb5", "#d9825a", "#6f8a4a", "#a8668f", "#b8913a", "#4f8a8b", "#8a7fc4", "#8a6a4f"];
   const liveCategories = data.organizationItems
     .filter(i => i.kind === "category" && !i.deleted)
     .sort((a, b) => a.id.localeCompare(b.id));
   const categoryColor = (id: string) => categoryPalette[
     liveCategories.findIndex(i => i.id === id) % categoryPalette.length
-  ] ?? "#8791a5";
+  ] ?? "#939a95";
   const colors = (m: MemoryVector) => {
     if (colorBy === "creator") return creatorColor(m.creator);
     const id = [...(m.classification?.category_ids ?? [])].sort().find(id => graphCatalog.categoryIds.has(id));
-    return id ? categoryColor(id) : "#8791a5";
+    return id ? categoryColor(id) : "#939a95";
   };
   const legend = colorBy === "creator"
     ? creators.map(name => ({ id: name, name, color: creatorColor(name) }))
@@ -426,6 +427,7 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
           ) : !filtered.length ? (
             <Empty
               icon="memory"
+              valley={!data.memories.length}
               title={
                 data.memories.length
                   ? "No memories match"

@@ -108,14 +108,14 @@
 .sp-app .sp-workspace-search kbd { padding: 1px 6px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-muted); font: 500 12px/18px var(--sp-font); box-shadow: none; }
 .sp-app .sp-workspace-create { justify-self: end; color: var(--color-muted); }
 
-/* Page headings: large, tight, Apple-like titles over generous space. */
+/* Page headings: large, tight, Apple-like titles over generous space, at the public site's semibold weight. */
 .sp-app .sp-topbar { min-height: 0; border-bottom: 0; padding: 32px 48px 20px; background: transparent; }
-.sp-app .sp-topbar h1.sp-topbar-title { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; color: var(--color-ink); }
+.sp-app .sp-topbar h1.sp-topbar-title { font-size: 30px; line-height: 1.2; font-weight: 600; letter-spacing: -.7px; color: var(--color-ink); }
 .sp-app .sp-topbar:has(> strong) { min-height: 48px; padding-block: 8px 0; }
 .sp-app .sp-topbar > strong { color: var(--color-muted); font-size: 14px; font-weight: 500; }
 .sp-app .sp-page { padding: 24px 48px 64px; }
 .sp-app .sp-page-heading { margin-bottom: 24px; }
-.sp-app .sp-page-heading h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.6px; font-weight: 700; }
+.sp-app .sp-page-heading h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.7px; font-weight: 600; }
 .sp-app .sp-page-heading p { font-size: 15px; line-height: 1.55; color: var(--color-muted); }
 
 /* One page heading everywhere: title (the menu label), one-line description, actions on the right. */
@@ -135,9 +135,9 @@
   margin: 0 0 6px;
   color: var(--color-ink);
   font-size: 30px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -.6px;
+  letter-spacing: -.7px;
 }
 .sp-app .sp-main :is(.sp-work-heading, .sp-page-heading, .sp-doc-library-heading):not(.sp-project-heading) p {
   margin: 0;
@@ -166,6 +166,16 @@
 .sp-app .sp-segment button.selected { background: var(--color-surface); color: var(--color-accent-hover); box-shadow: 0 1px 2px rgb(15 15 15 / .08), 0 0 0 1px rgb(15 15 15 / .04); }
 .sp-app .sp-empty { border-radius: var(--radius-lg); background: var(--color-panel); }
 .sp-app .sp-empty h2 { font-weight: 600; letter-spacing: -.2px; }
+/* An agent's connection state is the public site's status pill: a dot and a word, green once connected. */
+.sp-app .sp-connection-state { flex-shrink: 0; height: 26px; padding: 0 11px; border-radius: 999px; gap: 8px; background: #eef1ef; color: var(--color-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.sp-app .sp-connection-state i { width: 7px; height: 7px; background: #b4bdb7; }
+.sp-app .sp-connection-state.connected { background: var(--color-selection); color: var(--color-accent-hover); }
+.sp-app .sp-connection-state.connected i { background: var(--color-accent); }
+/* First-use empty states end on the public site's engraved valley, multiplied into the panel. */
+/* No specificity for position, so the memory page can still centre its empty state absolutely. */
+:where(.sp-empty[data-valley]) { position: relative; }
+.sp-app .sp-empty[data-valley] { isolation: isolate; overflow: hidden; padding-bottom: 168px; }
+.sp-app .sp-empty[data-valley]::after { content: ""; position: absolute; inset: auto 0 0; z-index: -1; height: 190px; background: url("/design/footer-engraving-1920.a05e5f14.webp") 72% 100% / max(100%, 570px) auto no-repeat; background-image: image-set(url("/design/footer-engraving-1920.a05e5f14.webp") 1x, url("/design/footer-engraving-3840.bc563351.webp") 2x); mix-blend-mode: multiply; -webkit-mask-image: linear-gradient(transparent, #000 55%); mask-image: linear-gradient(transparent, #000 55%); pointer-events: none; }
 
 /* Cards: one surface for documents, databases, tasks, and metrics.
    White, hairline sage border, 12px corners; hover deepens the border and shadow without moving. */
@@ -330,4 +340,58 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-app *, .sp-app *::before, .sp-app *::after { scroll-behavior: auto; animation-duration: .01ms; transition-duration: .01ms; }
+}
+
+/* ---- The public site's components, carried into every workspace page ----
+   Shapes and surfaces only: the dithered pictures stay on Home, the edges of the app and
+   the foot of the lighter pages (.sp-valley-footer). */
+
+/* Labelled actions are pills, as on the public site. Icon buttons, text buttons, tabs,
+   segments, filters and form fields keep their own shapes. */
+.sp-app :is(.sp-primary, .sp-button),
+.sp-app .sp-main :is(.sp-actions, .sp-doc-library-actions, .sp-task-dialog-actions, .sp-work-heading, .sp-page-heading) > :is(button, a):not(.sp-icon-button, .sp-text-button, .text-button),
+.sp-app .sp-modal-footer :is(button, a):not(.sp-icon-button, .sp-text-button, .text-button) { border-radius: 999px; padding-inline: 14px; }
+
+/* The top bar stays in reach. At the top of a page it is open; once the page scrolls under it,
+   a translucent paper pill fades in behind it, like the public header. Nothing moves. */
+.sp-app .sp-workspace-bar { position: sticky; top: 0; z-index: 20; isolation: isolate; background: transparent; }
+.sp-app .sp-workspace-search { border-radius: 999px; }
+.sp-app .sp-workspace-bar::before { content: ""; position: absolute; inset: 4px 10px; z-index: -1; border: 1px solid transparent; border-radius: 999px; pointer-events: none; transition: background-color 200ms ease, border-color 200ms ease, box-shadow 300ms ease; }
+.sp-app .sp-workspace-bar[data-floating]::before { border-color: var(--color-border); background: color-mix(in srgb, var(--color-paper) 90%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); box-shadow: 0 1px 2px rgb(32 37 34 / .05), 0 12px 28px -14px rgb(32 37 34 / .25); }
+/* Elements that already stick to the top sit below the bar. */
+.sp-app .sp-doc-tree-pane { top: 48px; height: calc(100svh - 56px); }
+.sp-app .sp-db-record-panel { top: 56px; max-height: calc(100dvh - 72px); }
+
+/* States read as the public site's status pill: a mark and a word on a sage capsule. */
+.sp-app .sp-main :is(.sp-project-heading, .sp-project-table, .sp-task-dialog) .sp-with-status,
+.sp-app .sp-task-dialog .sp-with-status { height: 26px; padding: 0 11px 0 8px; border-radius: 999px; background: #eef1ef; color: var(--color-text); font-size: 12px; font-weight: 600; }
+.sp-app .sp-project-table .sp-with-status { white-space: nowrap; }
+.sp-app .sp-db-option { gap: 6px; padding: 4px 9px 4px 8px; border-radius: 999px; }
+.sp-app .sp-db-option i { width: 7px; height: 7px; border-radius: 50%; }
+
+/* Softer cards: the public site's rounder corners and a low, diffuse shadow. */
+.sp-app { --sp-card-radius: 16px; --sp-card-soft-shadow: 0 1px 2px rgb(37 51 42 / .03), 0 10px 26px -16px rgb(37 51 42 / .16); }
+.sp-app .sp-main :is(.sp-doc-card, .sp-db-library-card, .sp-db-add-card, .sp-settings-page, .sp-table-wrap) { border-radius: var(--sp-card-radius); box-shadow: var(--sp-card-soft-shadow); }
+
+/* Detail titles share the semibold weight of page titles and the public site. */
+.sp-app .sp-main :is(.sp-document-reader.sp-doc-reader h1, .sp-doc-library-heading h1, .sp-db-title-row h1, .sp-project-heading h1, .sp-work-view .sp-work-heading h1),
+.sp-app .sp-task-dialog .sp-inspector-body h1 { font-weight: 600; }
+
+/* Home, Tasks and the lighter pages (Agents, Projects, Databases, Settings, Overview) sit on the
+   engraved valley: it stays at the foot of the window behind the content, so it shows without
+   scrolling, and the page scrolls over it. The main column is a full-height column (so a short page
+   still reaches the window's foot) and its own stacking context (so the valley sits above the paper
+   but below every block of content). At the end of a long page the valley rests in its own space. */
+.sp-app .sp-main:has(> .sp-valley-footer) { display: flex; flex-direction: column; min-height: 100dvh; isolation: isolate; }
+/* Children keep their block widths: a flex item with auto margins would otherwise shrink to fit. */
+.sp-app .sp-main:has(> .sp-valley-footer) > * { flex-shrink: 0; width: 100%; }
+/* The footer grows into any free space (so pages whose blocks use auto margins keep their
+   positions) and draws the valley in a fixed-height layer at its base. */
+.sp-app .sp-valley-footer { --valley-height: clamp(150px, 17vw, 220px); position: sticky; bottom: 0; z-index: -1; flex: 1 0 var(--valley-height); pointer-events: none; }
+.sp-app .sp-valley-footer::before { content: ""; position: absolute; inset: auto 0 0; height: var(--valley-height); background: url("/design/footer-engraving-1920.a05e5f14.webp") 70% 82% / cover no-repeat; background-image: image-set(url("/design/footer-engraving-1920.a05e5f14.webp") 1x, url("/design/footer-engraving-3840.bc563351.webp") 2x); opacity: .4; -webkit-mask-image: linear-gradient(transparent, #000 60%); mask-image: linear-gradient(transparent, #000 60%); }
+@media (max-width: 760px) {
+  .sp-app .sp-workspace-bar { position: static; }
+  .sp-app .sp-workspace-bar::before { content: none; }
+  .sp-app .sp-doc-tree-pane { top: 0; }
+  .sp-app .sp-valley-footer { --valley-height: 140px; }
 }

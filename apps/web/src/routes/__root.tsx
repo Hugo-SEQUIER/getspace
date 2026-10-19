@@ -1,6 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { NotificationsProvider } from "@web/app/components/notifications";
-import Link from "@web/lib/navigation";
+import { StatusPage } from "@web/app/components/status-page";
 import "@web/app/theme.css";
 import "@web/app/globals.css";
 import "@web/app/typography.css";
@@ -18,8 +18,8 @@ export const Route = createRootRoute({
     links: [{ rel: "icon", href: "/favicon.ico" }],
   }),
   component: Root,
-  notFoundComponent: () => <main className="source-reader"><h1>Page not found</h1><p><Link href="/app">Open your Space</Link></p></main>,
-  errorComponent: () => <main className="source-reader"><h1>This page could not load</h1><p>Please reload and try again.</p><p><a href="/app">Open your Space</a></p></main>,
+  notFoundComponent: () => <StatusPage title="Page not found"><p>The link may be out of date, or the page has moved.</p></StatusPage>,
+  errorComponent: () => <StatusPage title="This page could not load"><p>Please reload and try again.</p></StatusPage>,
 });
 function Root() {
   return <html lang="en"><head><HeadContent /></head><body><NotificationsProvider><Outlet /></NotificationsProvider><Scripts /></body></html>;

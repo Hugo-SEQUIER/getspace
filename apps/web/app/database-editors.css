@@ -281,7 +281,8 @@
 :is(.sp-db-context, .sp-db-property-modal, .sp-db-create-modal, .sp-db-settings-modal, .sp-db-topbar) .sp-primary {
   min-height: 36px;
   padding: 8px 16px;
-  border-radius: 4px;
+  /* A pill, like every labelled action in the workspace (refined-workspace.css). */
+  border-radius: 999px;
   font-size: var(--text-ui);
   line-height: 1.3;
 }

@@ -49,7 +49,7 @@ export function SpaceApp({
   const { preferences, update: updateSidebar } = useSidebarPreferences();
   const sidebarCollapsed = preferences.sidebarCollapsed;
   const base = "/app",
-    view = path[0] ?? "home",
+    view = path[0] || "home", // "/app/" splits to an empty segment
     id = path[1];
   const [mobileNav, setMobileNav] = useState(false),
     [accountOpen, setAccountOpen] = useState(false);
@@ -57,6 +57,17 @@ export function SpaceApp({
   const [compose, setCompose] = useState<"document" | "task" | null>(null);
   const [searchShortcut, setSearchShortcut] = useState("Ctrl K");
   const onSearch = useCallback(() => setCommand(true), []);
+  // Once the page scrolls under the top bar, it floats on translucent paper like the public header.
+  const floatOnScroll = useCallback((bar: HTMLElement | null) => {
+    if (!bar) return;
+    const update = () => bar.toggleAttribute("data-floating", window.scrollY > 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
+  // Home, Tasks and the lighter pages end on the engraved valley, like the public site's footer.
+  // An open task is a dialog over the Tasks page, so the valley stays put behind it.
+  const valleyFooter = view === "settings" || view === "tasks" || (!id && ["home", "agents", "projects", "databases", "overview"].includes(view));
   const shellActions = useMemo(
     () => ({ onSearch, searchShortcut }),
     [onSearch, searchShortcut],
@@ -137,7 +148,7 @@ export function SpaceApp({
   }, [mobileNav]);
   if (!data.space)
     return (
-      <main className="sp-auth-page">
+      <main className="sp-auth-page sp-valley">
         <Link href="/app" prefetch={false} className="sp-auth-brand">
           <Wordmark />
         </Link>
@@ -307,7 +318,7 @@ export function SpaceApp({
         tabIndex={-1}
         inert={mobileNav}
       >
-        <header className="sp-workspace-bar">
+        <header className="sp-workspace-bar" ref={floatOnScroll}>
           <div className="sp-workspace-location"><Link href={base}>Workspace</Link><span aria-hidden="true">/</span><span>{view === "home" ? "Home" : view.charAt(0).toUpperCase() + view.slice(1)}</span>{!data.canWrite && <span className="sp-tag" title="You can read and search this Space.">View only</span>}</div>
           <button className="sp-workspace-search" onClick={onSearch} aria-label="Search your space"><Icon name="search" size={16} /><span>Search in Space…</span><kbd aria-hidden="true">{searchShortcut}</kbd></button>
           <button className="sp-icon-button sp-workspace-create" disabled={!data.canWrite} aria-label="Create document" title="New document" onClick={() => setCompose("document")}><Icon name="plus" size={19} /></button>
@@ -325,6 +336,7 @@ export function SpaceApp({
             {children}
           </ShellActionsContext.Provider>
         )}
+        {valleyFooter && !data.pageError && !data.loading && !data.pageLoading && <div className="sp-valley-footer" aria-hidden="true" />}
       </main>
       {compose && (
         <Suspense

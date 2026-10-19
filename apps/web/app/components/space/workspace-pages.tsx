@@ -411,7 +411,7 @@ export function ProjectsView({ base, id }: { base: string; id?: string }) {
                 </table>
               </div>
             ) : (
-              <Empty icon="folder" title="A place for the bigger picture">
+              <Empty icon="folder" title="A place for the bigger picture" valley>
                 <p>Group related documents and tasks in a project.</p>
               </Empty>
             )}

@@ -1,5 +1,8 @@
 .shell {
+  box-sizing: border-box;
   min-height: 100svh;
+  /* Room at the foot of the page for the engraved valley (valley.css). */
+  padding-bottom: clamp(200px, 22vw, 380px);
   color: var(--text);
   background: var(--color-paper);
   --connection-muted: var(--color-text);
@@ -16,6 +19,22 @@
   display: inline-flex;
   align-items: center;
   min-height: 36px;
+}
+/* The same filled green tile and ink wordmark as the public site and sign-in. */
+.header :global(.sp-wordmark) {
+  color: var(--color-ink);
+  font-weight: 650;
+  letter-spacing: -0.65px;
+}
+.header :global(.sp-mark) {
+  color: #fff;
+  background: var(--color-accent);
+  border-radius: 7px;
+  padding: 4px;
+}
+.header :global(.sp-mark-frame),
+.spaceMark :global(.sp-mark-frame) {
+  display: none;
 }
 .help {
   gap: 7px;
@@ -165,11 +184,13 @@
   color: #397c69;
 }
 .spaceMark {
-  background: var(--color-surface);
+  background: var(--color-accent);
+  color: #fff;
 }
 .spaceMark :global(.sp-mark) {
   width: 34px;
   height: 34px;
+  color: #fff;
 }
 .connector {
   display: flex;
@@ -641,6 +662,9 @@
   }
 }
 @media (max-width: 540px) {
+  .shell {
+    padding-bottom: 180px;
+  }
   .header {
     height: 66px;
     padding: 0 20px;

@@ -783,7 +783,7 @@ export function TasksView({ base, id }: { base: string; id?: string }) {
               }}
             />
           ) : !tasks.length ? (
-            <Empty icon="tasks" title="A little room to make progress">
+            <Empty icon="tasks" title="A little room to make progress" valley={!(query || filter || projectFilter)}>
               <p>
                 {query || filter || projectFilter
                   ? "No tasks match these filters."

@@ -46,6 +46,7 @@ export function HomeView({ base, onSearch, searchShortcut }: {
   const name = data.profile.displayName.split(" ")[0];
   const now = new Date();
   return <div className="sp-home-v2">
+    <div className="sp-home-band" aria-hidden="true" />
     <header className="sp-home-v2-heading">
       <p className="sp-home-v2-date">{now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
       <h1>{greeting(now)}{name ? `, ${name}` : ""}</h1>

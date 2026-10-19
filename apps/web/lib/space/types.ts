@@ -153,9 +153,11 @@ export const statuses: { value: Status; label: string }[] = [
 ];
 /** The revision of a document or task the owner last opened. */
 export type ResourceView = { resource_id: string; seen_revision: number; seen_at: string };
+// Category and creator colours come from the public site's evening valley: dusk blue,
+// apricot, olive hills and plum cloud first (categoryPalette in memory-view.tsx).
 export const categoryColors: Record<string, string> = {
-  Product: "#885dff",
-  Design: "#f27391",
-  Engineering: "#5795ef",
-  Research: "#38bba8",
+  Product: "#5b6fb5",
+  Design: "#d9825a",
+  Engineering: "#6f8a4a",
+  Research: "#a8668f",
 };

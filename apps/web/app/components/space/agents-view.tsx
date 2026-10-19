@@ -149,7 +149,7 @@ export function AgentsView() {
                       </small>
                     </span>
                     <span
-                      className={`sp-connection-state ${active ? "" : "revoked"}`}
+                      className={`sp-connection-state ${active ? "connected" : "revoked"}`}
                     >
                       <i />
                       {active
@@ -163,7 +163,7 @@ export function AgentsView() {
                 );
               })
             ) : (
-              <Empty icon="agents" title="Connect your first agent">
+              <Empty icon="agents" title="Connect your first agent" valley>
                 <p>Give Claude Code, Codex or another MCP client its own connection to this Space.</p>
                 <button onClick={() => setConnectFor({})}>Connect an agent</button>
               </Empty>

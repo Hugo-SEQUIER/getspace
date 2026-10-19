@@ -1,0 +1,23 @@
+/* The engraved valley from the public site's footer, quiet at the foot of a page.
+   Used by sign-in, the agent connection pages and the not-found page. Each page
+   leaves room for it with its own bottom padding. */
+.sp-valley {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.sp-valley::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: -1;
+  width: max(100%, 1100px);
+  aspect-ratio: 3 / 1;
+  background: url("/design/footer-engraving-1920.a05e5f14.webp") center bottom / 100% auto no-repeat;
+  background-image: image-set(url("/design/footer-engraving-1920.a05e5f14.webp") 1x, url("/design/footer-engraving-3840.bc563351.webp") 2x);
+  -webkit-mask-image: linear-gradient(transparent, #000 42%);
+  mask-image: linear-gradient(transparent, #000 42%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}

@@ -37,6 +37,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Settings: account density | `agents` | | |
 | Settings: API keys create, copy, revoke | `attention` (create) | `api-keys` | |
 | Settings: security, processing, data render | `surfaces` | | Export download and restore: not yet |
+| Design: evening strip on Home, engraved valley on first-use empty states, the setup dialog, the connection and not-found pages and the foot of lighter pages, pill actions, status pills, the floating top bar | | `app-design` | Desktop and phone widths |
 
 ## Adding a surface
 
