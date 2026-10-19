@@ -29,7 +29,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Databases: row selection | | `database-row-selection` | The checkbox cell selects a record; while any record is selected, a click on a row selects or clears it instead of editing or opening it, while the keyboard and the row menu keep their actions |
 | Databases: set a select value on selected rows | | `database-bulk-option` | The selection bar's menu lists only select properties; choosing an option or the empty choice saves every selected record at once and leaves unselected and unchanged records' edit times alone |
 | Databases: an edited row keeps its place | | `database-row-order` | Saving a cell no longer moves the row to the top under Last edited |
-| Webhooks: create with signing secret | `databases` | | Rotate, remove and deliveries: not yet |
+| Webhooks: create with signing secret, inbox subscription without a secret, inbox receipts | `databases` | `webhooks` | Rotate and remove: not yet |
 | Agents: create identity | `agents` | | |
 | Agents: connect an agent with a token | | `agent-tokens` | The token is shown once with client setups |
 | Agents: connector address for apps that sign in | | `agent-tokens` | Key mode only; absent in private mode |

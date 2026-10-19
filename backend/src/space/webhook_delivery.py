@@ -148,7 +148,7 @@ def claim(connection):
             "(e.organization_id,e.space_id,e.id)=(d.organization_id,d.space_id,d.event_id) "
             "WHERE ((d.status='queued' AND d.available_at<=clock_timestamp()) OR "
             "(d.status='processing' AND d.lease_until<=clock_timestamp())) AND d.attempts<%s "
-            "AND NOT s.paused AND s.removed_at IS NULL "
+            "AND s.delivery='endpoint' AND NOT s.paused AND s.removed_at IS NULL "
             "AND d.created_at>=clock_timestamp()-make_interval(days=>%s) "
             "AND e.created_at>=clock_timestamp()-make_interval(days=>%s) "
             "ORDER BY d.available_at,d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1",

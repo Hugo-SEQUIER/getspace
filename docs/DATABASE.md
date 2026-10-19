@@ -54,6 +54,7 @@ The runtime runs each transaction in Psycopg pipeline mode, which batches the sc
 | `0037_change_revisions` | Records which kinds of content changed at each content revision, so the website reloads only the lists whose kind changed |
 | `0038_export_snapshots` | Stamps each revision with the content revision it committed under, and keeps the recall vectors of deleted claims for a day, so an export reads the Space as it was at its first page |
 | `0039_profile_images` | The owner's own profile picture, chosen on the website, readable only by its person and purged with the Space |
+| `0040_webhook_inbox` | Adds the agent inbox delivery kind: a `delivery` column on `webhook_subscriptions` and the owner-scoped inbox receipt functions |
 
 Migration `0003` installs the `vector` extension in the `space` schema, because the restricted logins resolve types through `search_path = pg_catalog, space`; it stops if `vector` is already installed in another schema. The claim index is created with 1,536 dimensions. When `SPACE_MEMORY_EMBEDDING_DIMENSIONS` asks for another width (16 to 2000), the installer rebuilds the column and its index while the table is empty, and refuses to change the width once embeddings are stored.
 

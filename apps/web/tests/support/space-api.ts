@@ -89,6 +89,10 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** The revision of each resource the signed-in person last opened. */
     views: [] as SeenMark[],
     memoryJobs: [] as { id: string; status: string; attempts: number; error_code: string | null; result: null }[],
+    webhooks: [] as WebhookRow[],
+    /** Bodies of every subscription create or change command, in order. */
+    webhookCommands: [] as Record<string, unknown>[],
+    webhookDeliveries: [] as Record<string, unknown>[],
     profileImage: null as string | null,
     profileImageCommands: [] as string[],
     seenCommands: [] as SeenCommand[],
@@ -263,6 +267,32 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       const deleted = url.searchParams.get('deleted') === 'true';
       return send({ items: key ? state[key].filter(entry => !!entry.deleted === deleted) : [], next_cursor: null });
     }
+    if (path.endsWith('/webhooks')) {
+      if (method === 'POST') {
+        state.webhookCommands.push(body);
+        const subscription: WebhookRow = {
+          id: `${String(state.webhooks.length + 1).padStart(8, '0')}-5555-4555-8555-555555555555`, space_id: spaceId,
+          database_id: body.database_id, delivery: body.delivery ?? 'endpoint', endpoint_url: body.endpoint_url ?? null,
+          transition: body.transition ?? null, paused: false, revision: 1, created_at: '2026-10-14T09:00:00Z', updated_at: '2026-10-14T09:00:00Z', removed_at: null,
+        };
+        state.webhooks = [...state.webhooks, subscription];
+        return send(subscription.delivery === 'endpoint' ? { subscription, signing_secret: 'synthetic-fixture-secret-not-a-credential' } : { subscription });
+      }
+      return send({ items: state.webhooks });
+    }
+    if (/\/webhooks\/[^/]+\/deliveries$/.test(path)) return send({ items: state.webhookDeliveries });
+    const webhook = /\/webhooks\/([^/]+)$/.exec(path);
+    if (webhook && method === 'POST') {
+      state.webhookCommands.push({ ...body, id: webhook[1] });
+      const current = state.webhooks.find(item => item.id === webhook[1])!;
+      const subscription: WebhookRow = {
+        ...current, revision: current.revision + 1,
+        paused: body.action === 'pause' ? true : body.action === 'resume' ? false : current.paused,
+        removed_at: body.action === 'remove' ? '2026-10-14T10:00:00Z' : current.removed_at,
+      };
+      state.webhooks = state.webhooks.map(item => item.id === subscription.id ? subscription : item);
+      return send(body.action === 'rotate' ? { subscription, signing_secret: 'synthetic-rotated-secret-not-a-credential' } : { subscription });
+    }
     if (path.endsWith('/search') && method === 'POST') {
       const query = String(body.query ?? '').toLowerCase();
       const items = [...state.tasks, ...state.documents]
@@ -333,6 +363,25 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
 }
 
 export type SpaceMock = Awaited<ReturnType<typeof mockSpace>>;
+
+export type WebhookRow = {
+  id: string; space_id: string; database_id: string; delivery: 'endpoint' | 'inbox'; endpoint_url: string | null;
+  transition: { field_id: string; to: string } | null; paused: boolean; revision: number;
+  created_at: string; updated_at: string; removed_at: string | null;
+};
+
+export const databaseId = '66666666-6666-4666-8666-666666666666';
+
+/** A pipeline database with one select field, so a webhook can filter on Stage → Review. */
+export function sampleDatabase() {
+  return {
+    id: databaseId, kind: 'database', name: 'Pipeline', description: '', revision: 1, deleted: false,
+    fields: [
+      { id: 'stage', name: 'Stage', type: 'select', options: ['New', 'Review', 'Won'] },
+      { id: 'notes', name: 'Notes', type: 'text' },
+    ], records: [], view: 'table', groupBy: 'stage',
+  };
+}
 
 /** Records uncaught page errors in session storage, so they survive reloads within the test. */
 export async function watchPageErrors(browser: Browser) {

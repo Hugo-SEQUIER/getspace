@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useFeedback } from "@web/app/components/notifications";
 import { ACCESS_RESET_EVENT, api, ApiError, invalidateReads, message } from "../../../lib/client";
 import {
-  canRedeliver, webhookEndpoint, webhookPath, webhookTransition,
-  type WebhookAction, type WebhookDelivery, type WebhookResult, type WebhookSubscription,
+  canRedeliver, canRotate, receiptOutcome, webhookDestination, webhookEndpoint, webhookPath, webhookTransition,
+  type WebhookAction, type WebhookDelivery, type WebhookDeliveryKind, type WebhookResult, type WebhookSubscription,
 } from "../../../lib/space/webhooks";
 import { useSpace } from "./provider";
 import { Empty, Modal } from "./ui";
@@ -26,7 +26,7 @@ export function WebhookSettings() {
   return (
     <div className={styles.settings}>
       <h1>Webhooks</h1>
-      <p className="sp-subtitle">Send database change events to a receiver you control.</p>
+      <p className="sp-subtitle">Send database change events to your agents or to a receiver you control.</p>
       {!data.space ? null : data.space.role !== "owner" ? (
         <p className={styles.callout}>Only the Space owner can manage webhooks and view delivery receipts.</p>
       ) : (
@@ -49,6 +49,7 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
   const [databaseReady, setDatabaseReady] = useState(false);
   const [databaseError, setDatabaseError] = useState("");
   const [databaseId, setDatabaseId] = useState("");
+  const [delivery, setDelivery] = useState<WebhookDeliveryKind>("inbox");
   const [endpoint, setEndpoint] = useState("");
   const [fieldId, setFieldId] = useState("");
   const [to, setTo] = useState("");
@@ -211,7 +212,7 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
 
   return (
     <>
-      <p className={styles.callout}>Events disclose identifiers, event type and revisions, not whole records. A transition filter also discloses the selected field’s before and after values to your receiver. Record names, notes and other field values are not sent.</p>
+      <p className={styles.callout}>Events disclose identifiers, event type and revisions, not whole records. A transition filter also discloses the selected field’s before and after values to the agent or receiver. Record names, notes and other field values are not sent.</p>
       {secret && (
         <section className={styles.secret} aria-label="One-time signing secret">
           <h2>Save your signing secret</h2>
@@ -236,13 +237,15 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
             if (!database || database.deleted) throw new Error("Choose a current database in this Space.");
             const result = await command<WebhookResult>(webhookPath(spaceId), {
               database_id: database.id,
-              endpoint_url: webhookEndpoint(endpoint),
+              delivery,
+              ...(delivery === "endpoint" ? { endpoint_url: webhookEndpoint(endpoint) } : {}),
               transition: webhookTransition(database, fieldId, to),
             }, signal);
             saveSubscription(result.subscription);
             if (result.signing_secret) setSecret({ subscriptionId: result.subscription.id, value: result.signing_secret });
             setEndpoint("");
-            setNotice(result.signing_secret ? "Webhook created. Save the signing secret now." : "Webhook created, but no secret was returned. Rotate the secret to obtain one.");
+            setNotice(delivery === "inbox" ? "Inbox subscription created. Your agents can pull its events now."
+              : result.signing_secret ? "Webhook created. Save the signing secret now." : "Webhook created, but no secret was returned. Rotate the secret to obtain one.");
           }, true);
         }}>
           <fieldset className={styles.form} disabled={disabled || !databaseReady || !databases.length || subscriptions === null}>
@@ -252,10 +255,22 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
                 {databases.map(database => <option key={database.id} value={database.id}>{database.name}</option>)}
               </select>
             </label>
-            <label className="sp-field">HTTPS endpoint
-              <input type="url" required maxLength={2048} value={endpoint} onChange={event => setEndpoint(event.target.value)} placeholder="https://receiver.example.com/webhook" autoComplete="off" aria-describedby="webhook-endpoint-help" />
+            <label className="sp-field">Deliver to
+              <select value={delivery} onChange={event => setDelivery(event.target.value as WebhookDeliveryKind)} aria-describedby="webhook-delivery-help">
+                <option value="inbox">Your agents, over MCP</option>
+                <option value="endpoint">An HTTPS receiver you run</option>
+              </select>
             </label>
-            <p id="webhook-endpoint-help" className="sp-muted">Use a public HTTPS receiver you control. Private network addresses are not allowed. Creating a webhook does not send a test event.</p>
+            {delivery === "inbox" ? (
+              <p id="webhook-delivery-help" className="sp-muted">Agents connected to this Space pull waiting events with the pull_events tool and acknowledge them with ack_events. Nothing to host and no secret to copy. Events wait up to 30 days and nothing is pushed, so an agent checks on a schedule.</p>
+            ) : (
+              <>
+                <label className="sp-field">HTTPS endpoint
+                  <input type="url" required maxLength={2048} value={endpoint} onChange={event => setEndpoint(event.target.value)} placeholder="https://receiver.example.com/webhook" autoComplete="off" aria-describedby="webhook-delivery-help" />
+                </label>
+                <p id="webhook-delivery-help" className="sp-muted">Use a public HTTPS receiver you control. Private network addresses are not allowed. Creating a webhook does not send a test event.</p>
+              </>
+            )}
             <label className="sp-field">Transition filter (optional)
               <select value={fieldId} onChange={event => { setFieldId(event.target.value); setTo(""); }} disabled={!database}>
                 <option value="">No transition filter</option>
@@ -270,7 +285,7 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
             </label>}
             {database && !selectFields.length && <p className="sp-muted">This database has no select fields with options. You can create a webhook without a transition filter.</p>}
             {field && <p className="sp-muted">Send an event when {field.name} changes to {to || "the chosen option"}. Only this selected field’s before and after values are disclosed, with event metadata.</p>}
-            <button className="sp-primary" disabled={!database || !endpoint.trim() || !!fieldId && !field?.options?.includes(to)}>Create webhook</button>
+            <button className="sp-primary" disabled={!database || delivery === "endpoint" && !endpoint.trim() || !!fieldId && !field?.options?.includes(to)}>Create webhook</button>
           </fieldset>
         </form>
       </section>
@@ -279,20 +294,20 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
           <h2>Saved webhooks</h2>
           <button type="button" disabled={disabled} onClick={() => void run("Refreshing webhooks…", loadSubscriptions)}>Refresh webhooks</button>
         </div>
-        {!listLoading && subscriptions?.length === 0 && <Empty icon="external" title="No webhooks yet">Add a receiver for a database in this Space.</Empty>}
+        {!listLoading && subscriptions?.length === 0 && <Empty icon="external" title="No webhooks yet">Send a database’s changes to your agents or to a receiver.</Empty>}
         {!listLoading && subscriptions === null && <p>Webhooks could not be loaded. Use Refresh webhooks to try again.</p>}
         <ul className={styles.list}>
           {subscriptions?.map(subscription => (
-            <li key={subscription.id} aria-label={`Webhook for ${databaseName(subscription)} at ${subscription.endpoint_url}`}>
+            <li key={subscription.id} aria-label={`Webhook for ${databaseName(subscription)} at ${webhookDestination(subscription)}`}>
               <div className={styles.heading}>
                 <h3>{databaseName(subscription)}</h3>
                 <span className="sp-tag">{subscription.paused ? "Paused" : "Active"}</span>
               </div>
-              <p className={styles.endpoint}>{subscription.endpoint_url}</p>
+              <p className={styles.endpoint}>{webhookDestination(subscription)}</p>
               <p>{transitionName(subscription)} · Revision {subscription.revision}</p>
               <div className={styles.actions}>
                 <button type="button" disabled={disabled} onClick={() => void run(subscription.paused ? "Resuming webhook…" : "Pausing webhook…", signal => change(subscription, subscription.paused ? "resume" : "pause", signal), true)}>{subscription.paused ? "Resume" : "Pause"}</button>
-                <button type="button" disabled={disabled} onClick={() => setConfirmation({ kind: "rotate", subscriptionId: subscription.id })}>Rotate secret</button>
+                {canRotate(subscription) && <button type="button" disabled={disabled} onClick={() => setConfirmation({ kind: "rotate", subscriptionId: subscription.id })}>Rotate secret</button>}
                 <button type="button" disabled={disabled} onClick={() => setConfirmation({ kind: "remove", subscriptionId: subscription.id })}>Remove</button>
                 <button type="button" disabled={disabled} aria-pressed={selectedId === subscription.id} onClick={() => {
                   setSelectedId(subscription.id);
@@ -310,8 +325,8 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
             <h2>Delivery receipts</h2>
             <button type="button" disabled={disabled} onClick={() => void run("Refreshing receipts…", signal => loadDeliveries(selected.id, signal))}>Refresh receipts</button>
           </div>
-          <p className={styles.endpoint}>{selected.endpoint_url}</p>
-          <p>Latest 100 deliveries. Refresh manually to see new attempts. No receiver response bodies are stored here.</p>
+          <p className={styles.endpoint}>{webhookDestination(selected)}</p>
+          <p>{selected.delivery === "inbox" ? "Latest 100 deliveries. Each attempt is one pull by an agent; an acknowledged attempt means the agent finished with it. Refresh manually to see new pulls." : "Latest 100 deliveries. Refresh manually to see new attempts. No receiver response bodies are stored here."}</p>
           {!receiptsLoading && deliveries === null && <p>Receipts could not be loaded. Use Refresh receipts to try again.</p>}
           {deliveries?.length === 0 && <p>No deliveries yet.</p>}
           {selected.paused && <p className="sp-muted">Resume this webhook before redelivering an event.</p>}
@@ -341,7 +356,7 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
                       <strong>Cycle {receipt.cycle} · Attempt {receipt.attempt}</strong>
                       <span>Started: {receipt.started_at}</span>
                       <span>Finished: {receipt.finished_at ?? "In progress"}</span>
-                      <span>HTTP status: {receipt.status_code ?? "No response"}</span>
+                      <span>{selected.delivery === "inbox" ? "Outcome" : "HTTP status"}: {receiptOutcome(selected, receipt)}</span>
                       {receipt.error_code && <span>Error code: {receipt.error_code}</span>}
                     </li>)}
                   </ol>}
@@ -356,8 +371,8 @@ function OwnerWebhooks({ spaceId }: { spaceId: string }) {
       {confirmation && target && (
         <Modal size="small" className="sp-confirm-modal" title={confirmation.kind === "remove" ? "Remove webhook?" : confirmation.kind === "rotate" ? "Rotate signing secret?" : "Redeliver event?"} onClose={() => { if (!busy) setConfirmation(null); }}>
           <div className={`sp-modal-content ${styles.confirmation}`}>
-            <p className={styles.endpoint}>{target.endpoint_url}</p>
-            <p>{confirmation.kind === "remove" ? "This stops future deliveries for this webhook. An in-flight request may already have reached your receiver." : confirmation.kind === "rotate" ? "The previous signing secret will be replaced. Update your receiver with the new secret shown once after rotation." : "This sends the same event again and can repeat receiver side effects. Your receiver should deduplicate by event ID."}</p>
+            <p className={styles.endpoint}>{webhookDestination(target)}</p>
+            <p>{confirmation.kind === "remove" ? (target.delivery === "inbox" ? "This stops future deliveries for this subscription. Events an agent already pulled stay with that agent." : "This stops future deliveries for this webhook. An in-flight request may already have reached your receiver.") : confirmation.kind === "rotate" ? "The previous signing secret will be replaced. Update your receiver with the new secret shown once after rotation." : target.delivery === "inbox" ? "This queues the same event again for your agents. An agent should deduplicate by event ID." : "This sends the same event again and can repeat receiver side effects. Your receiver should deduplicate by event ID."}</p>
             {confirmation.kind === "redeliver" && <p>Event ID: {deliveryTarget?.event_id}</p>}
             <div className="sp-modal-footer">
               <button type="button" disabled={!!busy} onClick={() => setConfirmation(null)}>Cancel</button>

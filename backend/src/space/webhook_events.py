@@ -142,6 +142,7 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
                 "webhook_filter",
                 sub["encrypted_filter"],
             )["transition"],
+            sub["delivery"],
         )
         for sub in subscribers
     ]
@@ -162,8 +163,8 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
             "transition": None,
         }
         deliveries = [
-            (sub_id, payload)
-            for sub_id, transition in filters
+            (sub_id, payload, delivery)
+            for sub_id, transition, delivery in filters
             if (payload := projection(event, transition, old_record, new_record, fields))
             is not None
         ]
@@ -199,7 +200,7 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
                 ),
             ),
         )
-        for sub_id, payload in deliveries:
+        for sub_id, payload, _ in deliveries:
             delivery_id = uuid4()
             connection.execute(
                 "INSERT INTO space.webhook_deliveries (organization_id,space_id,id,"
@@ -221,5 +222,8 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
                     ),
                 ),
             )
-    if (marks := _queued.get()) is not None and any(deliveries for _, deliveries in intents):
+    # Only endpoint deliveries need the HTTPS worker; agents pull inbox deliveries.
+    if (marks := _queued.get()) is not None and any(
+        delivery == "endpoint" for _, deliveries in intents for _, _, delivery in deliveries
+    ):
         marks.append(True)

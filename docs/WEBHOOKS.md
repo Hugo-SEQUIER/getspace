@@ -2,16 +2,18 @@
 
 ## Purpose
 
-Space can persist signed notifications for committed changes to records in a selected database. A notification is a wake-up hint, not permission to review, approve, modify code or merge. The `webhooks` service of the compose stack delivers them; see [Architecture](ARCHITECTURE.md#background-work).
+Space can persist signed notifications for committed changes to records in a selected database. A notification is a wake-up hint, not permission to review, approve, modify code or merge. The `webhooks` service of the compose stack delivers them; see [Architecture](ARCHITECTURE.md#background-work). Migration `0040_webhook_inbox` adds a second delivery kind: an agent inbox that the owner's agents drain over MCP with `pull_events` and `ack_events`, with no receiver to host and no signing secret to copy. See [Agent inbox delivery](#agent-inbox-delivery).
 
 ## When to use
 
-Use Settings → Webhooks to send minimal database change notifications to a receiver the Space owner controls. For Dev Review, select the Dev database, its stable Stage field ID and the existing Review option. Review is a database select value; webhook setup never adds general Tasks columns.
+Use Settings → Webhooks to send minimal database change notifications to a receiver the Space owner controls, or to an agent inbox the owner's connected agents pull from. For Dev Review, select the Dev database, its stable Stage field ID and the existing Review option. Review is a database select value; webhook setup never adds general Tasks columns. Choose the inbox when the consumer is an agent that already connects over MCP; choose an HTTPS receiver when a server you run must be notified without an agent polling.
 
 ## Context map
 
 - `backend/src/space/webhooks.py` — human owner management, expected revisions, command deduplication and receipts.
 - `backend/src/space/webhook_events.py` — stable-record snapshot comparisons and transactional outbox production.
+- `backend/src/space/webhook_inbox.py` — agent leases and acknowledgements for inbox deliveries over MCP.
+- `backend/migrations/versions/0040_webhook_inbox.sql` — the `delivery` column and owner-scoped inbox receipt functions.
 - `backend/src/space/workspace_items.py` and `backend/src/space/restore_publish.py` — ordinary REST/MCP saves and committed archive-restore heads.
 - `backend/src/space/webhook_http.py` — signature verification, public HTTPS validation and pinned TLS connections.
 - `backend/src/space/webhook_delivery.py` and `backend/src/space/webhook_worker.py` — durable attempts, lease recovery and bounded worker execution.
@@ -23,13 +25,13 @@ Use Settings → Webhooks to send minimal database change notifications to a rec
 
 ### Subscription management
 
-Only the Space's owner may manage subscriptions or read receipts, from the website or with the access key. Agent tokens and personal API keys cannot configure a destination or read its signing secret. A subscription names an active database in that exact Space. The optional `transition` filter names one existing select field and one of its current options; field IDs, not display labels, are authoritative.
+Only the Space's owner may manage subscriptions or read receipts, from the website or with the access key. Agent tokens and personal API keys cannot configure a destination or read its signing secret. A subscription names an active database in that exact Space and a `delivery` kind: `endpoint` (the default, with a required `endpoint_url`) or `inbox` (no endpoint, no signing secret). The optional `transition` filter names one existing select field and one of its current options; field IDs, not display labels, are authoritative.
 
 | Method | `/v1/spaces/{space_id}` route | Request / response |
 |---|---|---|
 | GET | `/webhooks` | `{items: [subscription]}`; excludes removed subscriptions and all secrets |
-| POST | `/webhooks` | `{command_id, database_id, endpoint_url, transition}` → `{subscription, signing_secret}` |
-| POST | `/webhooks/{subscription_id}` | `{command_id, expected_revision, action}`; action is `pause`, `resume`, `remove` or `rotate` |
+| POST | `/webhooks` | `{command_id, database_id, delivery, endpoint_url, transition}` → `{subscription, signing_secret}`; `signing_secret` only for `endpoint` delivery |
+| POST | `/webhooks/{subscription_id}` | `{command_id, expected_revision, action}`; action is `pause`, `resume`, `remove` or `rotate`; `rotate` is refused for an inbox subscription |
 | GET | `/webhooks/{subscription_id}/deliveries` | Latest 100 deliveries and their attempt receipts; manual Refresh in Settings |
 | POST | `/webhooks/{subscription_id}/deliveries/{delivery_id}/redeliver` | `{command_id}`; requeues only a terminal delivery for an active, unpaused subscription |
 
@@ -69,6 +71,19 @@ The v1 payload shape is:
 
 Bodies never contain complete records, names, notes, canonical task bodies, Git metadata, subscription secrets or unrelated content. Configuration, filters, events and delivery bodies are stored as readable JSON, like every other payload. Record writers can read only filters, through a scoped function, never subscription destinations or secrets. Receipts contain IDs, revision numbers, timestamps, numeric HTTP status and fixed diagnostic codes. No receiver response body, raw exception or provider message is stored or logged.
 
+### Agent inbox delivery
+
+An inbox subscription keeps everything above (owner-only management, the transition filter, commit-only events, encrypted payloads, receipts, retention, pause, remove and redelivery) and replaces the HTTPS send with a pull. The delivery worker never claims inbox deliveries and a save that queues only inbox deliveries does not wake the delivery container.
+
+An agent drains the inbox with two MCP tools. Both require a write grant held by the Space's owner; a read-only grant, another person's agent or a team member's agent gets a fixed 403 and learns nothing about the inbox.
+
+- `pull_events(space_id, request={subscription_id?, database_id?, limit})` leases the oldest eligible deliveries, at most 50 and 20 by default, for ten minutes and returns each one's stable `delivery_id`, `subscription_id`, `database_id`, `attempt`, `cycle`, `lease_until` and the decrypted `event`, which is the same v1 payload an HTTPS receiver would receive. A leased delivery is invisible to other pulls until its lease expires. `has_more` says whether eligible deliveries remain.
+- `ack_events(space_id, request={delivery_ids})` marks those deliveries `delivered` and closes their receipts. The response carries one status per ID: `acknowledged`, `already_done` or `not_found`. Repeating an acknowledgement is harmless.
+
+Each pull records an attempt receipt, visible under the subscription's receipts in Settings with no HTTP status. A lease that expires without an acknowledgement closes its receipt as `worker_lost` and the delivery returns to the queue. Five pulls without an acknowledgement exhaust the cycle: the delivery becomes `failed` with `attempts_exhausted` when the worker's maintenance pass or a later pull sees it, and the owner can redeliver it from Settings as for an HTTPS delivery. Pending inbox deliveries expire after the same 30 days. A paused or removed subscription hides its deliveries from pulls.
+
+Nothing pushes to the agent. The tested MCP clients do not turn a server notification into a turn, so an agent that should react to a transition polls `pull_events` on a schedule or a loop, reads the current record with `query_database` before acting, and acknowledges once the work is done. The event is a hint; the Dev Review guards in [Decisions and constraints](#decisions-and-constraints) still apply to an agent consumer.
+
 ### Authentication and outbound safety
 
 Space POSTs UTF-8 JSON with `Content-Type: application/json` and these headers:
@@ -88,10 +103,11 @@ The delivery queue uses durable PostgreSQL leases and immutable bodies. A new at
 
 | Bound | Value |
 |---|---|
-| Active or paused subscriptions per Space | 20 |
+| Active or paused subscriptions per Space, either delivery kind | 20 |
 | Pending deliveries per Space | 10,000 |
 | Attempts per automatic delivery cycle | 5 |
 | Socket timeout / supervisor wall deadline / lease | 10 / 30 / 60 seconds |
+| Inbox pull lease / items per pull | 600 seconds / 1–50, default 20 |
 | Retry base delays | 30, 120, 480, 1,920 seconds, plus bounded jitter |
 | Retry-After for 429/503 | Decimal seconds or HTTP date, bounded to 1–3,600 seconds |
 | Manual recovery cycles | At most 20, audited with the original IDs/body |
@@ -118,13 +134,13 @@ Use the repository's locked backend environment. Disposable database tests requi
 
 ```sh
 uv run --directory backend --locked pytest tests/test_webhook_http.py tests/test_webhook_review_receiver.py
-SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest tests/test_webhooks.py tests/test_webhook_delivery.py tests/test_webhook_end_to_end.py
+SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest tests/test_webhooks.py tests/test_webhook_inbox.py tests/test_webhook_delivery.py tests/test_webhook_end_to_end.py
 uv run --directory backend --locked ruff check src tests migrations scripts
 uv run --directory backend --locked ruff format --check src tests migrations scripts
 npm --prefix apps/web test
 npm --prefix apps/web run typecheck
 ```
 
-`test_webhook_end_to_end.py` commits a real disposable Space Review row, claims and signs its stored delivery, uses the actual TLS-pinned connector against a synthetic trusted HTTPS listener through test-only socket mapping, rereads the canonical task/Dev row and verifies one controlled dispatch. It also posts duplicate/stale signed notifications and preserves general task columns. No production URL override exists. Consumer tests separately cover concurrency, unchanged-code resubmission, invalid signatures, stale versions and controlled pass/defect/blocked results.
+`test_webhook_end_to_end.py` commits a real disposable Space Review row, claims and signs its stored delivery, uses the actual TLS-pinned connector against a synthetic trusted HTTPS listener through test-only socket mapping, rereads the canonical task/Dev row and verifies one controlled dispatch. It also posts duplicate/stale signed notifications and preserves general task columns. No production URL override exists. Consumer tests separately cover concurrency, unchanged-code resubmission, invalid signatures, stale versions and controlled pass/defect/blocked results. The e2e test `apps/web/tests/webhooks.e2e.ts` uses the same synthetic fixtures. `test_webhook_inbox.py` covers inbox creation without a secret or DNS lookup, leases, acknowledgements, lease expiry, exhaustion with redelivery, owner-only access and the official MCP tools.
 
 Update this document when the payload version, endpoint policy, management contract, retry bounds, retention or worker activation model changes. Browser interaction evidence is separate from static checks; a blocked full-app build must not be reported as a passed application flow.

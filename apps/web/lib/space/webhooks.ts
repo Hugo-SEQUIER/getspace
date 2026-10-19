@@ -1,11 +1,14 @@
 import type { WorkspaceDatabase } from "./databases";
 
 export type WebhookTransition = { field_id: string; to: string };
+/** endpoint: Space posts to a receiver you run. inbox: your agents pull over MCP. */
+export type WebhookDeliveryKind = "endpoint" | "inbox";
 export type WebhookSubscription = {
   id: string;
   space_id: string;
   database_id: string;
-  endpoint_url: string;
+  delivery: WebhookDeliveryKind;
+  endpoint_url: string | null;
   transition: WebhookTransition | null;
   paused: boolean;
   revision: number;
@@ -80,4 +83,29 @@ export function webhookTransition(database: WorkspaceDatabase, fieldId: string, 
 export function canRedeliver(subscription: WebhookSubscription, delivery: WebhookDelivery) {
   return !subscription.paused && !subscription.removed_at &&
     (delivery.status === "delivered" || delivery.status === "failed");
+}
+
+/** Only an HTTPS receiver has a signing secret to rotate. */
+export function canRotate(subscription: Pick<WebhookSubscription, "delivery">) {
+  return subscription.delivery === "endpoint";
+}
+
+/** Where a subscription's events go, as shown in lists and dialogs. */
+export function webhookDestination(subscription: Pick<WebhookSubscription, "delivery" | "endpoint_url">) {
+  return subscription.delivery === "inbox" ? "Agent inbox" : subscription.endpoint_url ?? "";
+}
+
+/**
+ * Parameters: the subscription a receipt belongs to and the receipt.
+ * What it does: reads an attempt as a receiver's HTTP answer or as an agent's pull.
+ * Output: the outcome text for the receipt line.
+ */
+export function receiptOutcome(
+  subscription: Pick<WebhookSubscription, "delivery">,
+  receipt: Pick<WebhookReceipt, "finished_at" | "status_code" | "error_code">,
+) {
+  if (subscription.delivery === "endpoint")
+    return receipt.status_code === null ? "No response" : String(receipt.status_code);
+  if (!receipt.finished_at) return "Leased to an agent";
+  return receipt.error_code ? "Lease expired" : "Acknowledged";
 }

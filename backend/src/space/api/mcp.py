@@ -20,6 +20,7 @@ from space import (
     resource_deletion,
     space_map,
     tasks,
+    webhook_inbox,
     workspace_items,
     workspace_search,
 )
@@ -559,6 +560,60 @@ def create_mcp(
                 lambda actor: resource_deletion.delete_resource(
                     workspace, actor, space_id, resource_id, expected_revision
                 ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+            )
+        )
+        async def pull_events(
+            space_id: UUID,
+            request: webhook_inbox.PullEvents | None = None,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: optional subscription_id or database_id filter and limit (1-50).
+            What it does: leases the oldest waiting database change events from this
+            Space's agent inbox for ten minutes, so another agent pulling at the same
+            time does not receive them. The Space owner creates an inbox subscription
+            under Settings → Webhooks, choosing a database and optionally one select
+            transition such as Stage → Review. Each item carries a stable delivery_id
+            and the event: database_id, record_id, operation, revisions, changed field
+            IDs and, for a filtered subscription, the before/after values of that one
+            field. Read the current record with query_database before acting; the
+            event is a hint, not the record. Call ack_events with each delivery_id once
+            the work is done; an unacknowledged lease returns to the queue, and after
+            five pulls without acknowledgement the delivery fails and the owner can
+            redeliver it. Requires a write grant held by the Space owner. Poll on a
+            schedule; nothing pushes to the agent. Output: items, has_more, lease_seconds.
+            """
+            return await command(
+                lambda actor: webhook_inbox.pull(
+                    workspace, actor, space_id, request or webhook_inbox.PullEvents()
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+            )
+        )
+        async def ack_events(
+            space_id: UUID,
+            request: webhook_inbox.AcknowledgeEvents,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: delivery_ids (1-50) returned by pull_events.
+            What it does: marks those inbox deliveries delivered so no agent receives
+            them again, and closes their receipts in Settings → Webhooks. Acknowledge
+            after the work is done, or at once when the event needs no action.
+            Repeating an acknowledgement is harmless. Output: one status per ID:
+            acknowledged, already_done or not_found.
+            """
+            return await command(
+                lambda actor: webhook_inbox.acknowledge(workspace, actor, space_id, request),
                 agent_id=agent_id,
             )
 
