@@ -184,7 +184,8 @@ if [ "$mode" = key ] && [ -n "$domain" ]; then
 Next:
   1. Point a DNS A (or AAAA) record for $domain at this server and open ports 80 and 443.
   2. Start Space:  docker compose up -d
-  3. Open $public_url and unlock it with this access key (also in .env):
+  3. Check every setting:  docker compose exec api python -m space.check
+  4. Open $public_url and unlock it with this access key (also in .env):
 
        $access_key
 
@@ -194,7 +195,8 @@ elif [ "$mode" = key ]; then
   cat <<NEXT
 Next:
   1. Start Space:  docker compose up -d
-  2. Open $public_url and unlock it with this access key (also in .env):
+  2. Check every setting:  docker compose exec api python -m space.check
+  3. Open $public_url and unlock it with this access key (also in .env):
 
        $access_key
 
@@ -204,7 +206,8 @@ else
   cat <<NEXT
 Next:
   1. Start Space:  docker compose up -d
-  2. Open $public_url
+  2. Check every setting:  docker compose exec api python -m space.check
+  3. Open $public_url
      From another computer, tunnel to it first:  ssh -L $http_port:$bind_address:$http_port you@this-server
 
   Private mode has no access check. Keep port $http_port off the public internet.

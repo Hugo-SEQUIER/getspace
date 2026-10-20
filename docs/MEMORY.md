@@ -121,15 +121,15 @@ The default provider is `disabled`. [Self-hosting](SELF_HOSTING.md#configuration
 SPACE_MEMORY_PROVIDER=openai_compatible
 SPACE_MEMORY_PROVIDER_URL=https://openrouter.ai/api/v1
 SPACE_MEMORY_API_KEY=<provider key>
-SPACE_MEMORY_TEXT_MODEL=openai/gpt-6-luna
-SPACE_MEMORY_REASONING_EFFORT=none
+SPACE_MEMORY_TEXT_MODEL=anthropic/claude-haiku-5.5
+SPACE_MEMORY_REASONING_EFFORT=low
 SPACE_MEMORY_RELEVANCE_REASONING_EFFORT=low
 SPACE_MEMORY_EMBEDDING_MODEL=text-embedding-3-small
 SPACE_MEMORY_EMBEDDING_URL=https://api.openai.com/v1
 SPACE_MEMORY_EMBEDDING_API_KEY=<embedding key>
 ```
 
-For a reasoning model, the effort is configuration rather than a property of the model name: `none` keeps extraction fast and `low` is enough for the relevance pass, and neither request then carries a temperature. A model that takes a temperature leaves both settings unset. Chat and embeddings may run on different services, which is why the embedding endpoint and key are separate settings; unset, both calls go to the provider URL. `SPACE_MEMORY_RELEVANCE_MODEL` optionally names a separate assessing model.
+For a reasoning model, the effort is configuration rather than a property of the model name, and a request with an effort carries no temperature. Use `low` for both with `anthropic/claude-haiku-5.5`: with `none`, it repeated its extraction answer until the length limit, so extraction failed. `none` suits `openai/gpt-6-luna` for extraction. A model that takes a temperature leaves both settings unset. Chat and embeddings may run on different services, which is why the embedding endpoint and key are separate settings; unset, both calls go to the provider URL. `SPACE_MEMORY_RELEVANCE_MODEL` optionally names a separate assessing model.
 
 `SPACE_MEMORY_ANTHROPIC_API_KEY` is optional. When it is set, extraction and relevance chat go first to the Anthropic Messages API with `SPACE_MEMORY_ANTHROPIC_MODEL` (default `claude-haiku-5-5`), constrained to the response schema through `output_config.format`. Any failure there (an HTTP error, overload, a refusal, a truncated or invalid answer) retries the same request once on the configured chat model, inside the same request budget, so a fallback counts as a second model request. The reasoning-effort settings apply to both routes; `none` sends Anthropic `thinking: disabled`, and no request to Anthropic carries a temperature. Decisions and embeddings are unchanged. The key is part of the chat fingerprint, so setting or clearing it makes queued extraction jobs ask for resubmission, like any other chat-provider change. Anthropic requests have no `store=false` option.
 

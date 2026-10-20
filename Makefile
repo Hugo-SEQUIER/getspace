@@ -1,5 +1,6 @@
 .PHONY: setup backend web memory-worker webhook-worker install check check-database api-reference \
-	check-memory-models benchmark-memory benchmark-decisions evaluate-retrieval up up-source down logs backup upgrade
+	check-settings check-memory-models benchmark-memory benchmark-decisions evaluate-retrieval up up-source \
+	down logs backup upgrade
 
 BACKEND_PORT ?= 8000
 BACKEND_WORKERS ?= 1
@@ -68,6 +69,10 @@ check:
 # Database tests start disposable pgvector/pgvector:pg17 containers; Docker is required.
 check-database:
 	SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest
+
+# Checks every setting, including one tiny call to each configured model.
+check-settings:
+	uv run --directory backend --locked python -m space.check
 
 check-memory-models:
 	uv run --directory backend --locked python scripts/check_memory_models.py
