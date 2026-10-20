@@ -123,6 +123,7 @@ The browser tests use the [e2e](https://e2e.tester.army/docs) runner. `test:e2e`
 | Command | What it does |
 |---|---|
 | `make api-reference` | Regenerates `docs/openapi.json` from the running application's schema. Run it after changing a public route or schema; a test fails while the committed file is stale. |
+| `make check-settings` | Checks every setting in `backend/.env`, the database login and one tiny call to each configured model, and prints PASS, WARN or FAIL per check in plain words; see [Self-hosting](SELF_HOSTING.md#checking-the-settings). The model calls cost a fraction of a cent. |
 | `make check-memory-models` | Runs both extraction builders and recall against the configured provider on synthetic text, without writing to Space. It costs provider usage. |
 | `make benchmark-memory` | Times lexical ranking on synthetic data in process, with no provider or database. |
 | `make benchmark-decisions MODELS=a,b` | Runs the invented recall and filing cases in `backend/evaluations/decisions/` through each decision model on OpenRouter's Decisions API and prints their scores, latency and cost. It costs provider usage; `ARGS=--list` shows the available models. |

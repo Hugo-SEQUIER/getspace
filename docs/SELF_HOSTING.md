@@ -45,7 +45,13 @@ scripts/setup.sh --mode private --url http://127.0.0.1:8080
 scripts/setup.sh --mode private --url http://100.101.102.103:8080 --bind 100.101.102.103
 ```
 
-`docker compose up -d` downloads the two released images named by `SPACE_VERSION` (written by `scripts/setup.sh`: the release you checked out, or `latest`). To build them from your checkout instead, for example after changing the code, run `docker compose up -d --build`; that takes a few minutes. The `migrate` service then creates the database logins and schema and exits, the API creates your Private Space, and the website becomes available. Check with `docker compose ps`: every service except `migrate` should be running, and `migrate` should have exited with code 0.
+`docker compose up -d` downloads the two released images named by `SPACE_VERSION` (written by `scripts/setup.sh`: the release you checked out, or `latest`). To build them from your checkout instead, for example after changing the code, run `docker compose up -d --build`; that takes a few minutes. The `migrate` service then creates the database logins and schema and exits, the API creates your Private Space, and the website becomes available. Check with `docker compose ps`: every service except `migrate` should be running, and `migrate` should have exited with code 0. Then check every setting:
+
+```sh
+docker compose exec api python -m space.check
+```
+
+It prints one line per check, PASS, WARN or FAIL, and says what to change; see [Checking the settings](#checking-the-settings).
 
 ## Access modes
 
@@ -118,6 +124,18 @@ The memory index stores every embedding with one fixed size. On each start the i
 
 ## Operating Space
 
+### Checking the settings
+
+`docker compose exec api python -m space.check` checks the installation with the settings the API runs with, and prints one line per check:
+
+- **Settings**: every value is valid, for example a long enough access key, or an HTTPS decision endpoint and its key when a decision feature is on.
+- **Access** and **address**: the access mode suits the address, `SPACE_ALLOWED_HOSTS` accepts it, and whether apps such as claude.ai can sign in.
+- **Database**: the API's login connects as `space_app`, and the size of the memory index.
+- **Public address**: the domain answers over HTTPS with a valid certificate.
+- **Models**: the text model, the embedding model, the Anthropic model when `SPACE_MEMORY_ANTHROPIC_API_KEY` is set, and the decision model each answer one tiny invented question, through the same code the application uses. The text model is asked without the Anthropic route, so each line names the model that answered. A wrong key, an unknown model, an account without credit or an embedding size that does not match the memory index is named in plain words.
+
+The model checks cost a fraction of a cent. `--offline` skips them and the public address. The command never prints keys, passwords or provider replies, and it exits with status 1 when a check fails, so scripts can rely on it. From a source checkout, `make check-settings` runs the same check with `backend/.env`.
+
 ### Logs and status
 
 ```sh
@@ -183,6 +201,8 @@ Columns whose names start with `encrypted_` keep their historical names but hold
 - **Exposure.** Only Caddy publishes ports. The database, API and website are reachable only inside the compose network.
 
 ## Troubleshooting
+
+Start with `docker compose exec api python -m space.check`: it names most of these problems directly.
 
 | Symptom | Likely cause |
 |---|---|

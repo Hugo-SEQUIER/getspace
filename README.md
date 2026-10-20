@@ -43,6 +43,7 @@ cd getspace
 git checkout "$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"   # latest release
 scripts/setup.sh                 # asks for the access mode and your domain, writes .env
 docker compose up -d             # downloads the released images and starts everything
+docker compose exec api python -m space.check   # checks every setting, in plain words
 ```
 
 Both offer two access modes:
