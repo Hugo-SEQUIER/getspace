@@ -107,6 +107,8 @@ Database tests are skipped unless `SPACE_RUN_DATABASE_TESTS=1`. `make check-data
 
 To run a subset, call pytest directly, for example `SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest tests/test_webhooks.py`.
 
+The `CI` workflow runs these checks on every push to `main` and every pull request. [CI runner](ci-runner.md) explains which jobs run on the project's own server and which on GitHub's runners.
+
 ### Website tests
 
 ```sh

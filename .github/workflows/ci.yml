@@ -12,9 +12,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Where the jobs run (docs/ci-runner.md):
+#
+# - backend, web, skills and security run on the project's self-hosted runner (label
+#   `getspace`). A pull request from a fork never does: for those the expression below
+#   picks GitHub's hosted ubuntu-24.04 instead, so outside code never runs on the server.
+# - database-tests and images need Docker, and the self-hosted runner has no Docker on
+#   purpose: access to the Docker daemon is root on that host. Both stay on GitHub's
+#   hosted runners.
+
 jobs:
   backend:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON('["self-hosted","getspace"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +38,25 @@ jobs:
           uv run --directory backend --locked ruff format --check src tests migrations scripts
       - name: Unit tests
         run: uv run --directory backend --locked pytest
+
+  # Needs Docker (disposable pgvector containers), so it stays on a hosted runner.
+  database-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.19"
+      - name: Install
+        run: uv sync --directory backend --locked --group dev
       - name: Database tests
         run: |
           docker pull --quiet pgvector/pgvector:pg17
           SPACE_RUN_DATABASE_TESTS=1 uv run --directory backend --locked pytest
 
   web:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON('["self-hosted","getspace"]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -54,13 +75,14 @@ jobs:
         run: npm --prefix apps/web run build
 
   skills:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON('["self-hosted","getspace"]') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: skills/ matches space-skills
         run: scripts/sync-skills.sh --check
 
+  # Builds with Docker, so it stays on a hosted runner.
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -70,3 +92,10 @@ jobs:
         run: docker build --tag getspace/backend:ci backend
       - name: Build the website image
         run: docker build --tag getspace/web:ci --file apps/web/Dockerfile .
+
+  # Shared checks: gitleaks on the new commits (blocking) and osv-scanner on the lockfiles
+  # (a pull request fails only when it adds a vulnerable dependency).
+  security:
+    uses: Hugo-SEQUIER/ci-workflows/.github/workflows/security.yml@v1
+    with:
+      runs-on: ${{ github.event.pull_request.head.repo.fork && '["ubuntu-24.04"]' || '["self-hosted","getspace"]' }}
