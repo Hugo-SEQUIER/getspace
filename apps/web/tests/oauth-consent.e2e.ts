@@ -98,6 +98,33 @@ test('an app that signs in is approved and returned to with its code', async ({ 
   await expect(screen.getByRole('heading', 'Back in Claude')).toBeVisible();
 });
 
+// Returning delivers the one-time code that completes the connection, so after
+// approval the action must be on screen, ahead of the optional memory setup,
+// even though Allow access sits far down the consent page. The viewports are a
+// small laptop and a small phone.
+for (const [name, width, height] of [['laptop', 1280, 720], ['phone', 375, 667]] as const) {
+  test(`after approval the return action is on screen first on a ${name}`, async ({ app, screen, browser }) => {
+    await fakeApi(browser, []);
+    await browser.setViewport({ width, height });
+    await app.open(`/connect/authorize?authorization_id=${requestId}`);
+    await screen.getByRole('button', 'Allow access').click();
+    await expect(screen.getByRole('heading', { level: 1 })).toHaveText('Agent setup');
+    const action = screen.getByRole('button', { name: 'Return to Claude' });
+    await expect.poll(async () => {
+      const box = await action.boundingBox();
+      return box ? box.y + box.height : Infinity;
+    }).toBeLessThanOrEqual(height);
+    const box = (await action.boundingBox())!;
+    const setup = (await screen.getByRole('button', { name: 'Copy setup prompt' }).boundingBox())!;
+    expect(box.y + box.height).toBeLessThan(setup.y);
+    await expect(screen.getByRole('heading', { level: 3, name: 'Give your agent a memory habit' })).toBeVisible();
+    if (name === 'phone') {
+      const column = (await screen.getByRole('region', { name: 'Agent setup' }).boundingBox())!;
+      expect(Math.round(box.width)).toBe(Math.round(column.width));
+    }
+  });
+}
+
 test('a locked browser unlocks first, and a refusal is returned to the app', async ({ app, screen, browser }) => {
   const log: string[] = [];
   await fakeApi(browser, log, { unlocked: false });

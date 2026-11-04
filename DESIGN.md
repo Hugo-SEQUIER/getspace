@@ -99,7 +99,7 @@ Color, radius, and shadow tokens live in `apps/web/app/theme.css`; the workspace
 
 ## Page overrides
 
-- Agent connection (`/connect` and the consent pages): the header uses the filled green tile and ink wordmark, the agent-to-Space marks end on the green Space tile, and the engraved valley sits at the foot of the page below the card.
+- Agent connection (`/connect` and the consent pages): the header uses the filled green tile and ink wordmark, the agent-to-Space marks end on the green Space tile, and the engraved valley sits at the foot of the page below the card. On the approved page (`/connect/done`) the connection comes before the memory setup, because it is not finished until the agent receives the callback: the access summary, then, when the agent registered a callback, the Return button (Return to Claude, for example) with its fallbacks, then the callback link, and only then the memory setup under its own heading, Give your agent a memory habit. The Return button is the page's main action: 46px tall, a step larger than the copy buttons below it, full width on phones, and on the first screen of a small laptop or phone (`apps/web/app/components/connect/done-page.tsx`).
 - Unlock and unavailable states (the workspace before the access key is entered, or while the API cannot be reached): the centred card on paper with the engraved valley as a quiet band at the foot of the page; nothing animates.
 - Not found and errors: the wordmark, a 44px/600 title, one line and a green pill back to Space, centred above the engraved valley (`apps/web/app/components/status-page.tsx`).
 - Workspace (`/app`): compact controls and persistent rail. Detail titles (a document, a database, a project, the task dialog) are semibold (600) like page titles.

@@ -34,7 +34,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Agents: connect an agent with a token | | `agent-tokens` | The token is shown once with client setups |
 | Agents: connector address for apps that sign in | | `agent-tokens` | Key mode only; absent in private mode |
 | Device-code connection | | `connect-code` | Includes unlocking before reviewing the code |
-| App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token |
+| App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token; after Allow access the Return button is on the first screen of a small laptop and phone, above the memory setup |
 | Memory page renders, extraction status only while a job runs | `surfaces` | `settings` | Memory needs a model provider; browsing and editing memory are not covered |
 | Overview renders | `surfaces` | | |
 | Settings: account profile, picture upload and removal | | `settings` | The name comes from `SPACE_OWNER_NAME` |
