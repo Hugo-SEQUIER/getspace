@@ -44,6 +44,31 @@ from space.settings import Settings
 from space.workspace import CommandError, SaveResource, Workspace
 
 
+class SpaceMCP(FastMCP):
+    """FastMCP that lists tools in the form the connector directories check."""
+
+    async def list_tools(self):
+        # Claude's directory reads the title from the annotations, and flags a parameter with
+        # no type, which a request model referenced only by $ref has.
+        return [
+            tool.model_copy(
+                update={
+                    "annotations": (tool.annotations or ToolAnnotations()).model_copy(
+                        update={"title": tool.title}
+                    ),
+                    "inputSchema": tool.inputSchema
+                    | {
+                        "properties": {
+                            name: {"type": "object"} | schema if "$ref" in schema else schema
+                            for name, schema in tool.inputSchema.get("properties", {}).items()
+                        }
+                    },
+                }
+            )
+            for tool in await super().list_tools()
+        ]
+
+
 def create_mcp(
     settings: Settings, workspace: Workspace | None = None, verifier: TokenVerifier | None = None
 ) -> FastMCP:
@@ -53,7 +78,7 @@ def create_mcp(
     # identity gets its own connection (see space.private_access).
     private = bool(verifier and verifier.private)
     protected = verifier is not None and not private
-    server = FastMCP(
+    server = SpaceMCP(
         "Space",
         instructions=guide.operating_instructions(
             models,
