@@ -82,7 +82,7 @@ An agent drains the inbox with two MCP tools. Both require a write grant held by
 
 Each pull records an attempt receipt, visible under the subscription's receipts in Settings with no HTTP status. A lease that expires without an acknowledgement closes its receipt as `worker_lost` and the delivery returns to the queue. Five pulls without an acknowledgement exhaust the cycle: the delivery becomes `failed` with `attempts_exhausted` when the worker's maintenance pass or a later pull sees it, and the owner can redeliver it from Settings as for an HTTPS delivery. Pending inbox deliveries expire after the same 30 days. A paused or removed subscription hides its deliveries from pulls.
 
-Nothing pushes to the agent. The tested MCP clients do not turn a server notification into a turn, so an agent that should react to a transition polls `pull_events` on a schedule or a loop, reads the current record with `query_database` before acting, and acknowledges once the work is done. The event is a hint; the Dev Review guards in [Decisions and constraints](#decisions-and-constraints) still apply to an agent consumer.
+Nothing pushes to the agent. The tested MCP clients do not turn a server notification into a turn, so an agent that should react to a transition polls `pull_events` on a schedule or a loop, reads the current record with `read_database` before acting, and acknowledges once the work is done. The event is a hint; the Dev Review guards in [Decisions and constraints](#decisions-and-constraints) still apply to an agent consumer.
 
 ### Authentication and outbound safety
 

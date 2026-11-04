@@ -63,18 +63,14 @@ class Statement(Input):
     )
 
 
-class Query(Input):
-    """One statement (sql, params) or a batch (statements) against one database."""
+class Statements(Input):
+    """The SQL of a request: one statement (sql, params) or a batch (statements)."""
 
     sql: str | None = Field(default=None, min_length=1, max_length=MAX_STATEMENT_CHARS)
     params: list[str | int | float | bool | None] = Field(
         default_factory=list, max_length=MAX_STATEMENT_PARAMS
     )
     statements: list[Statement] | None = Field(default=None, min_length=1, max_length=MAX_BATCH)
-    command_id: UUID | None = None
-    expected_revision: int | None = Field(default=None, ge=1, strict=True)
-    max_rows: int = Field(default=100, ge=1, le=500)
-    include_schema: bool = False
 
     @model_validator(mode="after")
     def valid(self):
@@ -82,8 +78,6 @@ class Query(Input):
             raise ValueError("Pass either sql or statements")
         if self.sql is None and self.params:
             raise ValueError("Batch parameters belong to each statement")
-        if (self.command_id is None) != (self.expected_revision is None):
-            raise ValueError("Writes need both command_id and expected_revision")
         batch = self.batch()
         if sum(len(s.sql) for s in batch) > MAX_BATCH_CHARS:
             raise ValueError("A batch is limited to 20,000 characters of SQL")
@@ -94,9 +88,58 @@ class Query(Input):
     def batch(self):
         return self.statements or [Statement(sql=self.sql, params=self.params)]
 
+
+class Read(Statements):
+    """read_database: SELECT only; the authorizer refuses INSERT, UPDATE and DELETE."""
+
+    max_rows: int = Field(default=100, ge=1, le=500)
+    include_schema: bool = False
+
+    @property
+    def writable(self):
+        return False
+
+
+class Query(Statements):
+    """One statement (sql, params) or a batch (statements) against one database."""
+
+    command_id: UUID | None = None
+    expected_revision: int | None = Field(default=None, ge=1, strict=True)
+    max_rows: int = Field(default=100, ge=1, le=500)
+    include_schema: bool = False
+
+    @model_validator(mode="after")
+    def paired(self):
+        if (self.command_id is None) != (self.expected_revision is None):
+            raise ValueError("Writes need both command_id and expected_revision")
+        return self
+
     @property
     def writable(self):
         return self.command_id is not None
+
+
+class Change(Query):
+    """query_database: a write, refused unless it holds an INSERT, UPDATE or DELETE.
+
+    Reads go through read_database, so each MCP tool either reads or changes records.
+    """
+
+    command_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def names_the_read_tool(cls, data):
+        # An agent that still reads through query_database learns where reads went.
+        if isinstance(data, dict) and (
+            data.get("command_id") is None or data.get("expected_revision") is None
+        ):
+            raise ValueError(
+                "query_database changes records and needs command_id and "
+                "expected_revision; read rows with read_database"
+            )
+        return data
 
 
 class QueryRejected(Exception):
@@ -322,7 +365,7 @@ def bounded(results):
     return results
 
 
-def execute(workspace, identity, space_id, database_id, request: Query) -> dict[str, Any]:
+def execute(workspace, identity, space_id, database_id, request: Read | Query) -> dict[str, Any]:
     from space.workspace import CommandError
 
     item = workspace_items.get(
@@ -365,6 +408,11 @@ def execute(workspace, identity, space_id, database_id, request: Query) -> dict[
         if request.include_schema:
             response["schema"] = schema(item["fields"])
         if not sandbox.wrote:
+            if isinstance(request, Change):
+                raise QueryRejected(
+                    "query_database changes records and needs an INSERT, UPDATE or DELETE; "
+                    "read rows with read_database"
+                )
             return response
         stamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         records, counts = sandbox.records(item["records"], stamp)

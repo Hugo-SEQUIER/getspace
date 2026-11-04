@@ -209,6 +209,42 @@ def test_batches_see_earlier_changes_and_fail_atomically(commands):
     assert gone["changes"] is None and gone["database"]["revision"] == current["revision"]
 
 
+def test_read_and_change_requests_keep_reads_and_writes_apart():
+    """read_database takes no write fields; query_database cannot run without them."""
+    with pytest.raises(ValidationError):
+        database_sql.Read(sql="SELECT 1", command_id=str(uuid4()), expected_revision=1)
+    with pytest.raises(ValidationError, match="read rows with read_database"):
+        database_sql.Change(sql="SELECT count(*) FROM records")
+    assert not database_sql.Read(sql="SELECT 1").writable
+    assert database_sql.Change(sql="DELETE FROM records", command_id=uuid4(), expected_revision=1)
+
+
+def test_read_database_refuses_writes_and_query_database_refuses_plain_reads(commands):
+    service, owner, space, _ = commands
+    db = leads(service, owner, space)
+    database_id = UUID(db["id"])
+
+    def change(sql):
+        request = database_sql.Change(sql=sql, command_id=uuid4(), expected_revision=db["revision"])
+        return database_sql.execute(service, owner, space, database_id, request)
+
+    counted = database_sql.execute(
+        service, owner, space, database_id, database_sql.Read(sql="SELECT count(*) FROM records")
+    )
+    assert counted["results"][0]["rows"] == [[3]] and counted["changes"] is None
+    with pytest.raises(CommandError, match="not authorized"):
+        database_sql.execute(
+            service, owner, space, database_id, database_sql.Read(sql="DELETE FROM records")
+        )
+    with pytest.raises(CommandError, match="read_database") as error:
+        change("SELECT count(*) FROM records")
+    assert error.value.status == 400
+    # A write that matches no row is still a write, and saves nothing.
+    assert change("UPDATE records SET notes='x' WHERE id='missing'")["changes"] is None
+    assert change("DELETE FROM records WHERE id='r3'")["changes"]["deleted"] == 1
+    assert workspace_items.get(service, owner, space, database_id)["revision"] == db["revision"] + 1
+
+
 def test_retry_replays_the_committed_revision_and_stale_revisions_conflict(commands):
     service, owner, space, _ = commands
     db = leads(service, owner, space)

@@ -4,11 +4,12 @@ Design recorded on 2 October 2026 and implemented the same day. It is the compan
 
 ## Decisions
 
-
 - `list_workspace_items(kind="database")` stops returning records.
 - Agents read and change records with SQL, one database per call.
 - The first version supports reads and writes: `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
 - One call can run a short batch of statements that succeed or fail together and produce one revision. The user was tentative about batches ("I don't know if it's good, yes"), so the batch is kept small and simple.
+
+On 20 October 2026 the owner decided to split the MCP tool in two: `read_database` reads and is marked read-only, and `query_database` only changes records. Three problems led to it. A connector directory rejects a tool that both reads and changes data. Because `query_database` was marked destructive, Claude asked for confirmation before every database read. And a ChatGPT Pro connection, which allows only read-only tools, could not read a database at all. The REST endpoint still takes both reads and writes.
 
 ## Purpose
 
@@ -20,21 +21,36 @@ Records are not table rows in PostgreSQL: each database revision stores all its 
 
 ## Interface
 
-### MCP `query_database`
+### MCP `read_database` and `query_database`
 
 ```
+read_database(
+    space_id, database_id,
+    request={
+        "sql": None, "params": [],
+        "statements": None,
+        "max_rows": 100, "include_schema": False,
+    },
+    agent_id=None,
+) -> QueryResult
+
 query_database(
     space_id, database_id,
-    sql=None, params=[],
-    statements=None,
-    expected_revision=None, command_id=None,
-    max_rows=100, include_schema=False, agent_id=None,
+    request={
+        "sql": None, "params": [],
+        "statements": None,
+        "expected_revision": …, "command_id": …,
+        "max_rows": 100, "include_schema": False,
+    },
+    agent_id=None,
 ) -> QueryResult
 ```
 
+The query fields travel together in one `request` object: `database_sql.Read` for `read_database` and `database_sql.Change` for `query_database`. `max_rows` accepts 1 to 500.
+
 - Pass either `sql` with `params` for one statement, or `statements: [{"sql": "…", "params": […]}, …]` for a batch. Passing both, or neither, is rejected.
-- A call made only of `SELECT` statements needs the read grant. It reads the current revision, or `expected_revision` when given.
-- A call that passes `command_id` and `expected_revision` runs in write mode and needs the write grant. Without them, the authorizer refuses `INSERT`, `UPDATE` and `DELETE`. A stale revision returns 409, like every other revision-checked write.
+- `read_database` needs the read grant and reads the current revision. Its request has no `command_id` or `expected_revision`, and its authorizer refuses `INSERT`, `UPDATE` and `DELETE`. It is marked read-only, so clients can run it without asking for confirmation.
+- `query_database` requires `command_id` and `expected_revision`. It runs in write mode and needs the write grant. A request without them, or with no `INSERT`, `UPDATE` or `DELETE`, is refused, and the error points to `read_database`, so an agent that still reads through `query_database` finds the new tool. A write that matches no row is still accepted and saves nothing. A stale revision returns 409, like every other revision-checked write.
 - A retry with the same `command_id` and the same request returns the committed revision with `replayed: true`, empty `results` and no `changes`; it does not replay `RETURNING` rows. The caller's command ID is bound to an HMAC of the exact request, so reusing it for different SQL is treated as a new write and fails on the now-stale revision.
 - `params` binds `?` placeholders. Agents should bind values rather than build SQL strings, and the served guide says so.
 - `max_rows` ranges from 1 to 500 per statement. The whole result is also capped at 20,000 serialized characters. A larger result sets `truncated` and reports the full row count, and the agent narrows the query or adds `LIMIT`/`OFFSET`.
@@ -65,7 +81,7 @@ A batch is for one small, related change, such as "move these three rows to Won 
 
 A batch is not a script. Each entry is still exactly one statement, under the same authorizer. If batches turn out to cause confusing partial-intent errors in practice, the single-statement form remains and batches can be removed without breaking it.
 
-The REST equivalent is `POST /v1/spaces/{space_id}/databases/{database_id}/query`, used by the same workspace command.
+The REST endpoint `POST /v1/spaces/{space_id}/databases/{database_id}/query` runs the same command with one request shape, `database_sql.Query`: a read without `command_id` and `expected_revision`, a write with both. The split into two tools applies to MCP only.
 
 ### Table shape
 

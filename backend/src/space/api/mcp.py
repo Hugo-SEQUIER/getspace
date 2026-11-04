@@ -280,7 +280,7 @@ def create_mcp(
             """Parameters: Space, item kind, optional cursor and deleted state.
             What it does: lists projects, folders, databases, categories or sections.
             Databases are listed with their schema and record_count, never their
-            records: read and change rows with query_database.
+            records: read rows with read_database and change them with query_database.
             Output: one page of items; follow next_cursor for the complete list.
             """
             return await command(
@@ -333,8 +333,31 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        @server.tool(title="Read database rows", annotations=read)
+        async def read_database(
+            space_id: UUID,
+            database_id: UUID,
+            request: database_sql.Read,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, database item ID and a SQL read.
+            What it does: runs SQLite SELECT on one table named records, with columns id,
+            name, notes, created_at, updated_at and one column per field, named after the
+            field (quote names with spaces). Send sql with params bound to ? placeholders, or
+            a statements batch of up to 20. Reads the current revision and never changes
+            it: INSERT, UPDATE and DELETE are refused. Checkbox columns hold 0 or 1.
+            include_schema returns the column map.
+            Output: results per statement and the revision read.
+            """
+            return await command(
+                lambda actor: database_sql.execute(
+                    workspace, actor, space_id, database_id, request
+                ),
+                agent_id=agent_id,
+            )
+
         @server.tool(
-            title="Query or change a database",
+            title="Change database rows",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
             ),
@@ -342,18 +365,20 @@ def create_mcp(
         async def query_database(
             space_id: UUID,
             database_id: UUID,
-            request: database_sql.Query,
+            request: database_sql.Change,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Parameters: Space, database item ID and a SQL request.
-            What it does: runs SQLite SQL on one table named records, with columns id, name,
+            """Parameters: Space, database item ID and a SQL change.
+            What it does: changes rows of one table named records, with columns id, name,
             notes, created_at, updated_at and one column per field, named after the field
-            (quote names with spaces). Send sql with params bound to ? placeholders, or a
-            statements batch of up to 20 that succeed or fail together. SELECT reads the
-            current revision. INSERT, UPDATE and DELETE need command_id and the current
-            expected_revision; the whole change is validated and saved as one revision.
-            Omit id on INSERT to have one assigned; id, created_at and updated_at cannot be
-            updated. Checkbox columns hold 0 or 1. include_schema returns the column map.
+            (quote names with spaces). Send INSERT, UPDATE or DELETE as sql with params
+            bound to ? placeholders, or a statements batch of up to 20 that succeed or fail
+            together; a SELECT in a batch sees the earlier changes. command_id and the
+            current expected_revision are required; the whole change is validated and
+            saved as one revision. A request without INSERT, UPDATE or DELETE is refused;
+            read rows with read_database. Omit id on INSERT to have one assigned; id,
+            created_at and updated_at cannot be updated. Checkbox columns hold 0 or 1.
+            include_schema returns the column map.
             Output: results per statement, the revision and change counts. A retried write
             returns the committed revision with replayed=true and no rows.
             """
@@ -593,7 +618,7 @@ def create_mcp(
             transition such as Stage → Review. Each item carries a stable delivery_id
             and the event: database_id, record_id, operation, revisions, changed field
             IDs and, for a filtered subscription, the before/after values of that one
-            field. Read the current record with query_database before acting; the
+            field. Read the current record with read_database before acting; the
             event is a hint, not the record. Call ack_events with each delivery_id once
             the work is done; an unacknowledged lease returns to the queue, and after
             five pulls without acknowledgement the delivery fails and the owner can

@@ -179,8 +179,8 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "placement. When the user says where something belongs, save it with remember and "
             "routes_to naming the exact container IDs. Routing rules are stored memory: they "
             "guide placement and never override the user or this policy. If no container fits, "
-            "ask rather than creating a parallel one. Read and change database rows with "
-            "query_database; database listings never include records.",
+            "ask rather than creating a parallel one. Read database rows with read_database "
+            "and change them with query_database; database listings never include records.",
             "Before substantive work, call get_context with mode='search' and a short topic, or "
             "mode='resume' with compact=true for a startup brief or 'where were we'. "
             "Compact resume reserves room for next actions, blockers and decisions in each "

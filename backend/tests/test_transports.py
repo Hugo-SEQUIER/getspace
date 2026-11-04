@@ -130,3 +130,19 @@ def test_every_tool_has_the_title_and_safety_hints_connector_directories_require
         hints = tool.annotations
         assert hints.readOnlyHint is not None and hints.destructiveHint is not None, tool.name
         assert not (hints.readOnlyHint and hints.destructiveHint), tool.name
+
+
+def test_database_reads_and_changes_are_separate_tools():
+    """The directories reject one tool that both reads and changes data."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = {
+        tool.name: tool
+        for tool in create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    }
+    reader, changer = tools["read_database"], tools["query_database"]
+    assert reader.annotations.readOnlyHint is True
+    assert changer.annotations.destructiveHint is True
+    assert "command_id" not in reader.parameters["$defs"]["Read"]["properties"]
+    assert {"command_id", "expected_revision"} <= set(
+        changer.parameters["$defs"]["Change"]["required"]
+    )
