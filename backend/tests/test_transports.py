@@ -60,6 +60,7 @@ def test_official_mcp_initialize_and_tool_roundtrip(client):
     assert initialized["result"]["serverInfo"]["name"] == "Space"
     tools = rpc(client, "tools/list")["result"]["tools"]
     assert [tool["name"] for tool in tools] == ["server_info"]
+    assert tools[0]["title"] == "Show Space server info"
     assert tools[0]["annotations"]["readOnlyHint"] is True
     result = rpc(client, "tools/call", {"name": "server_info", "arguments": {}})
     assert result["result"]["structuredContent"]["resource_access"] is False
@@ -117,3 +118,15 @@ def test_memory_tool_annotations_describe_forgetting_and_external_model_access()
         assert annotations[name].openWorldHint is True
     for name in ("save_resource", "save_handoff", "list_memories"):
         assert annotations[name].openWorldHint is False
+
+
+def test_every_tool_has_the_title_and_safety_hints_connector_directories_require():
+    """Claude's connectors directory flags a tool without a title or a read/destructive hint."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    assert len({tool.title for tool in tools}) == len(tools)
+    for tool in tools:
+        assert tool.title, tool.name
+        hints = tool.annotations
+        assert hints.readOnlyHint is not None and hints.destructiveHint is not None, tool.name
+        assert not (hints.readOnlyHint and hints.destructiveHint), tool.name

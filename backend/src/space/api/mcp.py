@@ -110,12 +110,13 @@ def create_mcp(
         )
 
     @server.tool(
+        title="Show Space server info",
         annotations=ToolAnnotations(
             readOnlyHint=True,
             destructiveHint=False,
             idempotentHint=True,
             openWorldHint=False,
-        )
+        ),
     )
     def server_info() -> dict[str, str | bool]:
         """Return non-sensitive build information; does not access a workspace."""
@@ -177,9 +178,10 @@ def create_mcp(
         )
 
         @server.tool(
+            title="Identify this agent",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def identify_agent(
             agent_id: UUID | None = None, name: str | None = None, harness: str | None = None
@@ -212,12 +214,12 @@ def create_mcp(
                 lambda actor: agents.identify(workspace, actor, agent_id=agent_id, profile=profile)
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List agent identities", annotations=read)
         async def list_agent_identities() -> dict[str, Any]:
             """List this Space's saved agent identities to reuse one when connecting."""
             return await command(lambda actor: agents.list_profiles(workspace, actor))
 
-        @server.tool(annotations=read)
+        @server.tool(title="Show Space details", annotations=read)
         async def workspace_info(agent_id: UUID | None = None) -> dict[str, Any]:
             """Get the Private Space, Tasks collection, and assigned agent_id.
 
@@ -226,7 +228,7 @@ def create_mcp(
             """
             return await command(workspace.info, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read the Space map", annotations=read)
         async def get_space_map(
             space_id: UUID,
             request: space_map.MapRequest | None = None,
@@ -252,7 +254,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="Search the Space", annotations=read)
         async def search_workspace(
             space_id: UUID, request: workspace_search.Search, agent_id: UUID | None = None
         ) -> dict[str, Any]:
@@ -267,7 +269,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List workspace items", annotations=read)
         async def list_workspace_items(
             space_id: UUID,
             kind: Literal["project", "database", "category", "section", "folder"],
@@ -288,7 +290,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read a workspace item", annotations=read)
         async def get_workspace_item(
             space_id: UUID, item_id: UUID, revision: int | None = None, agent_id: UUID | None = None
         ) -> dict[str, Any]:
@@ -302,9 +304,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Save a workspace item",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def save_workspace_item(
             space_id: UUID, change: workspace_items.SaveItem, agent_id: UUID | None = None
@@ -331,9 +334,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Query or change a database",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def query_database(
             space_id: UUID,
@@ -361,9 +365,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Archive or restore a workspace item",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_workspace_item_deleted(
             space_id: UUID,
@@ -382,7 +387,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List documents or tasks", annotations=read)
         async def list_resources(
             space_id: UUID,
             kind: Literal["document", "task"],
@@ -396,7 +401,7 @@ def create_mcp(
             """
             return await command(workspace.list_resources, space_id, kind, after, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read a document or task", annotations=read)
         async def get_resource(
             space_id: UUID,
             resource_id: UUID,
@@ -409,9 +414,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Save memory claims",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def remember_claims(
             space_id: UUID, change: RememberClaims, agent_id: UUID | None = None
@@ -432,9 +438,10 @@ def create_mcp(
             return await command(workspace.remember_claims, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Start a memory extraction",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def extract_memory(
             space_id: UUID, change: RememberMemory | BuildMemory, agent_id: UUID | None = None
@@ -449,7 +456,7 @@ def create_mcp(
             """
             return await command(workspace.extract_memory, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Check a memory extraction", annotations=read)
         async def memory_job(
             space_id: UUID, job_id: UUID, agent_id: UUID | None = None
         ) -> dict[str, Any]:
@@ -457,9 +464,10 @@ def create_mcp(
             return await command(workspace.memory_job, space_id, job_id, agent_id=agent_id)
 
         @server.tool(
+            title="Save a document or task",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def save_resource(
             space_id: UUID, change: SaveResource, agent_id: UUID | None = None
@@ -487,7 +495,7 @@ def create_mcp(
             """
             return await command(workspace.save, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="List task statuses", annotations=read)
         async def task_columns(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
             """Parameters: Space ID and optional agent identity.
             What it does: lists configured task status values and display labels.
@@ -498,9 +506,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Add a task status",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def add_task_column(
             space_id: UUID, change: tasks.AddColumn, agent_id: UUID | None = None
@@ -515,9 +524,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Change a task's status",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_task_status(
             space_id: UUID,
@@ -538,9 +548,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Delete a task",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def delete_task(
             space_id: UUID,
@@ -564,9 +575,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Pull database change events",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
-            )
+            ),
         )
         async def pull_events(
             space_id: UUID,
@@ -596,9 +608,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Acknowledge database change events",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def ack_events(
             space_id: UUID,
@@ -618,9 +631,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Save a session handoff",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def save_handoff(
             space_id: UUID, change: SaveHandoff, agent_id: UUID | None = None
@@ -634,9 +648,10 @@ def create_mcp(
             return await command(workspace.save_handoff, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Recall context",
             annotations=ToolAnnotations(
                 readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def get_context(
             space_id: UUID,
@@ -677,15 +692,16 @@ def create_mcp(
                 "tool_total_ms": round((perf_counter() - started) * 1000, 1),
             }
 
-        @server.tool(annotations=read)
+        @server.tool(title="Show memory model settings", annotations=read)
         async def memory_info(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
             """Show the configured memory model provider and models, without secrets."""
             return await command(workspace.memory_info, space_id, agent_id=agent_id)
 
         @server.tool(
+            title="Set memory links",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_memory_links(
             space_id: UUID, change: SetMemoryLinks, agent_id: UUID | None = None
@@ -699,7 +715,7 @@ def create_mcp(
             """
             return await command(workspace.set_memory_links, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read memory links", annotations=read)
         async def get_memory_links(
             space_id: UUID,
             resource_id: UUID,
@@ -719,7 +735,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List memories", annotations=read)
         async def list_memories(
             space_id: UUID,
             query: str = "",
@@ -746,9 +762,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Build memory from a document",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def build_memory(
             space_id: UUID, change: BuildMemory, agent_id: UUID | None = None
@@ -764,9 +781,10 @@ def create_mcp(
             return await command(workspace.build_memory, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Save a memory",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def remember(
             space_id: UUID, change: RememberMemory, agent_id: UUID | None = None
@@ -790,9 +808,10 @@ def create_mcp(
             return await command(workspace.remember, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Delete a memory",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def delete_memory(
             space_id: UUID,
@@ -818,9 +837,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Change a memory claim",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def change_memory(
             space_id: UUID, change: ChangeMemory, agent_id: UUID | None = None

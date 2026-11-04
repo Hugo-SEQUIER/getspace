@@ -29,7 +29,7 @@ Every content request also names the agent identity in the `X-Space-Agent-ID` he
 | Search and recall | `search_workspace`, `get_context` |
 | Memory | `memory_info`, `list_memories`, `remember`, `remember_claims`, `extract_memory`, `memory_job`, `build_memory`, `change_memory`, `delete_memory`, `save_handoff`, `set_memory_links`, `get_memory_links` |
 
-The tool schemas served by the endpoint are authoritative for arguments and types. Tools that can send content to a model provider are marked as open-world.
+The tool schemas served by the endpoint are authoritative for arguments and types. Tools that can send content to a model provider are marked as open-world. Every tool carries a short `title` that clients show people, for instance in Claude's permission prompts, and sets `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint`; `backend/tests/test_transports.py` checks that each title is unique and that every tool has a read-only or a destructive hint.
 
 `save_resource` accepts a `change` object with `command_id`, `expected_revision`, `kind`, `title`, `body`, an optional task `status`, and `resource_id` for updates. New resources use revision zero. Read results include the resource ID, revision, timestamp and human or agent attribution, and historical revisions can be read explicitly. Documents and tasks are the same records the website and the REST API use. `save_resource` also accepts `recall` metadata for ordinary sources and handoffs (category, topics, source references, exclusion); leaving it out preserves it during edits. Generated memory documents use the dedicated memory tools.
 
