@@ -12,6 +12,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from space.jobs import LEASE_SECONDS, YIELDED, claim, process
+from space.local_store import LocalObjectStore
 from space.model_provider import MemoryModels
 from space.providers import LocalKeys
 from space.queue_watch import QueueWatch, wait
@@ -63,7 +64,12 @@ def run_attempt(queue_env_file=None):
     database = Database(settings, pool_size=1)
     keys = LocalKeys()
     workspace = Workspace(
-        database, keys, None, settings.mcp_resource_url, settings.web_url, MemoryModels(settings)
+        database,
+        keys,
+        LocalObjectStore(settings.file_dir),
+        settings.mcp_resource_url,
+        settings.web_url,
+        MemoryModels(settings),
     )
     try:
         database.open()

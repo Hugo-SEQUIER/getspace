@@ -1,9 +1,10 @@
-"""Per-Space key material and the optional object-store interface.
+"""Per-Space key material and the object-store interface.
 
-The self-hosted edition has no key service and no object storage. Each Space gets a
-random 32-byte key stored beside it in PostgreSQL. The key encrypts nothing: it keys
-the search-term fingerprints and retry receipts, which keeps those stable per Space.
-Document bodies are stored inline with their revision, so no object store is needed.
+The self-hosted edition has no key service. Each Space gets a random 32-byte key stored
+beside it in PostgreSQL. The key encrypts nothing: it keys the search-term fingerprints
+and retry receipts, which keeps those stable per Space. Document bodies are stored inline
+with their revision; the parts of a document's original file go to the folder-backed
+store in `space.local_store`, named by `space.file_parts.object_key`.
 """
 
 import secrets
@@ -112,7 +113,12 @@ def unwrap_for_operation(store, organization_id, space_id, row):
 
 
 class ObjectStore(Protocol):
-    """Kept for revisions written by object-backed installations; new writes are inline."""
+    """Where the bytes of a document's original file live, named by their key.
+
+    One implementation ships, `space.local_store.LocalObjectStore`, over a folder on the
+    server's disk. It builds every key itself, keeps each write atomic and refuses a key
+    that is not exactly the shape it writes.
+    """
 
     def put(self, key: str, data: bytes) -> None: ...
 
@@ -121,6 +127,10 @@ class ObjectStore(Protocol):
     def delete_prefix(self, prefix: str) -> int: ...
 
     def delete_keys(self, keys: Iterable[str]) -> int: ...
+
+
+class ObjectMissing(LookupError):
+    """No object is stored under the key; the caller reports its own not-found error."""
 
 
 class ObjectDeletionError(RuntimeError):

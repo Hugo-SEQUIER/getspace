@@ -32,3 +32,6 @@ apps/web/.tanstack/
 apps/web/src/routeTree.gen.ts
 apps/web/public/favicon.ico
 apps/web/public/vendor/avatars/
+
+# Uploaded file bytes in the backend default SPACE_FILE_DIR.
+backend/data/

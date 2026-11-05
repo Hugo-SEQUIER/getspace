@@ -14,6 +14,7 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
+from space.local_store import LocalObjectStore
 from space.providers import LocalKeys
 from space.queue_watch import QueueWatch, wait
 from space.settings import CONFIG_FILE, Settings, database_connection_options
@@ -66,7 +67,13 @@ def run_attempt(queue_env_file=None):
     try:
         database = Database(settings, pool_size=1)
         keys = LocalKeys()
-        workspace = Workspace(database, keys, None, settings.mcp_resource_url, settings.web_url)
+        workspace = Workspace(
+            database,
+            keys,
+            LocalObjectStore(settings.file_dir),
+            settings.mcp_resource_url,
+            settings.web_url,
+        )
         database.open()
         with psycopg.connect(
             settings.webhook_database_url.get_secret_value(),

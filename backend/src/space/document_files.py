@@ -2,14 +2,16 @@
 document, and the part reads behind the website's viewer and download.
 
 A file travels in parts of at most PART_BYTES, about what one request may carry once
-base64-encoded. This edition keeps each part's bytes in its row, as it keeps document
-bodies, so a part needs no object store and costs about its own size. `space.file_parts`
-records the bytes with their sizes and a digest of what they hold. A part is staged when
-it arrives and attached when the document that holds the file commits, within
-STAGED_MINUTES. The website discards the staged parts of an upload that failed; the
-retention sweep removes any left an hour after their upload. The document's body holds the
-text the browser extracted from the file, so search, recall and agents read the file
-through it. Only a signed-in person uploads; agents see the file's details and its text.
+base64-encoded. This edition keeps a part's bytes in the folder-backed object store on the
+server's disk and the key in its row, so a large file never enters PostgreSQL. A row
+written before that move keeps its bytes in `content` and is still read from there;
+`space.file_parts` records the object key or those bytes with the sizes and a digest of
+what they hold. A part is staged when it arrives and attached when the document that holds
+the file commits, within STAGED_MINUTES. The website discards the staged parts of an
+upload that failed; the retention sweep removes any left an hour after their upload. The
+document's body holds the text the browser extracted from the file, so search, recall and
+agents read the file through it. Only a signed-in person uploads; agents see the file's
+details and its text.
 
 A picture, a video or a PDF may bring a thumbnail the browser made from it: a WebP or JPEG of
 at most THUMBNAIL_BYTES, uploaded as a one-part file under its own ID and attached to the
@@ -24,12 +26,16 @@ import hashlib
 import hmac
 import math
 import re
+from contextlib import suppress
 from typing import Literal
 from uuid import UUID
 
 from pydantic import Field, ValidationError, field_validator
 
+from space import local_store
+from space.local_store import ObjectStoreError
 from space.memory import Input
+from space.providers import ObjectMissing
 from space.read_timing import read_stage
 from space.workspace import CommandError, SaveResource
 
@@ -119,8 +125,9 @@ def _fingerprint(file_id, part, raw):
 def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request: Part):
     """Parameters: a signed-in writer, the Space, the file's client-chosen ID, the part
     number and its base64 bytes.
-    What it does: records the part as staged. Sending the same bytes again is safe; different
-    bytes for a part already recorded are refused.
+    What it does: writes the part to the object store and records its key as staged, so a
+    crash can leave an unreferenced object but never a row pointing at nothing. Sending
+    the same bytes again is safe; different bytes for a part already recorded are refused.
     Output: the part number and its size in bytes.
     """
     if not 0 <= part < MAX_PARTS:
@@ -136,6 +143,12 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
     fingerprint = _fingerprint(file_id, part, raw)
     with workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id, write=True, human=True)
+        # One writer per part: a retry writes the same object key, so two uploads with
+        # different bytes must not race on the file while the row decides which one stays.
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+            (f"space.file_part:{file_id}:{part}",),
+        )
         existing = connection.execute(
             "SELECT resource_id,fingerprint FROM space.file_parts WHERE file_id=%s AND part=%s",
             (file_id, part),
@@ -146,24 +159,41 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
             # Either already committed, or a staged retry that already holds these bytes;
             # in both cases the row needs no write.
             return {"file_id": str(file_id), "part": part, "bytes": len(raw)}
-        # The row comes first, so an interrupted upload leaves something the retention
-        # sweep can find. The storage quota applies here, before the part is kept.
-        inserted = connection.execute(
-            "INSERT INTO space.file_parts(organization_id,space_id,file_id,part,content,"
-            "fingerprint,plain_bytes,content_bytes) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) "
-            "ON CONFLICT DO NOTHING RETURNING part",
-            (
-                scope["organization_id"],
-                space_id,
-                file_id,
-                part,
-                raw,
-                fingerprint,
-                len(raw),
-                len(raw),
-            ),
-        ).fetchone()
+        # The bytes go first, so an interrupted upload leaves an object the reconcile
+        # command can sweep, never a row whose object is missing. The storage quota
+        # applies at the insert, before the part is counted.
+        key = local_store.part_key(scope["organization_id"], space_id, file_id, part)
+        try:
+            workspace.objects.put(key, raw)
+        except ObjectStoreError:
+            # The folder is unusable on this server; say which setting an operator must fix.
+            raise CommandError(
+                "File storage is unavailable on the server. Check SPACE_FILE_DIR.", 503
+            ) from None
+        try:
+            inserted = connection.execute(
+                "INSERT INTO space.file_parts(organization_id,space_id,file_id,part,object_key,"
+                "fingerprint,plain_bytes,content_bytes) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT DO NOTHING RETURNING part",
+                (
+                    scope["organization_id"],
+                    space_id,
+                    file_id,
+                    part,
+                    key,
+                    fingerprint,
+                    len(raw),
+                    len(raw),
+                ),
+            ).fetchone()
+        except BaseException:
+            # A part the database refused leaves no bytes behind.
+            with suppress(Exception):
+                workspace.objects.delete_keys([key])
+            raise
         if inserted is None:
+            with suppress(Exception):
+                workspace.objects.delete_keys([key])
             # A concurrent upload of this part recorded it first; accept only the same bytes.
             winner = connection.execute(
                 "SELECT fingerprint FROM space.file_parts WHERE file_id=%s AND part=%s",
@@ -245,27 +275,43 @@ def detach(connection, resource_id):
     Parameters: the transaction and the document's ID.
     What it does: removes the stored parts, which frees their storage through the usage
         trigger. Call with space.quota_deletion on, before the document's own rows go.
-    Output: none.
+    Output: the object prefixes to free, one per file, once the deletion has committed.
+        Deleting the bytes before the rows commit could leave a row pointing at nothing.
     """
-    connection.execute("DELETE FROM space.file_parts WHERE resource_id=%s", (resource_id,))
+    rows = connection.execute(
+        "DELETE FROM space.file_parts WHERE resource_id=%s "
+        "RETURNING organization_id,space_id,file_id",
+        (resource_id,),
+    ).fetchall()
+    return list(
+        dict.fromkeys(
+            local_store.file_prefix(row["organization_id"], row["space_id"], row["file_id"])
+            for row in rows
+        )
+    )
 
 
 def discard(workspace, identity, space_id, file_id: UUID):
     """Parameters: a signed-in writer, the Space and a file whose upload stopped.
-    What it does: removes the file's staged parts, so a failed upload stops counting towards
-    storage at once. A part a document already committed is never touched.
+    What it does: removes the file's staged parts and their objects, so a failed upload
+    stops counting towards storage and takes no disk space with it. A part a document
+    already committed is never touched.
     Output: {"discarded": the number of parts removed}.
     """
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, space_id, write=True, human=True)
         connection.execute("SELECT set_config('space.quota_deletion','on',true)")
-        discarded = len(
-            connection.execute(
-                "DELETE FROM space.file_parts WHERE file_id=%s AND resource_id IS NULL RETURNING 1",
+        prefixes = [
+            local_store.file_prefix(row["organization_id"], row["space_id"], row["file_id"])
+            for row in connection.execute(
+                "DELETE FROM space.file_parts WHERE file_id=%s AND resource_id IS NULL "
+                "RETURNING organization_id,space_id,file_id",
                 (file_id,),
             ).fetchall()
-        )
-    return {"discarded": discarded}
+        ]
+    for prefix in dict.fromkeys(prefixes):
+        workspace.objects.delete_prefix(prefix)
+    return {"discarded": len(prefixes)}
 
 
 def read_part(
@@ -299,11 +345,16 @@ def read_part(
             "wrapped_key": row["wrapped_key"],
         }
         # Which file a revision holds is part of its metadata, so read this part of every
-        # file the document has and keep the one its metadata names below.
+        # file the document has and keep the one its metadata names below. A row written
+        # before the move to disk keeps its bytes inline; both are read the same way.
         stored = {
-            str(found["file_id"]): bytes(found["content"])
+            str(found["file_id"]): (
+                found["object_key"],
+                None if found["content"] is None else bytes(found["content"]),
+            )
             for found in connection.execute(
-                "SELECT file_id,content FROM space.file_parts WHERE resource_id=%s AND part=%s",
+                "SELECT file_id,content,object_key FROM space.file_parts "
+                "WHERE resource_id=%s AND part=%s",
                 (resource_id, part),
             ).fetchall()
         }
@@ -324,7 +375,17 @@ def read_part(
         raise CommandError("File part not found", 404)
     with read_stage("db_recheck"):
         workspace._recheck(identity, space_id)
-    result = {"data": base64.b64encode(stored[file["id"]]).decode("ascii")}
+    object_key, content = stored[file["id"]]
+    if object_key:
+        with read_stage("object_get"):
+            try:
+                content = workspace.objects.get(object_key)
+            except ObjectMissing:
+                raise CommandError("File part not found", 404) from None
+    elif content is None:
+        # The check constraint keeps this from happening; refuse rather than encode nothing.
+        raise CommandError("File part not found", 404)
+    result = {"data": base64.b64encode(content).decode("ascii")}
     if thumbnail:
         result["type"] = file["type"]
     return result

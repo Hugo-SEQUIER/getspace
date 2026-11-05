@@ -19,6 +19,7 @@ from space.api.reference_docs import add_examples, route_options
 from space.api.rest import create_routes
 from space.brain import RetrievalConfig
 from space.health_hosts import HealthCheckedHostMiddleware
+from space.local_store import LocalObjectStore
 from space.model_provider import MemoryModels
 from space.oauth_server import OAuthTokens
 from space.observability import RequestMetrics, database_health, database_pool_stats
@@ -67,7 +68,7 @@ def create_app(
         workspace = Workspace(
             database,
             keys,
-            None,
+            LocalObjectStore(configuration.file_dir),
             configuration.mcp_resource_url,
             configuration.web_url,
             MemoryModels(configuration),

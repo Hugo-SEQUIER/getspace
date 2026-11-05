@@ -5,12 +5,16 @@ from uuid import UUID, uuid4
 
 import pytest
 from test_database_setup import database as database_fixture
+from test_document_files import commit as file_commit
+from test_document_files import stored_objects, upload
 from test_memora_workspace import claim_change, delegated, setup
 from test_teams import create_team, join
 from test_workspace import change
 from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 
+from space import document_files
+from space.local_store import LocalObjectStore
 from space.resource_deletion import delete_memory, delete_resource
 from space.workspace import CommandError
 
@@ -51,6 +55,19 @@ def test_deletion_removes_every_revision(commands):
         ).fetchone()[0]
         assert remaining == 0
         assert connection.execute("SELECT count(*) FROM space.restore_objects").fetchone()[0] == 0
+
+
+def test_deleting_a_document_removes_its_file_from_the_disk(commands, tmp_path):
+    service, owner, space, _ = commands
+    service.objects = LocalObjectStore(tmp_path / "files")
+    raw = b"f" * (document_files.PART_BYTES + 1)
+    saved = document_files.commit(
+        service, owner, space, file_commit(upload(service, owner, space, raw), raw)
+    )
+    assert len(stored_objects(service)) == 2
+    assert delete_resource(service, owner, space, UUID(saved["id"]), 1) == {"deleted": True}
+    # The rows are gone and so are the bytes they named.
+    assert stored_objects(service) == []
 
 
 def test_delete_preserves_memories_and_they_remain_editable(commands):

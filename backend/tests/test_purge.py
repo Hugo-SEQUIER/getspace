@@ -4,10 +4,14 @@ from uuid import UUID, uuid4
 
 import pytest
 from test_database_setup import database as database_fixture
+from test_document_files import commit as file_commit
+from test_document_files import stored_objects, upload
 from test_memora_workspace import Models
 from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 
+from space import document_files
+from space.local_store import LocalObjectStore
 from space.memory import RecallMetadata, RememberMemory
 from space.purge import purge_space
 from space.security.auth import Identity
@@ -89,6 +93,22 @@ def test_a_dry_run_reports_without_deleting(commands):
             "SELECT count(*) AS rows FROM space.resources WHERE space_id=%s", (space,)
         ).fetchone()
     assert still[0] == 1
+
+
+def test_a_content_reset_deletes_the_stored_files(commands, tmp_path):
+    """The reset removes rows and the objects those rows named, leaving nothing behind."""
+    service, owner, space, connect_as = commands
+    service.objects = LocalObjectStore(tmp_path / "files")
+    raw = b"p" * (document_files.PART_BYTES + 1)
+    file_commit_request = file_commit(upload(service, owner, space, raw), raw)
+    document_files.commit(service, owner, space, file_commit_request)
+    assert len(stored_objects(service)) == 2
+    scope, _ = service._key(owner, space)
+    with connect_as(admin=True) as connection:
+        counts = purge_space(connection, scope["organization_id"], space, objects=service.objects)
+    assert counts["file_parts"] == 2
+    assert counts["objects"] == 2
+    assert stored_objects(service) == []
 
 
 def test_content_reset_keeps_workspace_and_tasks_usable(commands):
