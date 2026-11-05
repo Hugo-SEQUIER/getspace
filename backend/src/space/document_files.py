@@ -177,10 +177,13 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
                 "File storage is unavailable on the server. Check SPACE_FILE_DIR.", 503
             ) from None
         try:
-            inserted = connection.execute(
+            # The connection runs in pipeline mode, so an error the insert raises (the
+            # storage quota, for one) surfaces on the result read rather than at execute:
+            # read the row here, while the failed part's bytes can still be taken away.
+            connection.execute(
                 "INSERT INTO space.file_parts(organization_id,space_id,file_id,part,object_key,"
                 "fingerprint,plain_bytes,content_bytes) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON CONFLICT DO NOTHING RETURNING part",
+                "RETURNING part",
                 (
                     scope["organization_id"],
                     space_id,
@@ -197,18 +200,6 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
             with suppress(Exception):
                 workspace.objects.delete_keys([key])
             raise
-        if inserted is None:
-            with suppress(Exception):
-                workspace.objects.delete_keys([key])
-            # A concurrent upload of this part recorded it first; accept only the same bytes.
-            winner = connection.execute(
-                "SELECT fingerprint FROM space.file_parts WHERE file_id=%s AND part=%s",
-                (file_id, part),
-            ).fetchone()
-            if winner is None or not hmac.compare_digest(bytes(winner["fingerprint"]), digest):
-                raise CommandError(
-                    "This file part was already uploaded with different content", 409
-                )
     return {"file_id": str(file_id), "part": part, "bytes": len(raw)}
 
 
@@ -307,17 +298,16 @@ def discard(workspace, identity, space_id, file_id: UUID):
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, space_id, write=True, human=True)
         connection.execute("SELECT set_config('space.quota_deletion','on',true)")
-        prefixes = [
-            local_store.file_prefix(row["organization_id"], row["space_id"], row["file_id"])
+        keys = [
+            row["object_key"]
             for row in connection.execute(
                 "DELETE FROM space.file_parts WHERE file_id=%s AND resource_id IS NULL "
-                "RETURNING organization_id,space_id,file_id",
+                "RETURNING object_key",
                 (file_id,),
             ).fetchall()
         ]
-    for prefix in dict.fromkeys(prefixes):
-        workspace.objects.delete_prefix(prefix)
-    return {"discarded": len(prefixes)}
+    workspace.objects.delete_keys([key for key in keys if key])
+    return {"discarded": len(keys)}
 
 
 def read_part(

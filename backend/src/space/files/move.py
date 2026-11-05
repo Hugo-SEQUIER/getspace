@@ -98,8 +98,8 @@ def move(connection, objects, *, batch_size=BATCH_SIZE, dry_run=False, write=pri
                 objects.put(key, raw)
                 connection.execute(
                     "UPDATE space.file_parts SET object_key=%s,content=NULL "
-                    "WHERE file_id=%s AND part=%s",
-                    (key, row[3], row[4]),
+                    "WHERE organization_id=%s AND space_id=%s AND file_id=%s AND part=%s",
+                    (key, row[1], row[2], row[3], row[4]),
                 )
         if len(rows) < batch_size:
             return counts

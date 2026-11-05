@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import sys
 
-from space import local_store
 from space.database_setup import InstallSettings, connect
 from space.local_store import LocalObjectStore
 from space.settings import CONFIG_FILE, Settings
@@ -82,26 +81,25 @@ WHERE ctid IN (
       AND created_at < now() - make_interval(mins => %s)
     LIMIT %s
 )
-RETURNING organization_id,space_id,file_id
+RETURNING object_key
 """
 
 
-def _file_prefix(row) -> str:
-    """The object prefix of one returned row, whether the connection yields mappings."""
-    values = (
-        (row["organization_id"], row["space_id"], row["file_id"]) if isinstance(row, dict) else row
-    )
-    return local_store.file_prefix(*values)
+def _staged_object_key(row):
+    """The object key of one returned row, or None for a part that holds its bytes in the row."""
+    key = row["object_key"] if isinstance(row, dict) else row[0]
+    return key or None
 
 
 def _delete_staged_parts(connection, batch_size: int, objects=None) -> int:
-    """Runs the staged-part sweep, freeing each file's objects after its row commits.
+    """Runs the staged-part sweep, freeing the objects those rows named after they commit.
 
     Parameters: an owner-role connection, the batch size and the object store, or None
         for a database-only run.
-    What it does: deletes a batch of expired staged parts, then removes the objects of
-        the files that batch named. Rows go first: a crash leaves an unreferenced object
-        for the reconcile command, never a row without its bytes.
+    What it does: deletes a batch of expired staged parts, then removes exactly the
+        objects the removed rows named, so a part of the same file still inside its window
+        keeps its object. Rows go first: a crash leaves an unreferenced object for the
+        reconcile command, never a row without its bytes.
     Output: the number of part rows deleted.
     """
     removed = 0
@@ -112,8 +110,8 @@ def _delete_staged_parts(connection, batch_size: int, objects=None) -> int:
             ).fetchall()
         removed += len(rows)
         if objects is not None:
-            for prefix in {_file_prefix(row) for row in rows}:
-                objects.delete_prefix(prefix)
+            keys = {_staged_object_key(row) for row in rows}
+            objects.delete_keys([key for key in keys if key])
         if len(rows) < batch_size:
             return removed
 
