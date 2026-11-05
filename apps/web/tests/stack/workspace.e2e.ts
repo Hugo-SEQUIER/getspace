@@ -18,7 +18,7 @@ test('a page written from the home page is saved, listed and searchable', { sess
   await expect(screen.getByText('Written through the real proxy and backend.')).toBeVisible();
 
   await app.open('/app/documents');
-  await expect(screen.getByRole('region', 'Document library').getByRole('link', title)).toBeVisible();
+  await expect(screen.getByRole('region', 'All documents').getByRole('row', new RegExp(title))).toBeVisible();
 
   await app.open('/app/search');
   const search = screen.getByRole('textbox', 'Search this space');
