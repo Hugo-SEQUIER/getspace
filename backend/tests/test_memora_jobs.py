@@ -84,7 +84,7 @@ def test_preview_and_encrypted_job_progress_survive_worker_turns(commands, queue
     job = jobs.claim(queue)
     assert b"Mira" in bytes(job["encrypted_request"])  # queued input is readable JSON
     assert not service.memory_models.calls
-    assert jobs.process(service, queue, job) is None  # A bounded turn yields the queue.
+    assert jobs.process(service, queue, job) is jobs.YIELDED  # A bounded turn yields the queue.
     progress = memora_jobs.recent(service, owner, space)["items"][0]
     assert progress["completed"] == 4 and progress["status"] == "queued"
     assert len(service.list_memories(owner, space)["items"]) == 4

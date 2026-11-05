@@ -108,6 +108,15 @@ def test_child_processes_at_most_one_job_and_closes_resources(runtime, job):
         resource.close.assert_called_once()
 
 
+def test_child_reports_a_yielded_turn_and_closes_resources(runtime):
+    runtime.claim.return_value = {"id": 1}
+    runtime.process.return_value = job_worker.YIELDED
+    assert job_worker.run_attempt() == job_worker.EXIT_YIELDED
+    runtime.claim.assert_called_once()
+    runtime.workspace.aclose.assert_awaited_once()
+    runtime.database.close.assert_called_once()
+
+
 def test_child_error_closes_resources_without_claiming_more(runtime):
     runtime.claim.return_value = {"id": 1}
     runtime.process.side_effect = RuntimeError("fixture failure")
@@ -141,7 +150,42 @@ def test_drain_exits_at_idle_or_batch_bound_without_parent_connections(
     runtime.database.open.assert_not_called()
 
 
-@pytest.mark.parametrize("outcome", [0, job_worker.EXIT_IDLE])
+def test_drain_keeps_taking_turns_of_a_yielding_job_without_counting_them(supervisor):
+    supervisor.run.side_effect = [job_worker.EXIT_YIELDED] * 5 + [0, 0]
+    assert job_worker.main(["--drain", "--max-jobs", "2"]) == 0
+    assert supervisor.run.call_count == 7
+    supervisor.sleep.assert_not_called()
+
+
+@pytest.fixture
+def clock(monkeypatch, supervisor):
+    """Each attempt takes `turn` seconds of a fake monotonic clock and yields."""
+    state = SimpleNamespace(now=0.0, turn=60)
+    monkeypatch.setattr(job_worker.time, "monotonic", lambda: state.now)
+
+    def turn(*_):
+        state.now += state.turn
+        return job_worker.EXIT_YIELDED
+
+    supervisor.run.side_effect = turn
+    return state
+
+
+def test_drain_starts_no_attempt_that_could_end_after_its_budget(supervisor, clock):
+    clock.turn = 100
+    args = ["--drain", "--max-seconds", "500", "--job-deadline", "200"]
+    assert job_worker.main(args) == 0
+    # Attempts start at 0, 100, 200 and 300 seconds; one at 400 could end at 600.
+    assert supervisor.run.call_count == 4
+
+
+def test_drain_uses_its_default_budget(supervisor, clock):
+    assert job_worker.main(["--drain", "--max-jobs", "2"]) == 0
+    last_start = job_worker.DRAIN_SECONDS - job_worker.JOB_DEADLINE_SECONDS
+    assert supervisor.run.call_count == last_start // clock.turn + 1
+
+
+@pytest.mark.parametrize("outcome", [0, job_worker.EXIT_IDLE, job_worker.EXIT_YIELDED])
 def test_once_never_waits_or_starts_a_second_child(supervisor, outcome):
     supervisor.run.return_value = outcome
     assert job_worker.main(["--once"]) == 0
@@ -212,6 +256,8 @@ def test_shutdown_during_hung_attempt_does_not_start_another(supervisor):
         ["--job-deadline", "0"],
         ["--job-deadline", "271"],
         ["--poll-interval", "0"],
+        ["--max-seconds", "239"],
+        ["--drain", "--job-deadline", "200", "--max-seconds", "199"],
     ],
 )
 def test_invalid_bounds_rejected_before_starting_child(supervisor, args):

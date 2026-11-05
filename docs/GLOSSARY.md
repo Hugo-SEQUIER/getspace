@@ -119,7 +119,7 @@ A memory is one record. The record holds claims, the entries they were extracted
 | Provider pin | The `provider_fingerprint` stored on a job: a hash of the provider, its endpoint and the text model. A job whose pin differs from the configured chat provider does no new model work; unless its result was already committed, it fails with `Extraction provider changed; submit a new job`. A reclassification catch-up stores the decision model's fingerprint instead, so each decision model gets one catch-up per Space. | `MemoryModels.chat_fingerprint`, `reclassify_jobs.enqueue`, `jobs.process` |
 | Queue bound | At most 100 unfinished jobs per Space. Beyond it, enqueue fails with 503 `This Space's extraction queue is full; retry after jobs finish`. The bound is per Space. | `jobs.MAX_PENDING_PER_SPACE` |
 | Idle check | While the queue is empty, a continuously running worker asks one cheap question every 3 seconds (`--poll-interval`) and starts an attempt only when a job is eligible: queued and due, or holding an expired lease. This also picks up delayed retries and crashed attempts. | `job_worker.PENDING_SQL`, `backend/src/space/queue_watch.py` |
-| Drain and once | Worker batch flags: `--drain --max-jobs N` runs at most N attempts and exits; `--once` runs at most one. A failed or killed attempt counts toward the batch, and the supervisor exits nonzero when a batch contained one. | `job_worker.main` |
+| Drain and once | Worker batch flags: `--drain --max-jobs N` runs at most N attempts and exits; `--once` runs at most one. A failed or killed attempt counts toward the batch, and the supervisor exits nonzero when a batch contained one. A yielded turn of a Memora import or catch-up does not count; `--max-seconds` (720 by default in a drain) stops the batch from starting an attempt that could end later. | `job_worker.main` |
 
 ## Index row versus revision
 
@@ -162,7 +162,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Job lease | 300 seconds | `jobs.LEASE_SECONDS` |
 | Job deadline per attempt | 240 seconds, 1 to 270 allowed | `job_worker.JOB_DEADLINE_SECONDS` |
 | Job attempts | 3 work attempts, plus at most 1 recovery-only attempt | `jobs.MAX_ATTEMPTS`, `jobs.MAX_RECOVERY_ATTEMPTS` |
-| Worker batch | 1 to 100 attempts, default 20 | `job_worker.main` |
+| Worker batch | 1 to 100 attempts, default 20; a drain also stops after 720 seconds by default | `job_worker.main`, `job_worker.DRAIN_SECONDS` |
 | Database statement, lock and idle-transaction timeouts | 15 s, 5 s, 30 s | `backend/src/space/database_setup.py`, `worker_setup.py` |
 
 ## Words that are easy to confuse
@@ -178,7 +178,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | provider versus model | The provider is the endpoint and credential; the model is the pinned name. The provider fingerprint covers both, plus the URL. |
 | source versus evidence | A source is a specific resource revision. Evidence is any item a recall returned that supports an answer, including memory. |
 | selected | At write time, "selected for indexing" means which claims enter the index. At read time, "selected claims" means the ranking's winners. They are different sets. |
-| attempt versus job | One job may be attempted several times: three work attempts plus one recovery-only attempt. `--max-jobs` bounds attempts in a batch, not distinct jobs. |
+| attempt versus job | One job may be attempted several times: three work attempts plus one recovery-only attempt. `--max-jobs` bounds attempts in a batch, not distinct jobs. A Memora import or reclassification catch-up also runs in turns; a turn that yields is neither a failed attempt nor counted toward `--max-jobs`. |
 
 ## Where to read more
 

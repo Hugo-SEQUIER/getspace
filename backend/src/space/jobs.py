@@ -18,6 +18,9 @@ MAX_ATTEMPTS = 3
 # One further lease may recover a committed command, but must never call a model.
 MAX_RECOVERY_ATTEMPTS = 1
 LEASE_SECONDS = 300
+# process() returns this when a bounded turn of a Memora import or reclassification
+# catch-up saved its progress and queued the job again.
+YIELDED = object()
 
 
 def public_job(row):
@@ -234,7 +237,11 @@ def finish(connection, job, *, result=None, error_code=None, retry=False):
 
 
 def process(workspace, connection, job):
-    """Use the queued actor's scope; never infer fresh authority from a new grant."""
+    """Use the queued actor's scope; never infer fresh authority from a new grant.
+
+    Returns the job's result, YIELDED after a turn that queued the job again, or None
+    when the attempt ended without a result (a failure, or a queued retry).
+    """
     from space.workspace import CommandError, SnapshotChanged
 
     actor = Identity(
@@ -265,7 +272,7 @@ def process(workspace, connection, job):
 
             result, yielded = process_batch(workspace, connection, job, actor, payload)
             if yielded:
-                return None
+                return YIELDED
         else:
             request = (
                 RememberMemory if job["request_kind"] == "remember" else BuildMemory
