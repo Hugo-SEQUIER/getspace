@@ -3,7 +3,7 @@ import { message, watchApi } from "../../../lib/client";
 import type { WorkspaceDatabase } from "../../../lib/space/databases";
 import type { MemoryVector, Project, Resource, Status } from "../../../lib/space/types";
 
-type Kind = "document" | "task" | "project" | "database" | "memory" | "category" | "section";
+type Kind = "document" | "task" | "project" | "database" | "memory" | "category" | "section" | "skill" | "system" | "lab_entry";
 export type Entry = {
   id: string;
   kind: Kind;
@@ -13,6 +13,8 @@ export type Entry = {
   updated_at?: string;
   project?: string | null;
   resource_id?: string;
+  /** A lab entry opens on its system's page. */
+  system_id?: string;
 };
 
 export type LocalSource = {
@@ -49,7 +51,24 @@ const labels = {
   memory: "Memory",
   category: "Categories",
   section: "Sections",
+  skill: "Skills",
+  system: "Systems",
+  lab_entry: "Lab entries",
 };
+
+/** The route that opens each kind of entry by its id. */
+const paths: Record<Exclude<Kind, "category" | "section" | "lab_entry">, string> = {
+  document: "documents", task: "tasks", project: "projects", database: "databases",
+  memory: "memory", skill: "skills", system: "systems",
+};
+
+function entryHref(base: string, item: Pick<Entry, "id" | "kind" | "system_id">) {
+  // Categories and sections are views of the memory page; a lab entry opens on its system.
+  if (item.kind === "category" || item.kind === "section") return `${base}/memory`;
+  if (item.kind === "lab_entry")
+    return `${base}/systems/${encodeURIComponent(item.system_id ?? "")}?entry=${encodeURIComponent(item.id)}`;
+  return `${base}/${paths[item.kind]}/${encodeURIComponent(item.id)}`;
+}
 
 /** Lowercased once per index load, so each keystroke only scans strings in memory. */
 function prepare(items: Entry[]) {
@@ -100,7 +119,7 @@ export function useWorkspaceSearch(
       .map((item) => ({
         ...item,
         type: labels[item.kind],
-        href: item.kind === "category" || item.kind === "section" ? `${base}/memory` : `${base}/${item.kind === "memory" ? "memory" : item.kind === "database" ? "databases" : item.kind === "project" ? "projects" : item.kind === "task" ? "tasks" : "documents"}/${encodeURIComponent(item.id)}`,
+        href: entryHref(base, item),
       }));
   }, [prepared, query, project, base]);
   return {

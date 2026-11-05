@@ -16,7 +16,11 @@ export function affectedReads(path: string) {
     // The search index holds every kind of content, so each content write refreshes it. A task
     // status the Space has no column for becomes one, so task writes also refresh the columns.
     const groups = /^tasks\/[^/]+\/status$/.test(command) ? ["resources", "memories", "overview", "search", "tasks"]
-      : command.startsWith("items") || command.startsWith("databases/") ? ["items", "memories", "overview", "search"]
+      // Archiving a system or lab entry goes through items, so its area refreshes too.
+      : command.startsWith("items") || command.startsWith("databases/") ? ["items", "memories", "overview", "search", "systems"]
+      // A verdict is a memory: promoting or demoting one changes what memory and recall show.
+      : /^systems\/entries\/[^/]+\/(?:promote|demote)$/.test(command) ? ["systems", "memories", "overview", "search"]
+      : command.startsWith("systems") ? ["systems", "search"]
       : /^(resources|handoffs|memory\/)/.test(command) ? ["resources", "memories", "search", "tasks"]
       // Saving a file creates a document, never a task or a task column.
       : command === "files" ? ["resources", "memories", "search"] : null;

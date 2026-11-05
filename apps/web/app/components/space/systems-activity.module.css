@@ -1,0 +1,92 @@
+/* "Recent in the lab": a ruled list of the latest moves, newest on top. */
+.feed {
+  margin: 0 0 32px;
+}
+.feed h2 {
+  margin: 0 0 10px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.quiet {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+.rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-rule);
+}
+.rows li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+/* A row that arrives after the first read slides down into place. */
+.rows li[data-new] {
+  animation: arrive 260ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes appear {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rows li[data-new] { animation: appear 200ms ease; }
+}
+.actor {
+  display: grid;
+  place-items: center start;
+  padding-top: 1px;
+}
+.body {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 16px;
+  min-width: 0;
+}
+.change {
+  display: inline-flex;
+  min-width: 0;
+  white-space: nowrap;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.change > svg { flex-shrink: 0; color: #4f8a8b; }
+.change > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sentence {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sentence:hover { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; }
+.body small {
+  color: var(--color-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .body { grid-template-columns: minmax(0, 1fr); }
+  .body small { white-space: normal; }
+}
+.more {
+  margin-top: 10px;
+  font-size: 13px;
+}

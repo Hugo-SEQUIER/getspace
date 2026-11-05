@@ -12,8 +12,8 @@ const filters = [
 ] as const;
 type Kind = typeof filters[number][0];
 type Result = { id: string; title: string; type: string; href: string };
-const icons: Record<string, IconName> = { document: "document", task: "tasks", project: "folder", memory: "memory", database: "database", agent: "agents", category: "folder" };
-const names: Record<string, string> = { document: "Document", task: "Task", project: "Project", memory: "Memory", database: "Database", agent: "Agent", category: "Category" };
+const icons: Record<string, IconName> = { document: "document", task: "tasks", project: "folder", memory: "memory", database: "database", agent: "agents", category: "folder", system: "system", lab_entry: "flask" };
+const names: Record<string, string> = { document: "Document", task: "Task", project: "Project", memory: "Memory", database: "Database", agent: "Agent", category: "Category", system: "System", lab_entry: "Lab entry" };
 
 export function CommandPalette({ base, onClose, onCreate }: {
   base: string; onClose: () => void; onCreate: (kind: "document" | "task") => void;

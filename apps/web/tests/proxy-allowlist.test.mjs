@@ -66,6 +66,10 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["DELETE", `${space}/files/${UUID}`],
     ["GET", `${space}/resources/${UUID}/file/0`], ["GET", `${space}/resources/${UUID}/file/3?revision=2`],
     ["GET", `${space}/resources/${UUID}/file/thumbnail`], ["GET", `${space}/resources/${UUID}/file/thumbnail?revision=2`],
+    ["GET", `${space}/systems`], ["POST", `${space}/systems`], ["POST", `${space}/systems/entries`],
+    ["POST", `${space}/systems/entries/${UUID}/promote`], ["POST", `${space}/systems/entries/${UUID}/demote`],
+    ["POST", `${space}/systems/entries/${UUID}/uses`], ["GET", `${space}/systems/entries/${UUID}/history`],
+    ["GET", `${space}/systems/activity?system_id=${UUID}`],
   ]) assert.ok(proxyAllowed(proxyPath(path), method), `${method} ${path}`);
   for (const [method, path] of [
     ["POST", `${space}/read-version`], ["GET", `${space}/unknown`], ["GET", "admin"],
@@ -75,5 +79,6 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["POST", `${space}/files/${UUID}`], ["GET", `${space}/files/${UUID}`],
     ["POST", `${space}/files/${UUID}/parts/x`], ["GET", `${space}/resources/${UUID}/file`],
     ["GET", `${space}/resources/${UUID}/file/thumbnails`], ["GET", `${space}/resources/${UUID}/file/thumbnail/0`],
+    ["GET", `${space}/systems/${UUID}`], ["POST", `${space}/systems/entries/${UUID}`], ["POST", `${space}/systems/entries/${UUID}/delete`],
   ]) assert.ok(!proxyAllowed(proxyPath(path), method), `${method} ${path} must be refused`);
 });

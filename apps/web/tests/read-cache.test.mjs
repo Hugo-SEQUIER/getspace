@@ -412,7 +412,7 @@ test("a selected document goes ahead of queued refreshes without exceeding the c
 
 test("a change to one kind reloads only reads showing that kind", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: 100000 });
-  const kinds = { document: 1, task: 1, memory: 1, project: 1, folder: 1, database: 1, category: 1, section: 1, columns: 1 };
+  const kinds = { document: 1, task: 1, memory: 1, project: 1, folder: 1, database: 1, category: 1, section: 1, columns: 1, system: 1, lab_entry: 1 };
   let revision = 1;
   const paths = [];
   const cache = versionedCache(t, async path => { paths.push(path); return { items: [], next_cursor: null }; }, async () => ({
@@ -427,6 +427,8 @@ test("a change to one kind reloads only reads showing that kind", async t => {
     columns: "spaces/a/tasks/columns",
     document: "spaces/a/resources/one",
     search: "spaces/a/search/index",
+    systems: "spaces/a/systems",
+    activity: "spaces/a/systems/activity",
   };
   for (const path of Object.values(reads)) t.after(cache.watch(path, () => {}, assert.fail));
   await tick();
@@ -445,6 +447,7 @@ test("a change to one kind reloads only reads showing that kind", async t => {
   assert.deepEqual(await refresh(() => { revision++; kinds.project++; }), ["memories", "projects", "search"]);
   assert.deepEqual(await refresh(() => { revision++; kinds.columns++; }), ["columns", "search"]);
   assert.deepEqual(await refresh(() => { revision++; kinds.document++; kinds.memory++; }), ["document", "documents", "memories", "search"]);
+  assert.deepEqual(await refresh(() => { revision++; kinds.lab_entry++; }), ["activity", "search", "systems"]);
 });
 
 test("without per-kind versions every versioned read follows the Space version", async t => {

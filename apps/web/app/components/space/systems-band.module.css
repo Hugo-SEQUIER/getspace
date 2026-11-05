@@ -1,0 +1,179 @@
+/* The Systems night band: the public site's night palette inside the workspace, the one dark
+   band of the app. Its tokens are local so it never depends on the public stylesheet. */
+.band {
+  --night: #0b120e;
+  --night-2: #0f1913;
+  --night-3: #142219;
+  --night-ink: #e8efe9;
+  --night-dim: #9aab9f;
+  --mint: #b4ecc0;
+  /* The lane and status marks shared with the light pages, retinted for night. */
+  --sys-testing: #8fd0d1;
+  --sys-works: var(--mint);
+  --sys-fails: #f0a27c;
+  --sys-retired: var(--night-dim);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  margin-bottom: 28px;
+  padding: 22px 8px 112px;
+  overflow: hidden;
+  border-radius: var(--sp-card-radius, 16px);
+  background: var(--night);
+  color: var(--night-ink);
+}
+/* The engraved valley, inverted and screened into mint dots along the foot, as on the
+   public footer, faded in from the night so no text crosses it. */
+.band::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  z-index: -1;
+  height: 150px;
+  background: url("/design/footer-engraving-1920.a05e5f14.webp") 50% 78% / cover no-repeat;
+  background-image: image-set(url("/design/footer-engraving-1920.a05e5f14.webp") 1x, url("/design/footer-engraving-3840.bc563351.webp") 2x);
+  -webkit-mask-image: linear-gradient(transparent, #000 62%);
+  mask-image: linear-gradient(transparent, #000 62%);
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.group {
+  min-width: 0;
+  padding: 0 22px;
+}
+.group + .group {
+  border-left: 1px solid var(--night-3);
+}
+.band .group h2 {
+  margin: 0 0 12px;
+  color: var(--night-dim);
+  font-size: 13px;
+  font-weight: 600;
+}
+.group ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.group li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--night-ink);
+  font-size: 14px;
+}
+.group li strong {
+  margin-left: auto;
+  font-weight: 600;
+}
+.group li[data-zero] { color: var(--night-dim); }
+.group li[data-zero] strong { font-weight: 500; }
+.group li > [data-status="healthy"] { background: var(--mint); }
+.group li > [data-status="needs_attention"] { background: #dcb862; }
+.group li > [data-status="broken"] { background: #ec8a8e; }
+.group li > [data-lane="validated"],
+.group li > [data-lane="invalidated"] { color: var(--night); }
+.reuseBody {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ring {
+  flex-shrink: 0;
+  width: 128px;
+  height: 128px;
+}
+.ringTrack,
+.ringValue {
+  fill: none;
+  stroke-width: 10;
+}
+.ringTrack { stroke: var(--night-3); }
+.ringValue {
+  stroke: var(--mint);
+  stroke-linecap: round;
+}
+.ringNotch {
+  stroke: var(--night-ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.ringValueText {
+  fill: var(--night-ink);
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ringLabel {
+  fill: var(--night-dim);
+  font-size: 12px;
+}
+.reuseBody p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+}
+.reuseBody strong {
+  color: var(--mint);
+  font-size: 15px;
+  font-weight: 600;
+}
+.reuseBody span {
+  color: var(--night-dim);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Rolling digits: one column of 0–9 per digit, moved by transform only. */
+.odometer {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+}
+.digits { display: inline-flex; }
+.digit {
+  display: inline-block;
+  height: 1.25em;
+  overflow: hidden;
+  line-height: 1.25;
+}
+.digit > span {
+  display: flex;
+  flex-direction: column;
+}
+.odometer[data-ready] .digit > span {
+  transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .odometer[data-ready] .digit > span { transition: none; }
+}
+
+@media (max-width: 1000px) {
+  .band {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 22px;
+  }
+  .group + .reuse {
+    grid-column: 1 / -1;
+    padding-top: 20px;
+    border-top: 1px solid var(--night-3);
+    border-left: 0;
+  }
+}
+@media (max-width: 620px) {
+  .band {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 0;
+  }
+  .group + .group {
+    padding-top: 20px;
+    border-top: 1px solid var(--night-3);
+    border-left: 0;
+  }
+}

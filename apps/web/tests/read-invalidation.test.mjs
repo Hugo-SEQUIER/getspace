@@ -63,3 +63,20 @@ test("staged file parts change no reads, and saving the file refreshes documents
   for (const path of ["spaces/two/resources?kind=document", "spaces/one/items?kind=project", "spaces/one/tasks/columns"])
     assert.equal(saved(path), false, path);
 });
+
+test("Systems writes refresh the area; promote and demote also refresh memory", () => {
+  for (const command of ["spaces/one/systems", "spaces/one/systems/entries", "spaces/one/systems/entries/e/uses"]) {
+    const affected = affectedReads(command);
+    for (const read of ["spaces/one/systems", "spaces/one/systems/activity?system_id=s", "spaces/one/systems/entries/e/history", "spaces/one/search/index"])
+      assert.equal(affected(read), true, `${command}: ${read}`);
+    for (const read of ["spaces/one/memories?limit=50", "spaces/one/resources?kind=task", "spaces/two/systems"])
+      assert.equal(affected(read), false, `${command}: ${read}`);
+  }
+  for (const command of ["spaces/one/systems/entries/e/promote", "spaces/one/systems/entries/e/demote"]) {
+    const affected = affectedReads(command);
+    for (const read of ["spaces/one/systems", "spaces/one/memories?limit=50", "spaces/one/overview"])
+      assert.equal(affected(read), true, `${command}: ${read}`);
+    assert.equal(affected("spaces/one/resources?kind=task"), false);
+  }
+  assert.equal(affectedReads("spaces/one/items/system-id/visibility")("spaces/one/systems"), true);
+});

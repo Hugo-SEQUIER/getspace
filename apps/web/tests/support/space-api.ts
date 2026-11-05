@@ -108,6 +108,12 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     databaseCommands: [] as Record<string, unknown>[],
     /** Database detail reads, by database ID: a listing never carries rows. */
     databaseReads: [] as string[],
+    /** Systems and lab entries, active and archived, every revision of each entry, and the
+     * bodies of every Systems command, in order. */
+    systems: [] as SystemRow[],
+    labEntries: [] as LabEntryRow[],
+    labHistory: {} as Record<string, (LabEntryRow & { author: string })[]>,
+    systemCommands: [] as Record<string, unknown>[],
     webhooks: [] as WebhookRow[],
     /** Bodies of every subscription create or change command, in order. */
     webhookCommands: [] as Record<string, unknown>[],
@@ -153,6 +159,10 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       return gate;
     },
   };
+  function putEntry(saved: LabEntryRow) {
+    state.labEntries = [...state.labEntries.filter(item => item.id !== saved.id), saved];
+    (state.labHistory[saved.id] ??= []).push({ ...saved, author: 'you' });
+  }
   async function pass(key: string) {
     const gate = state.gates.get(key);
     if (!gate) return;
@@ -374,6 +384,107 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
         ?? state.documents.find(item => item.id === resource[1]);
       return task ? send(task) : send({ error: 'Task not found' }, 404);
     }
+    // Systems: one read of the area, saves with a revision check, and the lab's moves with the
+    // backend's rules: the promotion gate, no edits to a live verdict, uses only on a verdict.
+    if (path.endsWith('/systems') && method === 'GET') {
+      const active = state.labEntries.filter(entry => !entry.deleted);
+      return send({
+        systems: state.systems.filter(system => !system.deleted).sort((a, b) => a.name.localeCompare(b.name))
+          .map(system => ({ ...system, stats: labStats(active.filter(entry => entry.system_id === system.id)) })),
+        entries: [...active].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+        domains: LAB_DOMAINS,
+      });
+    }
+    if (path.endsWith('/systems') && method === 'POST') {
+      state.systemCommands.push(body);
+      expect(body.command_id).toBeTruthy();
+      const current = state.systems.find(system => system.id === body.system_id);
+      if ((current?.revision ?? 0) !== body.expected_revision)
+        return send({ error: 'This system changed. Refresh before saving.' }, 409);
+      if (!body.data.name?.trim()) return send({ error: 'A name is required' }, 400);
+      const saved: SystemRow = {
+        ...blankSystem(), ...current, ...body.data, id: body.system_id ?? crypto.randomUUID(), kind: 'system',
+        revision: body.expected_revision + 1, deleted: false, updated_at: fixtureNow(),
+      };
+      state.systems = [...state.systems.filter(system => system.id !== saved.id), saved];
+      return send({ ...saved, stats: labStats(state.labEntries.filter(entry => !entry.deleted && entry.system_id === saved.id)) });
+    }
+    if (path.endsWith('/systems/entries') && method === 'POST') {
+      state.systemCommands.push(body);
+      const current = state.labEntries.find(entry => entry.id === body.entry_id);
+      if ((current?.revision ?? 0) !== body.expected_revision)
+        return send({ error: 'This lab entry changed. Refresh before saving.' }, 409);
+      if (current && (current.status === 'validated' || current.status === 'invalidated'))
+        return send({ error: 'This entry is a verdict. Move it back to Testing to change it' }, 409);
+      if (!state.systems.some(system => system.id === body.data.system_id && !system.deleted))
+        return send({ error: 'Choose an active system' }, 409);
+      const saved: LabEntryRow = {
+        ...blankEntry(), ...current, ...body.data, id: body.entry_id ?? crypto.randomUUID(), revision: body.expected_revision + 1, updated_at: fixtureNow(),
+      };
+      putEntry(saved);
+      return send(saved);
+    }
+    if (path.endsWith('/systems/activity') && method === 'GET') {
+      const system = url.searchParams.get('system_id');
+      const events = state.labEntries.filter(entry => !entry.deleted && (!system || entry.system_id === system))
+        .flatMap(entry => (state.labHistory[entry.id] ?? []).map((revision, index, all) => {
+          const { author, ...rest } = revision;
+          const previous = index ? (({ author: _, ...earlier }) => earlier)(all[index - 1]) : null;
+          return { at: revision.updated_at, author, author_agent: null, entry: rest, previous };
+        }))
+        .sort((a, b) => b.at.localeCompare(a.at));
+      return send({ events: events.slice(0, 30) });
+    }
+    const labMove = /\/systems\/entries\/([^/]+)\/(promote|demote|uses|history)$/.exec(path);
+    if (labMove) {
+      const [, id, move] = labMove;
+      const entry = state.labEntries.find(item => item.id === id);
+      if (!entry) return send({ error: 'Lab entry not found' }, 404);
+      if (move === 'history') return send({ revisions: state.labHistory[id] ?? [] });
+      state.systemCommands.push({ ...body, id, move });
+      expect(body.command_id).toBeTruthy();
+      if (entry.revision !== body.expected_revision)
+        return send({ error: 'This lab entry changed. Refresh before saving.' }, 409);
+      const live = entry.status === 'validated' || entry.status === 'invalidated';
+      const next = { ...entry, revision: entry.revision + 1, updated_at: fixtureNow(), note: body.note ?? '' };
+      if (move === 'promote') {
+        if (entry.status === body.verdict) return send({ error: 'This entry already has that verdict' }, 409);
+        const system = state.systems.find(item => item.id === entry.system_id && !item.deleted);
+        const problems = [
+          ...(['measured', 'owner_call'].includes(entry.evidence) ? [] : ["Set the evidence to Measured or Owner's call"]),
+          ...(entry.source.trim() ? [] : ['Name the source of the evidence']),
+          ...(system ? [] : ['Assign an active system']),
+        ];
+        if (problems.length) return send({ error: `Not promoted: ${problems.join('; ')}` }, 409);
+        putEntry({ ...next, status: body.verdict, verdict: {
+          memory_id: `${id}-verdict-${next.revision}`, label: body.verdict === 'validated' ? 'works' : 'does_not_work',
+          promoted_at: fixtureNow(), promoted_by: null,
+        } });
+      } else if (move === 'demote') {
+        if (entry.status === body.status) return send({ error: `This entry is already ${body.status}` }, 409);
+        putEntry({ ...next, status: body.status, verdict: null, retries: entry.retries + (body.status === 'testing' ? 1 : 0) });
+      } else {
+        if (!live) return send({ error: "Only a verdict's use is recorded" }, 409);
+        const use = { used_in: body.used_in.trim(), at: fixtureNow().slice(0, 10), by: null };
+        putEntry({ ...next, note: '', uses: [...entry.uses, use], last_used: use.at });
+      }
+      return send(state.labEntries.find(item => item.id === id));
+    }
+    const areaVisibility = /\/items\/([^/]+)\/visibility$/.exec(path);
+    const areaItem = areaVisibility && (state.systems.find(item => item.id === areaVisibility[1]) ?? state.labEntries.find(item => item.id === areaVisibility[1]));
+    if (areaVisibility && areaItem && method === 'POST') {
+      state.systemCommands.push({ ...body, id: areaItem.id, move: 'visibility' });
+      if (areaItem.revision !== body.expected_revision)
+        return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
+      if (areaItem.kind === 'system' && body.deleted && state.labEntries.some(entry => !entry.deleted && entry.system_id === areaItem.id && entry.verdict))
+        return send({ error: "Move this system's verdicts back to Testing or retire them first" }, 409);
+      if (areaItem.kind === 'lab_entry' && body.deleted && areaItem.verdict)
+        return send({ error: 'Move this verdict back to Testing before archiving it' }, 409);
+      const saved = { ...areaItem, revision: areaItem.revision + 1, deleted: body.deleted, updated_at: fixtureNow() };
+      if (saved.kind === 'system') state.systems = state.systems.map(item => item.id === saved.id ? saved as SystemRow : item);
+      else putEntry(saved as LabEntryRow);
+      return send(saved);
+    }
     // Folders and sections archive or restore through visibility, like a project.
     const containerVisibility = /\/items\/([^/]+)\/visibility$/.exec(path);
     const container = containerVisibility && (state.folders.find(entry => entry.id === containerVisibility[1]) ?? state.sections.find(entry => entry.id === containerVisibility[1]));
@@ -564,6 +675,72 @@ export type WebhookRow = {
   transition: { field_id: string; to: string } | null; paused: boolean; revision: number;
   created_at: string; updated_at: string; removed_at: string | null;
 };
+
+export const systemId = '99999999-9999-4999-8999-999999999999';
+export const labEntryId = 'abababab-abab-4bab-8bab-abababababab';
+export const LAB_DOMAINS = ['Copy & hooks', 'Social', 'Outreach & sales', 'SEO/GEO', 'Product & positioning',
+  'Dev & engineering', 'Agents & automation', 'Video', 'Ops & business'];
+
+export type SystemRow = {
+  id: string; kind: 'system'; revision: number; deleted: boolean; updated_at: string; author_agent: null;
+  name: string; description: string; status: string; goal_metric: string; goal_target: string; current_value: string;
+  counter_metric: string; source_of_truth: string; review_cadence: string | null; last_review: string | null;
+  next_decision: string; playbook_id: string | null;
+};
+export type LabEntryRow = {
+  id: string; kind: 'lab_entry'; revision: number; deleted: boolean; updated_at: string; author_agent: null;
+  name: string; system_id: string; domain: string; status: string; evidence: string; why: string; apply: string;
+  applies_to: string; source: string; captured: string | null; note: string;
+  uses: { used_in: string; at: string; by: string | null }[]; last_used: string | null;
+  verdict: { memory_id: string; label: string; promoted_at: string; promoted_by: string | null } | null; retries: number;
+};
+
+/** A moment that moves forward with each call, so newer saves sort first. */
+let fixtureClock = Date.parse('2026-10-20T09:00:00Z');
+function fixtureNow() {
+  fixtureClock += 60_000;
+  return new Date(Math.max(fixtureClock, Date.now())).toISOString();
+}
+
+function blankSystem(): Omit<SystemRow, 'id' | 'revision' | 'updated_at'> {
+  return { kind: 'system', deleted: false, author_agent: null, name: '', description: '', status: 'not_measured', goal_metric: '', goal_target: '',
+    current_value: '', counter_metric: '', source_of_truth: '', review_cadence: null, last_review: null, next_decision: '', playbook_id: null };
+}
+
+function blankEntry(): Omit<LabEntryRow, 'id' | 'revision' | 'updated_at' | 'name' | 'system_id' | 'domain'> {
+  return { kind: 'lab_entry', deleted: false, author_agent: null, status: 'testing', evidence: 'untested', why: '', apply: '', applies_to: '',
+    source: '', captured: null, note: '', uses: [], last_used: null, verdict: null, retries: 0 };
+}
+
+/** A system's lab counted the way the backend counts it. */
+export function labStats(entries: LabEntryRow[]) {
+  const count = (status: string) => entries.filter(entry => entry.status === status).length;
+  const verdicts = count('validated') + count('invalidated');
+  const reused = entries.filter(entry => entry.verdict && entry.uses.some(use => {
+    const days = (Date.parse(use.at) - Date.parse(entry.verdict!.promoted_at.slice(0, 10))) / 86400000;
+    return days >= 0 && days <= 30;
+  })).length;
+  return { entries: entries.length, testing: count('testing'), works: count('validated'), does_not_work: count('invalidated'),
+    retired: count('retired'), verdicts, reused_30d: reused, reuse_share: verdicts ? Math.round(reused / verdicts * 10000) / 10000 : null };
+}
+
+/** One system with a measured hypothesis ready to promote, its first revision in the history. */
+export function sampleSystem(space: SpaceMock) {
+  const system: SystemRow = {
+    ...blankSystem(), id: systemId, revision: 1, updated_at: '2026-10-19T09:00:00Z', name: 'Cold email', status: 'needs_attention',
+    description: 'Outbound to product teams.', goal_metric: 'Reply rate', goal_target: '8%', current_value: '5.1%',
+    counter_metric: 'Unsubscribe rate', source_of_truth: 'Campaign report', review_cadence: 'weekly', last_review: '2026-10-01',
+  };
+  const entry: LabEntryRow = {
+    ...blankEntry(), id: labEntryId, revision: 1, updated_at: '2026-10-19T10:00:00Z', system_id: systemId, domain: 'Outreach & sales',
+    name: "A first line naming the prospect's last release gets more replies.", evidence: 'measured', source: 'Campaign report, cohort 5',
+    why: 'Cohort 5 replied at 7.9% with the release line, 4.2% without.',
+  };
+  space.systems = [system];
+  space.labEntries = [entry];
+  space.labHistory = { [entry.id]: [{ ...entry, author: 'you' }] };
+  return { system, entry };
+}
 
 export const databaseId = '66666666-6666-4666-8666-666666666666';
 
