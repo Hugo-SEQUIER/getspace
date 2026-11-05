@@ -208,7 +208,7 @@ Columns whose names start with `encrypted_` keep their historical names but hold
 - **No application encryption.** Whoever can read the server's disk, its backups or the database can read every document and memory. Encrypt the disk and the backups if that matters to you.
 - **One owner.** There are no accounts or roles to separate people. Share an installation only with people you would give the access key to, or give others API keys and agent tokens with read-only access.
 - **Agents are delegates.** A read-write agent token can create, change and delete content. Prefer read-only tokens for agents that only need to look things up, and revoke tokens you no longer use.
-- **App sign-in is open to registration.** Any app can register itself and start a sign-in, as hosted assistants require, but nothing is granted until you approve it on the website. The consent page shows where it returns you; allow access only to a connection you started.
+- **App sign-in is open to registration.** Any app can register itself and start a sign-in, as hosted assistants require, but nothing is granted until you approve it on the website. The consent page shows where it returns you; allow access only to a connection you started. A sign-in request that is malformed is answered by Space itself, never redirected to the app's callback, so a registration cannot turn this address into a redirect to any site.
 - **Webhook signing secrets** and API key metadata are stored in the database. API keys, agent tokens and OAuth tokens themselves are stored only as SHA-256 digests.
 - **Updates.** Keep the host's packages, Docker and Space itself up to date.
 - **Exposure.** Only Caddy publishes ports. The database, API and website are reachable only inside the compose network.

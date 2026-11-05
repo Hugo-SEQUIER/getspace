@@ -248,12 +248,16 @@ def test_declined_and_malformed_requests_never_reach_the_owner(server):
         refusal = returned(declined.json()["redirect_url"])
         assert refusal["error"] == "access_denied" and refusal["state"] == "state-123"
 
-        # Errors go back to a registered callback, never to the consent page.
+        # Errors are answered here, never redirected: anyone can register a callback, so a
+        # redirect would make this origin an open redirect (RFC 9700, section 4.11.2).
         elsewhere = authorize(http, client, challenge, resource="https://other.example/mcp")
-        assert elsewhere.status_code == 302
-        assert returned(elsewhere.headers["location"])["error"] == "invalid_request"
+        assert elsewhere.status_code == 400 and "location" not in elsewhere.headers
+        assert elsewhere.json()["error"] == "invalid_request"
         unpaired = authorize(http, client, "short")
-        assert returned(unpaired.headers["location"])["error"] == "invalid_request"
+        assert unpaired.status_code == 400 and unpaired.json()["error"] == "invalid_request"
+        # The SDK's own checks, after the callback is validated, are answered here too.
+        unsupported = authorize(http, client, challenge, response_type="token")
+        assert unsupported.status_code == 400 and "location" not in unsupported.headers
         stranger = authorize(http, client, challenge, redirect_uri="https://evil.example/cb")
         assert stranger.status_code == 400
         unknown = authorize(http, {"client_id": "00000000-0000-4000-8000-000000000000"}, challenge)
