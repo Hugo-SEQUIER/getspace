@@ -173,9 +173,15 @@ def _page(workspace, identity, space_id, after, size, expected=None):
                 for record in records
             )
             text += "\n" + " ".join(field["name"] for field in data["fields"])
-        entries[row["id"]] = [
-            {"id": str(row["id"]), "kind": row["kind"], "title": data["name"], "text": text}
-        ]
+        entry = {"id": str(row["id"]), "kind": row["kind"], "title": data["name"], "text": text}
+        if row["kind"] == "system":
+            entry["text"] = "\n".join(
+                data.get(key) or "" for key in ("description", "goal_metric", "next_decision")
+            )
+        elif row["kind"] == "lab_entry":
+            entry["text"] = "\n".join(data.get(key) or "" for key in ("why", "apply", "source"))
+            entry["system_id"] = data["system_id"]
+        entries[row["id"]] = [entry]
     for row in resources:
         content = workspace._unpack(
             keys[row["key_id"]],

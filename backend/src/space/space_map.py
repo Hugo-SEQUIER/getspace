@@ -29,8 +29,8 @@ def current_items(workspace, identity, space_id):
     with workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id)
         rows = connection.execute(
-            workspace_items.ROW
-            + "WHERE NOT i.deleted AND v.revision=i.current_revision ORDER BY i.id LIMIT %s",
+            workspace_items.ROW + "WHERE NOT i.deleted AND v.revision=i.current_revision "
+            "AND i.kind NOT IN ('system','lab_entry') ORDER BY i.id LIMIT %s",
             (MAX_ITEMS + 1,),
         ).fetchall()
         key_rows = workspace_items.item_keys(workspace, connection, scope, rows[:MAX_ITEMS])

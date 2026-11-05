@@ -270,6 +270,10 @@ class ChangeVisibility(Input):
 
 
 def item_model(kind):
+    if kind in {"system", "lab_entry"}:
+        from space import systems
+
+        return systems.SystemData if kind == "system" else systems.LabEntryData
     return {
         "project": ProjectData,
         "folder": FolderData,
@@ -714,9 +718,42 @@ def _commit(
 
 
 def visibility(workspace, identity, space_id, item_id, change: ChangeVisibility):
+    from space.workspace import CommandError
+
     item = get(workspace, identity, space_id, item_id, change.expected_revision, records=False)
+    if item["kind"] == "lab_entry" and item.get("verdict") and change.deleted:
+        # An archived entry would leave its verdict in recall with no entry to review.
+        raise CommandError("Move this verdict back to Testing or retire it first", 409)
+    if item["kind"] == "system" and change.deleted:
+        from space import systems
+
+        if systems.live_verdicts(workspace, identity, space_id, item_id):
+            raise CommandError(
+                "Move this system's verdicts back to Testing or retire them first", 409
+            )
     model = item_model(item["kind"])
     data = {key: item[key] for key in model.model_fields if key in item}
+    if item["kind"] in {"system", "lab_entry"}:
+        # Systems and lab entries are written only by `systems`; archiving keeps their data.
+        data = model.model_validate(data).model_dump(mode="json")
+        _commit(
+            workspace,
+            identity,
+            space_id,
+            kind=item["kind"],
+            item_id=item_id,
+            expected_revision=change.expected_revision,
+            command_id=change.command_id,
+            fingerprint_input={
+                "visibility": {"data": data, "deleted": change.deleted},
+                "client_id": identity.client_id,
+                "agent_id": identity.agent_id,
+            },
+            data=data,
+            deleted=change.deleted,
+            emit_changes=False,
+        )
+        return get(workspace, identity, space_id, item_id, records=False)
     return save(
         workspace,
         identity,

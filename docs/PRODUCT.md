@@ -48,6 +48,7 @@ No account, billing, team or cloud service is needed for this workflow. A model 
 | Agents | Direct MCP connection from an existing client, with the same commands as REST | Additional verified clients and connectors |
 | Website assistant | Proposed: retrieval and cited answers within the current Space, with no write tools | Explicit assistant writing if needed |
 | Databases | Blank databases or a Clients starter; custom properties, record editing, table and board views, SQL for agents | Relationships, richer saved views, formulas, templates |
+| Systems | Recurring activities with a goal, health status and playbook, and a lab of hypotheses and lessons under test; only promoted verdicts reach recall, demotion takes them out, and reuse within 30 days is measured per system ([Systems](SYSTEMS.md)) | None planned yet |
 | Hosting | One Docker Compose stack on one machine | Additional deployment profiles |
 
 Custom databases are part of the personal product: the owner can organize their own data without installing a complete CRM. Projects and databases are stored with revisions, revision-checked commands and scoped MCP access, like other content. Tasks and projects keep their familiar views.

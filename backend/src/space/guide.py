@@ -213,6 +213,17 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "forget_memory_claim to delete it permanently, classify_memory_claim to reassign it "
             "and route_memory_claim to set the containers it governs; delete_memory removes a "
             "whole memory. Connecting never imports chat history.",
+            "SYSTEMS AND THE LAB. A system is a recurring activity (a posting routine, an "
+            "outreach campaign, an SEO routine) with a goal, a health status and a playbook "
+            "document; its lab holds hypotheses and lessons under test. Before recurring work, "
+            "call list_verdicts for your system or domain and follow its verdicts: label works "
+            "is a validated rule or tactic, does_not_work an anti-pattern. Record each verdict "
+            "you apply with record_verdict_use. Put a new idea or an unmeasured lesson in the "
+            "lab with add_lab_entry, never in memory: testing entries are not recalled, and "
+            "list_systems shows them so you do not duplicate one. Anyone may promote with "
+            "promote_lab_entry once the evidence is measured or owner_call and the source is "
+            "named; promote on evidence, never on your own judgement of an idea. When new "
+            "evidence contradicts a verdict, demote_lab_entry moves it back to testing.",
             "Connect contextual nodes with explicit links on remember/remember_claims, or "
             "set_memory_links to replace a node's connections. Supply existing resource IDs; "
             "use expands_on for a detail -> subject connection, such as 'What I like in my "

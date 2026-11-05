@@ -8168,6 +8168,17 @@
           "truncated": {
             "type": "boolean",
             "title": "Truncated"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecallVerdict"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when the memory is a verdict from the Systems area."
           }
         },
         "additionalProperties": true,
@@ -8336,6 +8347,69 @@
         ],
         "title": "RecallResult",
         "description": "Cited recall. Open: optional related, linked and timing details."
+      },
+      "RecallVerdict": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "enum": [
+              "works",
+              "does_not_work"
+            ],
+            "title": "Label",
+            "description": "works for a validated rule or tactic, does_not_work for an anti-pattern."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "invalidated"
+            ],
+            "title": "Status"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence",
+            "description": "The evidence level, such as Measured or Owner's call."
+          },
+          "system": {
+            "$ref": "#/components/schemas/VerdictSystem"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entry Id",
+            "description": "The lab entry the verdict was promoted from."
+          },
+          "promoted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Promoted At"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "A link to the lab entry in the Space website."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "status",
+          "evidence",
+          "system",
+          "domain",
+          "entry_id",
+          "promoted_at",
+          "url"
+        ],
+        "title": "RecallVerdict",
+        "description": "A lab entry promoted in the Systems area; only verdicts reach recall."
       },
       "RecentEvent": {
         "properties": {
@@ -10183,6 +10257,26 @@
           "plan"
         ],
         "title": "Usage"
+      },
+      "VerdictSystem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VerdictSystem"
       },
       "WorkspaceItem": {
         "properties": {

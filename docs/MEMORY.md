@@ -72,6 +72,8 @@ Capture remains explicit: an agent or the owner chooses finished claims, raw tex
 
 For a startup brief, call `get_context` with `mode="resume"` and `compact=true`. Recent handoff selection and citations are unchanged, but long structured handoffs receive an excerpt of at most 1,200 characters that reserves space for the summary, next actions, unresolved questions, decisions and progress. These are passages copied from the stored revision, not generated summaries. Omitted text sets `truncated=true`; open the cited revision for complete context. Short handoffs keep their full text, and manually edited or ambiguous layouts use a normal prefix excerpt. The response still obeys `max_chars`, which may shorten excerpts further. Compact mode is valid only for resume and makes no model calls. Topic search remains necessary for older constraints and project-specific evidence.
 
+Lab entries in the [Systems](SYSTEMS.md) area are never recalled. A promoted entry, a verdict, is a memory like any other and its recall item carries a `verdict` object with its label, evidence level and a link to the lab entry; demotion takes it out of recall with `recall.excluded`.
+
 Use `get_context` with `mode="search"` and a nonempty query:
 
 | Strategy | Behavior |
@@ -169,7 +171,7 @@ Recall never crosses Spaces. Forgetting a claim removes it from the index; earli
 
 ## Interfaces and limits
 
-MCP includes `memory_info`, `list_memories`, `remember`, `remember_claims`, `extract_memory`, `memory_job`, `build_memory`, the four claim tools (`edit_memory_claim`, `forget_memory_claim`, `classify_memory_claim` and `route_memory_claim`), `delete_memory`, `save_handoff`, `set_memory_links`, `get_memory_links` and `get_context`, alongside the resource tools. A fresh MCP connection discovers newly added tools.
+MCP includes `memory_info`, `list_memories`, `remember`, `remember_claims`, `extract_memory`, `memory_job`, `build_memory`, the four claim tools (`edit_memory_claim`, `forget_memory_claim`, `classify_memory_claim` and `route_memory_claim`), `delete_memory`, `save_handoff`, `set_memory_links`, `get_memory_links` and `get_context`, alongside the resource tools. The [Systems](SYSTEMS.md) tools write a verdict into recall when a lab entry is promoted, and their demotion takes it out. A fresh MCP connection discovers newly added tools.
 
 Space also serves its own operating guidance rather than leaving it to a document that can drift. Every connecting client receives it as the MCP instruction string, and the fuller version is readable as the `memory_guide` prompt and the `space://memory/guide` resource. The text is generated from the running configuration, so it names the provider, models and limits actually in effect, states that memory is autonomous and irreversible, and lists what an agent should and should not store. Because capture is agent-driven, this guidance is the control that shapes what memory holds.
 

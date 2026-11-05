@@ -24,6 +24,7 @@ from space import (
     restore_merge,
     restore_staging,
     space_map,
+    systems,
     tasks,
     teams,
     webhooks,
@@ -380,6 +381,39 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
         space_id: UUID, database_id: UUID, body: workspace_items.DatabaseChange, session=auth
     ):
         return workspace_items.change_database(workspace, session[0], space_id, database_id, body)
+
+    # The Systems area: systems, their lab entries and the promotion of verdicts.
+    @router.get("/spaces/{space_id}/systems")
+    def systems_area(space_id: UUID, session=auth):
+        return systems.overview(workspace, session[0], space_id)
+
+    @router.post("/spaces/{space_id}/systems")
+    def save_system(space_id: UUID, body: systems.SaveSystem, session=auth):
+        return systems.save_system(workspace, session[0], space_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries")
+    def save_lab_entry(space_id: UUID, body: systems.SaveLabEntry, session=auth):
+        return systems.save_entry(workspace, session[0], space_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/promote")
+    def promote_lab_entry(space_id: UUID, entry_id: UUID, body: systems.Promote, session=auth):
+        return systems.promote(workspace, session[0], space_id, entry_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/demote")
+    def demote_lab_entry(space_id: UUID, entry_id: UUID, body: systems.Demote, session=auth):
+        return systems.demote(workspace, session[0], space_id, entry_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/uses")
+    def record_verdict_use(space_id: UUID, entry_id: UUID, body: systems.RecordUse, session=auth):
+        return systems.record_use(workspace, session[0], space_id, entry_id, body)
+
+    @router.get("/spaces/{space_id}/systems/activity")
+    def lab_activity(space_id: UUID, system_id: UUID | None = None, session=auth):
+        return systems.activity(workspace, session[0], space_id, system_id)
+
+    @router.get("/spaces/{space_id}/systems/entries/{entry_id}/history")
+    def lab_entry_history(space_id: UUID, entry_id: UUID, session=auth):
+        return systems.history(workspace, session[0], space_id, entry_id)
 
     @router.post("/spaces/{space_id}/items/{item_id}/visibility")
     def item_visibility(

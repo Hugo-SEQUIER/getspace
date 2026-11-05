@@ -21,6 +21,7 @@ from space import (
     guide,
     resource_deletion,
     space_map,
+    systems,
     tasks,
     webhook_inbox,
     workspace_items,
@@ -724,6 +725,223 @@ def create_mcp(
             """
             return await command(
                 lambda actor: webhook_inbox.acknowledge(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        write_once = ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        )
+
+        @server.tool(title="List systems and their lab", annotations=read)
+        async def list_systems(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
+            """Parameters: Space and optional agent identity.
+            What it does: reads every system (a recurring activity such as a posting
+            routine or an outreach campaign, with its goal metric, target, current value,
+            counter-metric, source of truth, review cadence, health status and playbook
+            document) and every lab entry: a hypothesis or lesson with its system, domain,
+            status (testing, validated, invalidated, retired), evidence (untested,
+            suggestive, measured, owner_call), why, how to apply, source and uses. Only
+            verdicts (validated = works, invalidated = does not work) reach get_context;
+            testing entries are ideas, never rules. Read this before adding an entry, so
+            you do not duplicate one. Output: systems with stats (entries, verdicts,
+            reused_30d, reuse_share), entries newest first, and the domain names.
+            """
+            return await command(
+                lambda actor: systems.overview(workspace, actor, space_id), agent_id=agent_id
+            )
+
+        @server.tool(title="List verdicts", annotations=read)
+        async def list_verdicts(
+            space_id: UUID,
+            query: systems.VerdictQuery | None = None,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space and optional system_id or domain.
+            What it does: lists the live verdicts, validated rules and tactics (label
+            works) and invalidated anti-patterns (label does_not_work), with their
+            evidence level, system, domain, how to apply and a link to the lab entry, plus
+            each system's statistics. Read the verdicts of your system or domain before
+            doing that work, and call record_verdict_use when you apply one.
+            Output: {systems, verdicts}.
+            """
+            return await command(
+                lambda actor: systems.verdicts(
+                    workspace, actor, space_id, query or systems.VerdictQuery()
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Create a system", annotations=write_once)
+        async def create_system(
+            space_id: UUID,
+            command_id: UUID,
+            data: systems.SystemData,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, a new command ID and the system: name, description,
+            status (healthy, needs_attention, broken, not_measured, paused), goal_metric,
+            goal_target, current_value, counter_metric, source_of_truth, review_cadence
+            (weekly, per_cohort, monthly, quarterly), last_review, next_decision and
+            playbook_id, the ID of a document in this Space.
+            What it does: creates one system. Reuse command_id unchanged on retry.
+            Output: the system with its revision and lab statistics.
+            """
+            request = systems.SaveSystem(command_id=command_id, expected_revision=0, data=data)
+            return await command(
+                lambda actor: systems.save_system(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Update a system",
+            # Every field is replaced, so one left out is cleared.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def update_system(
+            space_id: UUID,
+            system_id: UUID,
+            expected_revision: int,
+            command_id: UUID,
+            data: systems.SystemData,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, system, the revision just read, a new command ID and the
+            complete system fields as in create_system.
+            What it does: saves a new revision of the system, such as a new current value,
+            status or last review. Read it with list_systems first and keep the fields you
+            do not change. Output: the saved system.
+            """
+            request = systems.SaveSystem(
+                command_id=command_id,
+                system_id=system_id,
+                expected_revision=expected_revision,
+                data=data,
+            )
+            return await command(
+                lambda actor: systems.save_system(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Add a lab entry", annotations=write_once)
+        async def add_lab_entry(
+            space_id: UUID,
+            command_id: UUID,
+            data: systems.LabEntryInput,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, a new command ID and the entry: name (the hypothesis or
+            lesson in one sentence), system_id, domain, evidence, why, apply (how to apply
+            it), applies_to, source, captured and an optional note.
+            What it does: adds the entry to its system's lab in testing. A testing entry is
+            never recalled; it becomes a verdict only through promote_lab_entry. Propose
+            freely here instead of saving untested ideas as memory.
+            Output: the entry with its revision.
+            """
+            request = systems.SaveLabEntry(command_id=command_id, expected_revision=0, data=data)
+            return await command(
+                lambda actor: systems.save_entry(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Update a lab entry",
+            # Every field is replaced, so one left out is cleared.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def update_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            expected_revision: int,
+            command_id: UUID,
+            data: systems.LabEntryInput,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry, the revision just read, a new command ID and the
+            complete entry fields as in add_lab_entry, with a note saying what changed,
+            such as a new measurement.
+            What it does: saves a new revision; status, uses and the verdict are kept. A
+            verdict is not edited: move it back to testing with demote_lab_entry first.
+            Output: the saved entry.
+            """
+            request = systems.SaveLabEntry(
+                command_id=command_id,
+                entry_id=entry_id,
+                expected_revision=expected_revision,
+                data=data,
+            )
+            return await command(
+                lambda actor: systems.save_entry(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Promote a lab entry to a verdict",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+            ),
+        )
+        async def promote_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.Promote,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry and command_id, expected_revision, verdict
+            (validated: it works; invalidated: it does not work) and an optional note.
+            What it does: the review step. Refused unless the evidence is measured or
+            owner_call, the source is set and the system is active. Writes a verdict
+            memory that get_context returns with its label, evidence and a link to the
+            entry. Promote only on evidence, never on your own judgement of an idea; the
+            memory provider embeds and organizes it. Reuse command_id unchanged on retry.
+            Output: the entry as a verdict.
+            """
+            return await command(
+                lambda actor: systems.promote(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Demote a verdict or retire an entry",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def demote_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.Demote,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry and command_id, expected_revision, status (testing
+            to test it again, retired to stop) and an optional note on why.
+            What it does: a verdict leaves get_context at once; its memory and the entry's
+            history are kept. Use it when new evidence contradicts a verdict.
+            Output: the entry.
+            """
+            return await command(
+                lambda actor: systems.demote(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Record a verdict's use", annotations=write_once)
+        async def record_verdict_use(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.RecordUse,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, verdict entry and command_id, expected_revision and
+            used_in: where you applied it, such as a post, campaign or pull request.
+            What it does: records the use with today's date, which sets last_used and
+            counts toward the system's reuse rate. Call it whenever a verdict shaped your
+            output. Output: the entry.
+            """
+            return await command(
+                lambda actor: systems.record_use(workspace, actor, space_id, entry_id, request),
                 agent_id=agent_id,
             )
 

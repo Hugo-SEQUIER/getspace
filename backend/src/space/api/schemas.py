@@ -600,6 +600,26 @@ class SearchPage(Closed):
     next_cursor: str | None = Field(description="Continue until null, even after empty pages.")
 
 
+class VerdictSystem(Closed):
+    id: UUID
+    name: str
+
+
+class RecallVerdict(Closed):
+    """A lab entry promoted in the Systems area; only verdicts reach recall."""
+
+    label: Literal["works", "does_not_work"] = Field(
+        description="works for a validated rule or tactic, does_not_work for an anti-pattern."
+    )
+    status: Literal["validated", "invalidated"]
+    evidence: str = Field(description="The evidence level, such as Measured or Owner's call.")
+    system: VerdictSystem
+    domain: str
+    entry_id: UUID = Field(description="The lab entry the verdict was promoted from.")
+    promoted_at: datetime
+    url: str = Field(description="A link to the lab entry in the Space website.")
+
+
 class RecallItem(Open):
     """One cited result. Open: assessed results add relevance and evidence details."""
 
@@ -612,6 +632,9 @@ class RecallItem(Open):
     url: str = Field(description="A link to this exact revision in the Space website.")
     excerpt: str
     truncated: bool
+    verdict: RecallVerdict | None = Field(
+        default=None, description="Present when the memory is a verdict from the Systems area."
+    )
 
 
 class RecallResult(Open):

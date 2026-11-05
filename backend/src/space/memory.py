@@ -114,6 +114,19 @@ class SaveHandoff(Input):
         return "\n\n".join(parts)
 
 
+class SetMemoryRecall(Input):
+    """Keep one memory out of recall, or return it, without changing its claims.
+
+    Used by demotion in the Systems area: the verdict memory and its history stay; only
+    recall stops returning it.
+    """
+
+    command_id: UUID
+    resource_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+    excluded: bool
+
+
 class ExplicitMemoryLink(Input):
     resource_id: UUID
     relation: Literal["related", "expands_on"] = "related"
@@ -461,7 +474,7 @@ def _shorten(entry: dict, query: str, length: int) -> None:
         entry["passage"]["end"] = entry["passage"]["start"] + len(entry["excerpt"])
 
 
-def _entry(item: dict, request: RecallRequest, source_url) -> dict:
+def _entry(item: dict, request: RecallRequest, source_url, entry_url=None) -> dict:
     """Shape one ranked or related record into the caller-visible entry."""
     entry = {
         key: item[key]
@@ -499,6 +512,12 @@ def _entry(item: dict, request: RecallRequest, source_url) -> dict:
             mode="json"
         )
         entry["url"] += "#memory-" + item["entry_id"]
+    if item.get("verdict"):
+        # A promoted lab entry: its label, evidence level and a link back to the entry.
+        verdict = dict(item["verdict"])
+        if entry_url is not None:
+            verdict["url"] = entry_url(verdict["system"]["id"], verdict["entry_id"])
+        entry["verdict"] = verdict
     if item.get("evidence_context"):
         entry["evidence_context"] = item["evidence_context"]
     if item.get("passage"):
@@ -525,11 +544,13 @@ def bounded_result(
     engine=ENGINE,
     related=(),
     assessment=None,
+    entry_url=None,
 ) -> dict:
     """Apply citation links, excerpts and the character budget to ranked items.
 
     Parameters: ranked item records, the request, a URL builder, the engine name and
-        optionally cue-related records, which are a separate tier.
+        optionally cue-related records, which are a separate tier, and a builder for the
+        link from a verdict to its lab entry.
     What it does: keeps items in rank order until the output budget is exhausted, then
         appends related records under their own key and cap. Related records never
         enter `items` and never displace a ranked result. The first ranked item sheds
@@ -570,7 +591,7 @@ def bounded_result(
         if len(result["items"]) >= request.limit:
             result["has_more"] = True
             break
-        entry = _entry(item, request, source_url)
+        entry = _entry(item, request, source_url, entry_url)
         result["items"].append(entry)
         if len(result["items"]) == 1:
             for key in SHEDDABLE_CONTEXT:
@@ -614,7 +635,7 @@ def bounded_result(
         for item in related:
             if len(result["related"]) >= MAX_RELATED:
                 break
-            result["related"].append(_entry(item, request, source_url))
+            result["related"].append(_entry(item, request, source_url, entry_url))
             # Related records share the same budget and are dropped, never truncated.
             if len(json.dumps(result, ensure_ascii=False)) > request.max_chars:
                 result["related"].pop()

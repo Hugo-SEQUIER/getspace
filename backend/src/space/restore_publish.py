@@ -97,6 +97,8 @@ def publish(
                     "author_agent",
                 )
             }
+            if value.get("verdict"):
+                metadata["verdict"] = value["verdict"]
             content = {**metadata, "body": value["body"]}
             if value.get("_memory"):
                 content["memory"] = value["_memory"]

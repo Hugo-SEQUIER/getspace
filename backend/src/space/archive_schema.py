@@ -238,28 +238,32 @@ def validate_archive(raw):
             if not entry["current"]:
                 raise ValueError("Agent archives contain the current identity only")
         elif entity == "item":
-            workspace_items.SaveItem.model_validate(
-                {
-                    "command_id": id_,
-                    "item_id": id_,
-                    "expected_revision": revision - 1,
-                    "kind": value["kind"],
-                    "data": {
-                        key: item
-                        for key, item in value.items()
-                        if key
-                        not in {
-                            "id",
-                            "kind",
-                            "revision",
-                            "deleted",
-                            "updated_at",
-                            "author_agent",
-                            "record_count",
-                        }
-                    },
+            data = {
+                key: item
+                for key, item in value.items()
+                if key
+                not in {
+                    "id",
+                    "kind",
+                    "revision",
+                    "deleted",
+                    "updated_at",
+                    "author_agent",
+                    "record_count",
                 }
-            )
+            }
+            if value["kind"] in {"system", "lab_entry"}:
+                workspace_items.item_model(value["kind"]).model_validate(data)
+            else:
+                workspace_items.SaveItem.model_validate(
+                    {
+                        "command_id": id_,
+                        "item_id": id_,
+                        "expected_revision": revision - 1,
+                        "kind": value["kind"],
+                        "data": data,
+                    }
+                )
             if type(value["deleted"]) is not bool:
                 raise ValueError("Invalid trash state")
             _agent(value.get("author_agent"))
