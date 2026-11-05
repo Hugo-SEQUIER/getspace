@@ -196,6 +196,7 @@ Columns whose names start with `encrypted_` keep their historical names but hold
 - **One owner.** There are no accounts or roles to separate people. Share an installation only with people you would give the access key to, or give others API keys and agent tokens with read-only access.
 - **Agents are delegates.** A read-write agent token can create, change and delete content. Prefer read-only tokens for agents that only need to look things up, and revoke tokens you no longer use.
 - **App sign-in is open to registration.** Any app can register itself and start a sign-in, as hosted assistants require, but nothing is granted until you approve it on the website. The consent page shows where it returns you; allow access only to a connection you started.
+- **Requests without credentials are limited per client.** Per client address, the API answers 429 past 20 app registrations, 60 sign-in requests or 30 agent connection codes in ten minutes, and past 10 wrong access keys or API keys in fifteen minutes, as the website's unlock form does. Behind Caddy the address is the last `X-Forwarded-For` hop, trusted only from a loopback or private-network peer. The limits are kept in memory and reset when the API restarts. Many addresses at once can still fill the pending sign-in and connection requests; your own direct connection on the Agents page is never held by them.
 - **Webhook signing secrets** and API key metadata are stored in the database. API keys, agent tokens and OAuth tokens themselves are stored only as SHA-256 digests.
 - **Updates.** Keep the host's packages, Docker and Space itself up to date.
 - **Exposure.** Only Caddy publishes ports. The database, API and website are reachable only inside the compose network.
@@ -211,6 +212,7 @@ Start with `docker compose exec api python -m space.check`: it names most of the
 | The website shows "Service unavailable" | The API is still starting or failing: `docker compose logs api`. |
 | An agent gets 401 Unauthorized | The token was revoked or mistyped, or the agent sends no `Authorization` header. Create a new connection on the Agents page. |
 | claude.ai, ChatGPT or another hosted app cannot connect | It reaches Space from its own servers. Use key mode on a public HTTPS address, and give the app exactly `SPACE_PUBLIC_URL` plus `/mcp/`. |
+| A sign-in, an agent connection or the API answers 429 Too Many Requests | Too many requests without credentials, or too many wrong keys, came from one address. Wait for the time `Retry-After` gives, or restart the API. |
 | The consent page says the request expired | Sign-in requests expire after ten minutes. Start the connection again from the app. |
 | An agent is told to identify itself | It must call `identify_agent` once, then send `X-Space-Agent-ID` (or `agent_id`) with every request. See [connecting agents](CONNECTING_AGENTS.md). |
 | Memory tools report no provider | Set `SPACE_MEMORY_PROVIDER` and its models in `.env`, then run `docker compose up -d`. |
