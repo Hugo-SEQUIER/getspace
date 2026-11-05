@@ -8,7 +8,7 @@ fallback and output budgeting. It has no database, model, key or network access.
 import json
 import re
 import unicodedata
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
@@ -112,6 +112,19 @@ class SaveHandoff(Input):
         ):
             parts.append("## " + heading + "\n" + "\n".join("- " + note for note in notes))
         return "\n\n".join(parts)
+
+
+class SetMemoryRecall(Input):
+    """Keep one memory out of recall, or return it, without changing its claims.
+
+    Used by demotion in the Systems area: the verdict memory and its history stay; only
+    recall stops returning it.
+    """
+
+    command_id: UUID
+    resource_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+    excluded: bool
 
 
 class ExplicitMemoryLink(Input):
@@ -335,6 +348,45 @@ class ChangeMemory(Input):
         return self
 
 
+class MemoryClaimChange(Input):
+    """One claim addressed by its current IDs, for an MCP tool that makes one kind of change.
+
+    Directories require each operation to be its own tool, so MCP offers a tool per
+    action where REST takes ChangeMemory with an action field.
+    Output of as_change: the equivalent ChangeMemory, validated as REST validates it.
+    """
+
+    action: ClassVar[Literal["edit", "forget", "classify", "route"]]
+    command_id: UUID
+    resource_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+    entry_id: UUID
+
+    def as_change(self) -> ChangeMemory:
+        return ChangeMemory(action=self.action, **self.model_dump())
+
+
+class EditMemoryClaim(MemoryClaimChange):
+    action = "edit"
+    value: str = Field(min_length=1, max_length=2000)
+
+
+class ForgetMemoryClaim(MemoryClaimChange):
+    action = "forget"
+
+
+class ClassifyMemoryClaim(MemoryClaimChange):
+    action = "classify"
+    # Omitted, the decision model reclassifies the claim.
+    classification: MemoryAssignment | None = None
+
+
+class RouteMemoryClaim(MemoryClaimChange):
+    action = "route"
+    # The containers this claim governs; an empty list clears routing and pins it.
+    routes_to: list[UUID] = Field(max_length=8)
+
+
 class RecallRequest(Input):
     query: str = Field(default="", max_length=500)
     mode: Literal["search", "resume"] = "search"
@@ -422,7 +474,7 @@ def _shorten(entry: dict, query: str, length: int) -> None:
         entry["passage"]["end"] = entry["passage"]["start"] + len(entry["excerpt"])
 
 
-def _entry(item: dict, request: RecallRequest, source_url) -> dict:
+def _entry(item: dict, request: RecallRequest, source_url, entry_url=None) -> dict:
     """Shape one ranked or related record into the caller-visible entry."""
     entry = {
         key: item[key]
@@ -460,6 +512,14 @@ def _entry(item: dict, request: RecallRequest, source_url) -> dict:
             mode="json"
         )
         entry["url"] += "#memory-" + item["entry_id"]
+    if item.get("verdict"):
+        # A promoted lab entry: its label, evidence level and a link back to the entry. A
+        # stored verdict block may lack its system; the link is then left out.
+        verdict = dict(item["verdict"])
+        system = verdict.get("system") or {}
+        if entry_url is not None and system.get("id") and verdict.get("entry_id"):
+            verdict["url"] = entry_url(system["id"], verdict["entry_id"])
+        entry["verdict"] = verdict
     if item.get("evidence_context"):
         entry["evidence_context"] = item["evidence_context"]
     if item.get("passage"):
@@ -486,11 +546,13 @@ def bounded_result(
     engine=ENGINE,
     related=(),
     assessment=None,
+    entry_url=None,
 ) -> dict:
     """Apply citation links, excerpts and the character budget to ranked items.
 
     Parameters: ranked item records, the request, a URL builder, the engine name and
-        optionally cue-related records, which are a separate tier.
+        optionally cue-related records, which are a separate tier, and a builder for the
+        link from a verdict to its lab entry.
     What it does: keeps items in rank order until the output budget is exhausted, then
         appends related records under their own key and cap. Related records never
         enter `items` and never displace a ranked result. The first ranked item sheds
@@ -531,7 +593,7 @@ def bounded_result(
         if len(result["items"]) >= request.limit:
             result["has_more"] = True
             break
-        entry = _entry(item, request, source_url)
+        entry = _entry(item, request, source_url, entry_url)
         result["items"].append(entry)
         if len(result["items"]) == 1:
             for key in SHEDDABLE_CONTEXT:
@@ -575,7 +637,7 @@ def bounded_result(
         for item in related:
             if len(result["related"]) >= MAX_RELATED:
                 break
-            result["related"].append(_entry(item, request, source_url))
+            result["related"].append(_entry(item, request, source_url, entry_url))
             # Related records share the same budget and are dropped, never truncated.
             if len(json.dumps(result, ensure_ascii=False)) > request.max_chars:
                 result["related"].pop()

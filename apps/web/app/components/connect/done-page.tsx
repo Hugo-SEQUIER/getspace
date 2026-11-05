@@ -85,23 +85,6 @@ export function DonePage() {
                   ? `${agent} collects the connection on its own within a few seconds. There is nothing more to do here; give your agent a memory habit while it finishes.`
                   : `You declined this request. ${agent} is told the next time it checks.`}
             </p>
-            {callback && (
-              <>
-                <button
-                  className={`${styles.primary} ${approved ? styles.returnAction : styles.fullWidth}`}
-                  onClick={returnToApp}
-                >
-                  {returning ? "Return again" : `Return to ${agent}`}
-                  <Icon name="arrow" size={17} />
-                </button>
-                <p className={styles.revoke}>
-                  {returning
-                    ? `If ${agent} didn’t open, return again or start the connection again from ${agent}.`
-                    : `Continue to ${callbackHost(callback)}`}
-                </p>
-              </>
-            )}
-            {approved && <AgentMemorySetup hideHeading />}
             {approved && (
               <>
                 <div className={styles.accessSummary}>
@@ -120,6 +103,22 @@ export function DonePage() {
                     {" "}Choose this identity when connecting the same agent again.
                   </p>
                 )}
+              </>
+            )}
+            {callback && (
+              <>
+                <button
+                  className={`${styles.primary} ${approved ? styles.returnAction : styles.fullWidth}`}
+                  onClick={returnToApp}
+                >
+                  {returning ? "Return again" : `Return to ${agent}`}
+                  <Icon name="arrow" size={17} />
+                </button>
+                <p className={styles.revoke}>
+                  {returning
+                    ? `If ${agent} didn’t open, return again or start the connection again from ${agent}.`
+                    : `Continue to ${callbackHost(callback)}`}
+                </p>
               </>
             )}
             {callback && approved && (
@@ -148,6 +147,10 @@ export function DonePage() {
                 </p>
               </details>
             )}
+            {/* The connection is not finished until the agent receives the
+                callback, so the return and its fallbacks come before the
+                optional memory setup. */}
+            {approved && <AgentMemorySetup heading="Give your agent a memory habit" />}
             <a className={styles.manageLink} href="/app/agents">
               Manage agent access <Icon name="arrow" size={14} />
             </a>

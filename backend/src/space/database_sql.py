@@ -1,8 +1,8 @@
-"""SQL over one database snapshot, in a throwaway in-memory SQLite table.
+"""SQL over one database's current rows, in a throwaway in-memory SQLite table.
 
-A database's records are stored as one JSON revision, not as PostgreSQL rows. Each call
-loads one snapshot, runs agent SQL under a deny-by-default authorizer and discards the
-SQLite database. Writes are validated as a whole snapshot and saved as one revision.
+Records are rows of their own in PostgreSQL; each call loads them, runs agent SQL under a
+deny-by-default authorizer and discards the SQLite database. A write stores only the rows
+it changed, as one revision.
 """
 
 import hmac
@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, model_validator
 
 from space import workspace_items
 from space.memory import Input
@@ -63,18 +63,14 @@ class Statement(Input):
     )
 
 
-class Query(Input):
-    """One statement (sql, params) or a batch (statements) against one database."""
+class Statements(Input):
+    """The SQL of a request: one statement (sql, params) or a batch (statements)."""
 
     sql: str | None = Field(default=None, min_length=1, max_length=MAX_STATEMENT_CHARS)
     params: list[str | int | float | bool | None] = Field(
         default_factory=list, max_length=MAX_STATEMENT_PARAMS
     )
     statements: list[Statement] | None = Field(default=None, min_length=1, max_length=MAX_BATCH)
-    command_id: UUID | None = None
-    expected_revision: int | None = Field(default=None, ge=1, strict=True)
-    max_rows: int = Field(default=100, ge=1, le=500)
-    include_schema: bool = False
 
     @model_validator(mode="after")
     def valid(self):
@@ -82,8 +78,6 @@ class Query(Input):
             raise ValueError("Pass either sql or statements")
         if self.sql is None and self.params:
             raise ValueError("Batch parameters belong to each statement")
-        if (self.command_id is None) != (self.expected_revision is None):
-            raise ValueError("Writes need both command_id and expected_revision")
         batch = self.batch()
         if sum(len(s.sql) for s in batch) > MAX_BATCH_CHARS:
             raise ValueError("A batch is limited to 20,000 characters of SQL")
@@ -94,9 +88,58 @@ class Query(Input):
     def batch(self):
         return self.statements or [Statement(sql=self.sql, params=self.params)]
 
+
+class Read(Statements):
+    """read_database: SELECT only; the authorizer refuses INSERT, UPDATE and DELETE."""
+
+    max_rows: int = Field(default=100, ge=1, le=500)
+    include_schema: bool = False
+
+    @property
+    def writable(self):
+        return False
+
+
+class Query(Statements):
+    """One statement (sql, params) or a batch (statements) against one database."""
+
+    command_id: UUID | None = None
+    expected_revision: int | None = Field(default=None, ge=1, strict=True)
+    max_rows: int = Field(default=100, ge=1, le=500)
+    include_schema: bool = False
+
+    @model_validator(mode="after")
+    def paired(self):
+        if (self.command_id is None) != (self.expected_revision is None):
+            raise ValueError("Writes need both command_id and expected_revision")
+        return self
+
     @property
     def writable(self):
         return self.command_id is not None
+
+
+class Change(Query):
+    """query_database: a write, refused unless it holds an INSERT, UPDATE or DELETE.
+
+    Reads go through read_database, so each MCP tool either reads or changes records.
+    """
+
+    command_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def names_the_read_tool(cls, data):
+        # An agent that still reads through query_database learns where reads went.
+        if isinstance(data, dict) and (
+            data.get("command_id") is None or data.get("expected_revision") is None
+        ):
+            raise ValueError(
+                "query_database changes records and needs command_id and "
+                "expected_revision; read rows with read_database"
+            )
+        return data
 
 
 class QueryRejected(Exception):
@@ -205,9 +248,13 @@ class Sandbox:
             column for column, _ in self.mapping
         ]
         # Identifiers are quoted field names in a private in-memory table, never agent SQL.
-        columns_sql = ",".join(quoted(n) for n in names)
-        placeholders = ",".join("?" for _ in names)
-        insert = f"INSERT INTO records ({columns_sql}) VALUES ({placeholders})"  # noqa: S608
+        insert = (
+            "INSERT INTO records ("  # noqa: S608
+            + ",".join(quoted(n) for n in names)
+            + ") VALUES ("
+            + ",".join("?" for _ in names)
+            + ")"
+        )
         for record in data["records"]:
             self.connection.execute(
                 insert,
@@ -276,15 +323,20 @@ class Sandbox:
             )
         return results
 
-    def records(self, original, stamp):
-        """Rebuild records in stored order; only changed rows get a new updatedAt."""
+    def changes(self, original, stamp):
+        """Parameters: the records loaded into the table and the write's timestamp.
+        What it does: reads the table back and compares it with what was loaded. Only changed
+        rows get a new updatedAt; inserted rows get their createdAt as well.
+        Output: (records to store, IDs to delete, counts of inserted, updated and deleted).
+        """
         self.connection.set_authorizer(None)
         names = ["id", "name", "notes"] + [column for column, _ in self.mapping]
         rows = self.connection.execute(
             "SELECT " + ",".join(quoted(n) for n in names) + " FROM records ORDER BY rowid"  # noqa: S608
         ).fetchall()
         before = {record["id"]: record for record in original}
-        rebuilt, counts = [], {"inserted": 0, "updated": 0, "deleted": 0}
+        upserts, seen = [], set()
+        counts = {"inserted": 0, "updated": 0, "deleted": 0}
         for row in rows:
             values = {}
             for (_, field), value in zip(self.mapping, row[3:], strict=True):
@@ -292,17 +344,17 @@ class Sandbox:
                 if value is not None:
                     values[field["id"]] = value
             record = {"id": str(row[0]), "name": row[1], "notes": row[2] or "", "values": values}
+            seen.add(record["id"])
             previous = before.get(record["id"])
             if previous is None:
                 counts["inserted"] += 1
-                rebuilt.append(record | {"createdAt": stamp, "updatedAt": stamp})
-            elif comparable(previous) == comparable(record):
-                rebuilt.append(previous)
-            else:
+                upserts.append(record | {"createdAt": stamp, "updatedAt": stamp})
+            elif comparable(previous) != comparable(record):
                 counts["updated"] += 1
-                rebuilt.append(previous | record | {"updatedAt": stamp})
-        counts["deleted"] = len(set(before) - {r["id"] for r in rebuilt})
-        return rebuilt, counts
+                upserts.append(previous | record | {"updatedAt": stamp})
+        deletes = [id_ for id_ in before if id_ not in seen]
+        counts["deleted"] = len(deletes)
+        return upserts, deletes, counts
 
     def close(self):
         self.connection.close()
@@ -322,16 +374,10 @@ def bounded(results):
     return results
 
 
-def execute(workspace, identity, space_id, database_id, request: Query) -> dict[str, Any]:
+def execute(workspace, identity, space_id, database_id, request: Read | Query) -> dict[str, Any]:
     from space.workspace import CommandError
 
-    item = workspace_items.get(
-        workspace,
-        identity,
-        space_id,
-        database_id,
-        request.expected_revision if request.writable else None,
-    )
+    item = workspace_items.get(workspace, identity, space_id, database_id)
     if item["kind"] != "database":
         raise CommandError("Workspace item is not a database", 404)
     if request.writable:
@@ -346,6 +392,8 @@ def execute(workspace, identity, space_id, database_id, request: Query) -> dict[
                 "changes": None,
                 "replayed": True,
             }
+        if item["revision"] != request.expected_revision:
+            raise CommandError("This workspace item changed. Refresh before saving.", 409)
     new_ids = (
         (str(uuid5(derived, str(n))) for n in range(workspace_items.MAX_DATABASE_RECORDS))
         if request.writable
@@ -365,30 +413,32 @@ def execute(workspace, identity, space_id, database_id, request: Query) -> dict[
         if request.include_schema:
             response["schema"] = schema(item["fields"])
         if not sandbox.wrote:
+            if isinstance(request, Change):
+                raise QueryRejected(
+                    "query_database changes records and needs an INSERT, UPDATE or DELETE; "
+                    "read rows with read_database"
+                )
             return response
         stamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-        records, counts = sandbox.records(item["records"], stamp)
+        upserts, deletes, _ = sandbox.changes(item["records"], stamp)
     except QueryRejected as error:
         raise CommandError(str(error), 400) from None
     finally:
         sandbox.close()
-    if records == item["records"]:
+    if not upserts and not deletes:
         return response
-    data = {key: item[key] for key in workspace_items.DatabaseData.model_fields if key in item}
-    try:
-        change = workspace_items.SaveItem(
-            command_id=derived,
-            item_id=database_id,
-            expected_revision=item["revision"],
-            kind="database",
-            data=data | {"records": records},
-        )
-    except ValidationError as error:
-        problem = error.errors()[0]["msg"].removeprefix("Value error, ")
-        raise CommandError(f"Rejected change: {problem}", 400) from None
-    saved = workspace_items.save(workspace, identity, space_id, change)
+    saved = workspace_items.change_rows(
+        workspace,
+        identity,
+        space_id,
+        database_id,
+        command_id=derived,
+        expected_revision=item["revision"],
+        upsert=upserts,
+        delete=deletes,
+    )
     response["database"]["revision"] = saved["revision"]
-    response["changes"] = counts
+    response["changes"] = saved["counts"]
     return response
 
 

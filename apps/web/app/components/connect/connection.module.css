@@ -86,9 +86,14 @@
   color: var(--connection-muted);
   overflow-wrap: anywhere;
 }
-.returnAction {
+/* The one action that completes the connection: a step larger than the memory
+   setup's copy buttons below it. */
+.approvedPage .returnAction {
   max-width: 100%;
+  min-height: 46px;
   margin-top: 20px;
+  padding: 11px 20px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 .approvedPage .revoke {
@@ -686,6 +691,9 @@
   }
   .card h1 {
     font-size: 26px;
+  }
+  .approvedPage .returnAction {
+    width: 100%;
   }
   .privateLabel {
     font-size: 10px;

@@ -4,7 +4,15 @@ import hmac
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from space import brain, content_changes, memory_link_index, memory_routing, tasks
+from space import (
+    brain,
+    content_changes,
+    database_records,
+    memory_link_index,
+    memory_routing,
+    tasks,
+    workspace_items,
+)
 from space.terms import resource_fingerprints, term_key
 from space.workspace import CommandError
 
@@ -49,8 +57,25 @@ def publish(
             content = {
                 k: v
                 for k, v in value.items()
-                if k not in {"id", "kind", "revision", "deleted", "updated_at", "author_agent"}
+                if k
+                not in {
+                    "id",
+                    "kind",
+                    "revision",
+                    "deleted",
+                    "updated_at",
+                    "author_agent",
+                    "records",
+                    "record_count",
+                }
             }
+            if value["kind"] == "database":
+                # Each archived revision carries the whole table; the rows go to the row
+                # tables below, one revision per record that changed between archived states.
+                row["records"] = [
+                    workspace_items.DatabaseRecord.model_validate(record).model_dump(mode="json")
+                    for record in value.get("records") or []
+                ]
             row["encrypted"] = workspace._pack(
                 key,
                 scope,
@@ -72,6 +97,8 @@ def publish(
                     "author_agent",
                 )
             }
+            if value.get("verdict"):
+                metadata["verdict"] = value["verdict"]
             content = {**metadata, "body": value["body"]}
             if value.get("_memory"):
                 content["memory"] = value["_memory"]
@@ -171,20 +198,20 @@ def publish(
                     "UPDATE space.collections SET encrypted_schema=%s WHERE id=%s",
                     (encrypted_schema, collection_id),
                 )
-            # Parameters: final database heads in this committed restore.
-            # What it does: reports actual row differences, not imported historical snapshots.
-            # Output: the same outbox as browser and MCP record saves.
-            from space.webhook_events import enqueue
-
+            # The databases this restore replaces, as they are before any head moves: their
+            # rows are the baseline of the first appended revision and of the change events.
+            existing_databases = {}
             for row in prepared:
                 value = row["value"]
                 if (
-                    row["current"]
-                    and row["entity"] == "item"
+                    row["entity"] == "item"
                     and value["kind"] == "database"
-                    and not value["deleted"]
+                    and row["action"] == "replace"
+                    and row["id"] not in existing_databases
                 ):
-                    enqueue(workspace, connection, scope, key, row["id"], row["revision"], value)
+                    existing_databases[row["id"]] = _current_database(
+                        workspace, connection, scope, key, row["id"]
+                    )
             # Publish all heads before their revisions; scoped foreign keys are deferred.
             for row in prepared:
                 if not row["current"]:
@@ -298,6 +325,7 @@ def publish(
                             len(row["encrypted"]),
                         ),
                     )
+            _publish_rows(workspace, connection, scope, key, prepared, existing_databases)
             for row in prepared:
                 if row["entity"] != "resource" or not row["current"]:
                     continue
@@ -367,3 +395,67 @@ def publish(
         raise
     workspace._recheck(identity, space_id)
     return {"id": str(restore_id), "state": "committed", "result": result}
+
+
+def _current_database(workspace, connection, scope, key, database_id):
+    """The unpacked current payload data and revision of a database about to be replaced."""
+    row = connection.execute(
+        workspace_items.ROW + "WHERE i.id=%s AND v.revision=i.current_revision", (database_id,)
+    ).fetchone()
+    row_key = (
+        key
+        if str(row["key_id"]) == key.key.key_id
+        else workspace._unwrap_key(
+            scope["organization_id"], scope["space_id"], workspace._key_rows([row])[row["key_id"]]
+        )
+    )
+    data = workspace._unpack(
+        row_key, scope, database_id, row["revision"], "workspace_item", row["encrypted_payload"]
+    )["data"]
+    return data, row["revision"]
+
+
+def _publish_rows(workspace, connection, scope, key, prepared, existing_databases):
+    """Parameters: the publishing transaction, the prepared entries whose item revisions are
+    inserted, and the pre-restore state of each replaced database.
+    What it does: stores the rows of every archived database revision, one record revision per
+    row that differs from the previous archived state, then queues one change event per record
+    whose content differs between the database before the restore and its restored head.
+    Output: nothing; a rolled-back transaction leaves no row and no event.
+    """
+    from space.webhook_events import enqueue, snapshot_changes
+
+    versions = {}
+    for row in prepared:
+        if row["entity"] == "item" and row["value"]["kind"] == "database":
+            versions.setdefault(row["id"], []).append(row)
+    for database_id, rows in versions.items():
+        existing_data, existing_revision = existing_databases.get(database_id, (None, 0))
+        before, heads, legacy, _ = database_records.baseline(
+            workspace, connection, scope, database_id, existing_data
+        )
+        pre_restore = list(before.values())
+        for row in sorted(rows, key=lambda row: row["revision"]):
+            upserts, deletes = database_records.snapshot_changes(before, row["records"])
+            writes, _, _ = database_records.plan(
+                before, upserts, deletes, legacy=legacy, total=len(before)
+            )
+            database_records.write(
+                workspace, connection, scope, key, database_id, row["revision"], writes, heads
+            )
+            heads |= {record_id for record_id, record in writes if record is not None}
+            before = {record["id"]: record for record in row["records"]}
+            legacy = False
+        head = max(rows, key=lambda row: row["revision"])
+        if head["current"] and not head["value"]["deleted"]:
+            enqueue(
+                workspace,
+                connection,
+                scope,
+                key,
+                database_id,
+                existing_revision,
+                head["revision"],
+                snapshot_changes(pre_restore, head["records"]),
+                head["value"].get("fields", []),
+            )

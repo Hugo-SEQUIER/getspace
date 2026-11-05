@@ -11,11 +11,12 @@ type ReadVersion = (spaceId: string, signal: AbortSignal) => Promise<SpaceVersio
 const FULL_RECHECK_MS = 15 * 60_000;
 const ITEM_KINDS = ["project", "folder", "database", "category", "section"];
 const RESOURCE_KINDS = ["document", "task", "memory"];
+const SYSTEM_KINDS = ["system", "lab_entry"];
 
 /** Only content covered by the Space revision can skip an unchanged response. */
 function versionedSpace(path: string) {
   const url = new URL(path, "https://cache.invalid/");
-  const match = /^\/spaces\/([^/]+)\/(?:resources(?:\/[^/]+)?|items(?:\/[^/]+)?|memories(?:\/[^/]+)?|tasks\/columns|search\/index)$/.exec(url.pathname);
+  const match = /^\/spaces\/([^/]+)\/(?:resources(?:\/[^/]+)?|items(?:\/[^/]+)?|memories(?:\/[^/]+)?|tasks\/columns|search\/index|systems(?:\/activity|\/entries\/[^/]+\/history)?)$/.exec(url.pathname);
   if (!match || url.searchParams.has("query")) return undefined;
   return { spaceId: match[1], kinds: contentKinds(url) };
 }
@@ -34,6 +35,8 @@ function contentKinds(url: URL): string[] | undefined {
   // Memory pages name the categories, projects and sections that classify each claim.
   if (collection === "memories") return ["memory", "category", "project", "section"];
   if (collection === "tasks") return ["columns"];
+  // The Systems area is one read of both kinds: lab statistics count entries.
+  if (collection === "systems") return SYSTEM_KINDS;
   return undefined;
 }
 

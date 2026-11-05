@@ -187,13 +187,15 @@
 @container (min-width: 1300px) {
   .sp-projects-view .sp-project-overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
 }
-.sp-settings-view { padding: 40px; }
+.sp-settings-view { --sp-settings-field: 600px; padding: 40px; }
 .sp-settings-view .sp-settings-layout { grid-template-columns: 210px minmax(0, 1fr); align-items: start; gap: 32px; padding: 0; }
 .sp-settings-view .sp-settings-layout > nav { gap: 5px; padding-top: 4px; }
 .sp-settings-view .sp-settings-layout > nav a { min-height: 40px; padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 1.4; }
 .sp-settings-view .sp-settings-layout > nav a.active { background: var(--color-selection); color: var(--color-accent); font-weight: 550; }
 .sp-settings-view .sp-settings-layout > nav a svg { flex-shrink: 0; }
-.sp-settings-view .sp-settings-page { width: 100%; max-width: 800px; padding: 28px 32px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.sp-settings-view .sp-settings-page { width: 100%; padding: 28px 32px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+/* The panel fills the window; one field never stretches past a comfortable width. */
+.sp-settings-view .sp-settings-page :is(input:not([type="radio"], [type="checkbox"]), select, textarea) { max-width: var(--sp-settings-field); }
 .sp-settings-view .sp-settings-page h1 { margin: 0 0 8px; font-size: 23px; font-weight: 600; letter-spacing: -.5px; line-height: 1.3; }
 .sp-settings-view .sp-settings-page .sp-subtitle { margin: 0 0 8px; color: var(--color-muted); font-size: 14px; line-height: 1.6; }
 .sp-settings-view .sp-settings-page section { padding: 24px 0; border-color: var(--color-rule); }
@@ -212,7 +214,7 @@
 .sp-settings-view .sp-properties { font-size: 14px; }
 .sp-settings-view .sp-profile { gap: 14px; }
 .sp-settings-view .sp-profile .sp-avatar { width: 44px; height: 44px; font-size: 16px; }
-.sp-settings-view .sp-profile > div { flex: 1; min-width: 0; }
+.sp-settings-view .sp-profile > div:not(.sp-profile-actions) { flex: 1; min-width: 0; }
 .sp-settings-view .sp-profile { flex-wrap: wrap; }
 .sp-settings-view .sp-profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sp-settings-view .sp-profile-form { max-width: 440px; margin-top: 16px; }

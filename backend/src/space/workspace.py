@@ -55,6 +55,7 @@ from space.memory import (
     RememberMemory,
     SaveHandoff,
     SetMemoryLinks,
+    SetMemoryRecall,
     bounded_result,
     rank_lexical,
     tokens,
@@ -701,6 +702,10 @@ class Workspace:
             "folder": metadata.get("folder"),
             "priority": metadata.get("priority"),
             "recall": metadata.get("recall", RecallMetadata().model_dump(mode="json")),
+            # A document that keeps its original file; see document_files.
+            **({"file": metadata["file"]} if metadata.get("file") else {}),
+            # A memory written by promoting a lab entry; see systems.
+            **({"verdict": metadata["verdict"]} if metadata.get("verdict") else {}),
         }
 
     def list_resources(
@@ -894,6 +899,11 @@ class Workspace:
     def save(self, identity, space_id: UUID, request: SaveResource):
         return self._save(identity, space_id, request)
 
+    @key_operation
+    def save_file(self, identity, space_id: UUID, request: SaveResource, file: dict):
+        """Create a document holding an uploaded file; see document_files.commit."""
+        return self._save(identity, space_id, request, file=file)
+
     def _save(
         self,
         identity,
@@ -906,19 +916,24 @@ class Workspace:
         new_id=None,
         index=None,
         quota_deletion=False,
+        file=None,
+        verdict=None,
     ):
+        if file is not None and request.resource_id:
+            raise CommandError("A file can only be added to a new document", 400)
         scope, key, previous = self._write_context(identity, space_id, request.command_id)
+        command = request.model_dump(
+            mode="json",
+            exclude=({"recall"} if request.recall is None else set())
+            | ({"project", "folder", "priority"} - request.model_fields_set),
+        )
+        if file is not None:
+            command["file"] = file
         fingerprint = fingerprint or hmac.digest(
             key.key.material,
             b"space.command.v1\0"
             + ((identity.agent_id + "\0").encode() if identity.agent_id else b"")
-            + encode(
-                request.model_dump(
-                    mode="json",
-                    exclude=({"recall"} if request.recall is None else set())
-                    | ({"project", "folder", "priority"} - request.model_fields_set),
-                )
-            ),
+            + encode(command),
             "sha256",
         )
         previous = self._validate_previous(identity, scope, previous, fingerprint)
@@ -949,9 +964,14 @@ class Workspace:
                 project = UUID(old["project"]) if old.get("project") else None
             if "priority" not in request.model_fields_set:
                 priority = old.get("priority")
+            # Edits keep the original file; only document_files.commit adds one.
+            file = old.get("file")
+            # A verdict stays on its memory through link, claim and recall changes.
+            verdict = verdict or old.get("verdict")
             if old["recall"]["category"] == "memory" and memory is None:
                 raise CommandError(
-                    "Use change_memory to edit or delete a memory, or build_memory to rebuild it",
+                    "Change a memory's claims with edit_memory_claim or forget_memory_claim, "
+                    "delete it with delete_memory, or rebuild it with build_memory",
                     409,
                 )
             if recall is None:
@@ -974,6 +994,10 @@ class Workspace:
             # website, so its writes count as unseen until they open them.
             "author_api_key": identity.api_key.id if identity.api_key else None,
         }
+        if file:
+            content["file"] = file
+        if verdict:
+            content["verdict"] = verdict
         if memory is not None:
             if request.expected_revision == 0:
                 memory_creator.capture(memory, content["author_agent"])
@@ -1005,6 +1029,8 @@ class Workspace:
                 "project": content["project"],
                 "folder": content["folder"],
                 "priority": content["priority"],
+                **({"file": file} if file else {}),
+                **({"verdict": verdict} if verdict else {}),
             },
         )
         # Searchable fingerprints of the same text, so recall can select this resource with
@@ -1101,6 +1127,13 @@ class Workspace:
                             memory_kind,
                         ),
                     )
+                    if file:
+                        from space import document_files
+
+                        document_files.attach(connection, resource_id, file)
+                        # The thumbnail is a second small file under its own ID.
+                        if file.get("thumbnail"):
+                            document_files.attach(connection, resource_id, file["thumbnail"])
                 saved_revision = connection.execute(
                     "INSERT INTO space.resource_revisions(organization_id,"
                     "space_id,resource_id,revision,key_id,encrypted_metadata,"
@@ -1241,6 +1274,9 @@ class Workspace:
 
     def source_url(self, space_id, resource_id, revision):
         return f"{self.web_url}/resources/{resource_id}?space_id={space_id}&revision={revision}"
+
+    def entry_url(self, space_id, system_id, entry_id):
+        return f"{self.web_url}/app/systems/{system_id}?entry={entry_id}&space_id={space_id}"
 
     @staticmethod
     def _manifest_digest(connection):
@@ -1716,6 +1752,8 @@ class Workspace:
             },
             "_context_project": resource.get("project"),
         }
+        if resource.get("verdict"):
+            item["verdict"] = resource["verdict"]
         if entry is not None:
             if entry.get("score") is not None:
                 item["score"] = entry["score"]
@@ -1992,14 +2030,27 @@ class Workspace:
     @admitted("_write_admission")
     @key_operation
     @reclassify_jobs.after_memory_write
-    def remember(self, identity, space_id, request: RememberMemory, *, extract=False):
-        """Organize and store authored text; only the extraction worker opts into generation."""
+    def remember(
+        self,
+        identity,
+        space_id,
+        request: RememberMemory,
+        *,
+        extract=False,
+        verdict=None,
+        resource_id=None,
+    ):
+        """Organize and store authored text; only the extraction worker opts into generation.
+
+        Promotion (see systems) passes the verdict it records and a resource ID derived from
+        its command, so a retried promotion lands on the same memory.
+        """
         fingerprint, previous = self._memory_retry(identity, space_id, "remember", request)
         if previous:
             return previous
         try:
             snapshot = self._incoming_memory_snapshot(identity, space_id, request.source)
-            resource_id = uuid4()
+            resource_id = resource_id or uuid4()
             explicit_links = memory_node_links.validate(
                 self, identity, space_id, resource_id, request.links, snapshot
             )
@@ -2050,7 +2101,7 @@ class Workspace:
                     command_id=request.command_id,
                     expected_revision=0,
                     kind="document",
-                    title=("Memory: " + request.title)[:300],
+                    title=(("Verdict: " if verdict else "Memory: ") + request.title)[:300],
                     body=memory_pipeline.memory_body(record),
                     recall=RecallMetadata(
                         category="memory",
@@ -2072,6 +2123,7 @@ class Workspace:
                 fingerprint=fingerprint,
                 snapshot=snapshot,
                 new_id=resource_id,
+                verdict=verdict,
             )
         except ModelError as error:
             raise CommandError(str(error), 503) from None
@@ -2198,6 +2250,47 @@ class Workspace:
             },
             fingerprint=fingerprint,
             snapshot=snapshot,
+        )
+
+    @admitted("_write_admission")
+    @key_operation
+    def set_memory_recall(self, identity, space_id, request: SetMemoryRecall):
+        """Parameters: scoped writer, memory revision, command ID and the excluded flag.
+
+        What it does: writes one revision that keeps the claims, links and index rows and
+        changes only whether recall may return the memory. No model call.
+        Output: the saved memory revision; retries return the original committed result.
+        """
+        fingerprint, previous = self._memory_retry(identity, space_id, "set_recall", request)
+        if previous:
+            return previous
+        resource = self.get_resource(
+            identity, space_id, request.resource_id, request.expected_revision, _internal=True
+        )
+        if not resource.get("_memory"):
+            raise CommandError("Memory not found", 404)
+        recall = RecallMetadata.model_validate(resource["recall"] | {"excluded": request.excluded})
+        refs = resource["recall"]["sources"]
+        return self._save(
+            identity,
+            space_id,
+            SaveResource(
+                command_id=request.command_id,
+                resource_id=request.resource_id,
+                expected_revision=request.expected_revision,
+                kind="document",
+                title=resource["title"],
+                body=memory_pipeline.memory_body(resource["_memory"]),
+                recall=recall,
+            ),
+            memory=resource["_memory"],
+            index={
+                "claims": memory_pipeline.index_rows(resource["_memory"]),
+                "vectors": {},
+                "model": None,
+                "source": (refs[0]["resource_id"], refs[0]["revision"]) if refs else None,
+            },
+            fingerprint=fingerprint,
         )
 
     @admitted("_write_admission")
@@ -2338,7 +2431,7 @@ class Workspace:
     @admitted("_write_admission")
     @key_operation
     def reclassify_limited(self, identity, space_id, resource_id, job_id):
-        """Reclassify only claims the old catalog limit left unassigned in one memory.
+        """Reclassify only claims a limit or an unavailable model left unassigned in one memory.
 
         Parameters: the queued writer's identity, the memory resource and the catch-up job.
         What it does: re-reads the current revision, so a concurrent edit wins; classifies
@@ -2428,8 +2521,15 @@ class Workspace:
             # select the exact memories whose current metadata and bodies are needed.
             snapshot, indexed = self._recall_state(identity, space_id)
             if request.strategy in {"semantic", "prompt"} and not indexed:
+                # Agents relay this to people. A new Space has no memory while the provider
+                # works, and naming the provider there read as "nothing can be stored".
                 raise CommandError(
-                    "Configure the memory provider and build memory before semantic recall",
+                    "This Space has no saved memory yet, so semantic recall has nothing to "
+                    "search. Use strategy='auto', or save memory with remember or "
+                    "remember_claims first."
+                    if self.memory_models.enabled
+                    else "No memory provider is configured, so semantic recall is unavailable. "
+                    "Use strategy='auto' or 'lexical'.",
                     409,
                 )
             ranked, engine = [], ENGINE
@@ -2689,6 +2789,7 @@ class Workspace:
                 engine=engine,
                 related=related_items,
                 assessment=assessment,
+                entry_url=lambda system_id, entry_id: self.entry_url(space_id, system_id, entry_id),
             )
             # A revoked grant must deny release; a concurrent write is not an error here.
             self._recheck(identity, space_id)

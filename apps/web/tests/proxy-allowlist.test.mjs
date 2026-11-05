@@ -62,11 +62,23 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["GET", `${space}/webhooks`], ["POST", `${space}/webhooks/${UUID}`],
     ["GET", `agents?workspace_id=${UUID}`], ["POST", `agents/${UUID}/identity`],
     ["GET", `oauth/details?authorization_id=${UUID}`], ["POST", "oauth/consent"],
+    ["POST", `${space}/files/${UUID}/parts/0`], ["POST", `${space}/files/${UUID}/parts/249`], ["POST", `${space}/files`],
+    ["DELETE", `${space}/files/${UUID}`],
+    ["GET", `${space}/resources/${UUID}/file/0`], ["GET", `${space}/resources/${UUID}/file/3?revision=2`],
+    ["GET", `${space}/resources/${UUID}/file/thumbnail`], ["GET", `${space}/resources/${UUID}/file/thumbnail?revision=2`],
+    ["GET", `${space}/systems`], ["POST", `${space}/systems`], ["POST", `${space}/systems/entries`],
+    ["POST", `${space}/systems/entries/${UUID}/promote`], ["POST", `${space}/systems/entries/${UUID}/demote`],
+    ["POST", `${space}/systems/entries/${UUID}/uses`], ["GET", `${space}/systems/entries/${UUID}/history`],
+    ["GET", `${space}/systems/activity?system_id=${UUID}`],
   ]) assert.ok(proxyAllowed(proxyPath(path), method), `${method} ${path}`);
   for (const [method, path] of [
     ["POST", `${space}/read-version`], ["GET", `${space}/unknown`], ["GET", "admin"],
     ["GET", `${space}/api-keys/${UUID}`], ["GET", "openapi.json"],
     // An app's own OAuth endpoints live outside /v1 and never pass through the website.
     ["POST", "oauth/token"], ["POST", "oauth/register"], ["GET", "oauth/authorize"],
+    ["POST", `${space}/files/${UUID}`], ["GET", `${space}/files/${UUID}`],
+    ["POST", `${space}/files/${UUID}/parts/x`], ["GET", `${space}/resources/${UUID}/file`],
+    ["GET", `${space}/resources/${UUID}/file/thumbnails`], ["GET", `${space}/resources/${UUID}/file/thumbnail/0`],
+    ["GET", `${space}/systems/${UUID}`], ["POST", `${space}/systems/entries/${UUID}`], ["POST", `${space}/systems/entries/${UUID}/delete`],
   ]) assert.ok(!proxyAllowed(proxyPath(path), method), `${method} ${path} must be refused`);
 });

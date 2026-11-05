@@ -48,24 +48,12 @@
       }
      ],
      "groupBy": null,
-     "id": "9d3b1d63-258d-4a4f-9e9e-6785d3c9a048",
+     "id": "46fd5197-eceb-4136-827d-71722f2e838a",
      "kind": "database",
      "name": "Leads",
-     "records": [
-      {
-       "createdAt": null,
-       "id": "r1",
-       "name": "Acme",
-       "notes": "",
-       "updatedAt": "2026-10-08T01:56:07.240528Z",
-       "values": {
-        "company": "Acme Ltd",
-        "value": 150.0
-       }
-      }
-     ],
+     "record_count": 1,
      "revision": 2,
-     "updated_at": "2026-10-08T01:56:07.242500+00:00",
+     "updated_at": "2026-11-05T02:18:02.239022+00:00",
      "view": "table"
     }
    ],
@@ -78,13 +66,13 @@
    "author_agent": null,
    "deleted": false,
    "description": "The Atlas launch.",
-   "id": "fc2108b2-a7c2-43b4-b0ea-44c6e01a30a8",
+   "id": "e8cdc874-3f86-4253-972f-6fe0174354a1",
    "kind": "project",
    "name": "Atlas",
    "revision": 1,
    "section_id": null,
    "status": "todo",
-   "updated_at": "2026-10-08T01:56:07.179434+00:00"
+   "updated_at": "2026-11-05T02:18:01.373554+00:00"
   }
  },
  "get /v1/spaces/{space_id}/map": {
@@ -93,7 +81,7 @@
    "categories": [
     {
      "description": "",
-     "id": "2783099a-562f-461b-b551-735fe15e947c",
+     "id": "dec5fa2d-b664-4dfa-ae01-65e8718adb23",
      "name": "Engineering"
     }
    ],
@@ -103,14 +91,14 @@
      "databases": [],
      "description": "",
      "folders": [],
-     "id": "fde5224d-38ab-4b85-8cff-44f268d8b48b",
+     "id": "0b63680d-e0df-4c91-8d08-010588668e80",
      "name": "Work",
      "projects": [
       {
        "databases": [],
        "description": "",
        "folders": [],
-       "id": "5c81be14-1e68-42d2-a4d4-48b684198713",
+       "id": "feddbffd-f344-4ffb-aa0d-91e417976ea9",
        "name": "Beacon",
        "rules": [],
        "status": "todo"
@@ -120,7 +108,7 @@
     }
    ],
    "space": {
-    "id": "704ffc7a-8ef2-4be4-931d-35f4d4f21933",
+    "id": "1b46d855-7c85-4547-a38b-af770e608f04",
     "name": "Private Space"
    },
    "task_statuses": [
@@ -149,7 +137,7 @@
        }
       ],
       "group_by": null,
-      "id": "9d3b1d63-258d-4a4f-9e9e-6785d3c9a048",
+      "id": "46fd5197-eceb-4136-827d-71722f2e838a",
       "name": "Leads",
       "records": 1,
       "rules": [],
@@ -159,7 +147,7 @@
     "folders": [
      {
       "description": "",
-      "id": "215cddb8-818a-4451-b237-ae9a80a45f5d",
+      "id": "b217c0e9-8df3-44da-b3a4-fb98e6c5c00d",
       "name": "Specs",
       "rules": []
      }
@@ -169,7 +157,7 @@
       "databases": [],
       "description": "The Atlas launch.",
       "folders": [],
-      "id": "fc2108b2-a7c2-43b4-b0ea-44c6e01a30a8",
+      "id": "e8cdc874-3f86-4253-972f-6fe0174354a1",
       "name": "Atlas",
       "rules": [],
       "status": "todo"
@@ -183,7 +171,7 @@
   "response": {
    "items": [
     {
-     "author": "you",
+     "author": "agent",
      "author_agent": null,
      "author_client_id": null,
      "claims": [
@@ -196,23 +184,23 @@
         "scope": "unassigned",
         "section_ids": []
        },
-       "created_at": "2026-10-08T01:56:07.876587+00:00",
+       "created_at": "2026-11-05T02:18:08.064649+00:00",
        "creator": {
         "agent": null,
         "basis": "captured",
         "kind": "human"
        },
        "edited": false,
-       "id": "400f9a95-be1a-5386-bfbb-47ceb37ab434",
+       "id": "5b6f4429-460b-58ac-93e3-eac45e954331",
        "importance": 0,
        "index": "Atlas launch window",
        "memory_type": "factual",
-       "source": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+       "source": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
        "value": "Atlas launches in November."
       }
      ],
      "folder": null,
-     "id": "3bd12481-05da-4243-9c3b-cc453fd74a31",
+     "id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15",
      "import_origin": null,
      "kind": "document",
      "priority": null,
@@ -222,7 +210,7 @@
       "excluded": false,
       "sources": [
        {
-        "resource_id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+        "resource_id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
         "revision": 2
        }
       ],
@@ -232,10 +220,10 @@
      "stale": false,
      "status": "todo",
      "title": "Memory: Atlas launch window",
-     "updated_at": "2026-10-08T01:56:07.904882+00:00"
+     "updated_at": "2026-11-05T02:18:08.309480+00:00"
     },
     {
-     "author": "you",
+     "author": "agent",
      "author_agent": null,
      "author_client_id": null,
      "claims": [
@@ -248,14 +236,14 @@
         "scope": "unassigned",
         "section_ids": []
        },
-       "created_at": "2026-10-08T01:56:07.311000+00:00",
+       "created_at": "2026-11-05T02:18:03.048442+00:00",
        "creator": {
         "agent": null,
         "basis": "captured",
         "kind": "human"
        },
        "edited": true,
-       "id": "cec465b1-0330-5209-8518-9c4ee6b52841",
+       "id": "eba67b70-2398-5684-8dec-7794c84aef83",
        "importance": 0,
        "index": "Launch month",
        "memory_type": "factual",
@@ -271,14 +259,14 @@
         "scope": "unassigned",
         "section_ids": []
        },
-       "created_at": "2026-10-08T01:56:07.311000+00:00",
+       "created_at": "2026-11-05T02:18:03.048442+00:00",
        "creator": {
         "agent": null,
         "basis": "user_attributed",
         "kind": "human"
        },
        "edited": false,
-       "id": "36976ce0-886b-51af-822f-f3efd5d720d6",
+       "id": "8b1e4d90-d605-5496-8875-27ab4a6d40ec",
        "importance": 1,
        "index": "Owner",
        "memory_type": "factual",
@@ -287,7 +275,7 @@
       }
      ],
      "folder": null,
-     "id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+     "id": "57226add-350f-4401-8ffd-22100deabc95",
      "import_origin": null,
      "kind": "document",
      "priority": null,
@@ -302,14 +290,15 @@
      "stale": false,
      "status": "todo",
      "title": "Memory: Atlas launch facts",
-     "updated_at": "2026-10-08T01:56:07.586955+00:00"
+     "updated_at": "2026-11-05T02:18:05.542857+00:00"
     }
    ],
    "next_cursor": null,
    "provider": {
+    "anthropic_model": null,
     "classification_provider": "decision",
     "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
-    "decision_model": "perplexity/pplx-decider-v1.1-27b",
+    "decision_model": "typesafe/jev-1.13",
     "embedding_dim": 1536,
     "embedding_endpoint": "https://models.example.com/v1",
     "embedding_model": "fixture-embed",
@@ -332,7 +321,7 @@
  "get /v1/spaces/{space_id}/memories/{resource_id}": {
   "request": null,
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "claims": [
@@ -345,14 +334,14 @@
       "scope": "unassigned",
       "section_ids": []
      },
-     "created_at": "2026-10-08T01:56:07.876587+00:00",
+     "created_at": "2026-11-05T02:18:08.064649+00:00",
      "creator": {
       "agent": null,
       "basis": "captured",
       "kind": "human"
      },
      "edited": false,
-     "id": "400f9a95-be1a-5386-bfbb-47ceb37ab434",
+     "id": "5b6f4429-460b-58ac-93e3-eac45e954331",
      "importance": 0,
      "index": "Atlas launch window",
      "memory_type": "factual",
@@ -360,12 +349,12 @@
       "links": [],
       "status": "disabled"
      },
-     "source": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+     "source": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
      "value": "Atlas launches in November."
     }
    ],
    "folder": null,
-   "id": "3bd12481-05da-4243-9c3b-cc453fd74a31",
+   "id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15",
    "kind": "document",
    "priority": null,
    "project": null,
@@ -374,7 +363,7 @@
     "excluded": false,
     "sources": [
      {
-      "resource_id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+      "resource_id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
       "revision": 2
      }
     ],
@@ -384,7 +373,7 @@
    "stale": false,
    "status": "todo",
    "title": "Memory: Atlas launch window",
-   "updated_at": "2026-10-08T01:56:07.904882+00:00"
+   "updated_at": "2026-11-05T02:18:08.309480+00:00"
   }
  },
  "get /v1/spaces/{space_id}/memories/{resource_id}/links": {
@@ -396,7 +385,7 @@
      "origin": "explicit",
      "related_entry_id": null,
      "relation": "expands_on",
-     "resource_id": "3bd12481-05da-4243-9c3b-cc453fd74a31",
+     "resource_id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15",
      "revision": 1
     }
    ],
@@ -411,7 +400,7 @@
     {
      "attempts": 0,
      "error_code": null,
-     "id": "a322f538-22cc-4895-bc0b-08fb9302a97f",
+     "id": "6e0f3fd6-5fab-4bd8-9e75-914e1bad85d2",
      "recall_ready": false,
      "result": null,
      "source_saved": true,
@@ -425,7 +414,7 @@
   "response": {
    "attempts": 0,
    "error_code": null,
-   "id": "a322f538-22cc-4895-bc0b-08fb9302a97f",
+   "id": "6e0f3fd6-5fab-4bd8-9e75-914e1bad85d2",
    "recall_ready": false,
    "result": null,
    "source_saved": true,
@@ -435,9 +424,10 @@
  "get /v1/spaces/{space_id}/memory/provider": {
   "request": null,
   "response": {
+   "anthropic_model": null,
    "classification_provider": "decision",
    "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
-   "decision_model": "perplexity/pplx-decider-v1.1-27b",
+   "decision_model": "typesafe/jev-1.13",
    "embedding_dim": 1536,
    "embedding_endpoint": "https://models.example.com/v1",
    "embedding_model": "fixture-embed",
@@ -462,14 +452,14 @@
    "activity": [
     {
      "available": false,
-     "date": "2026-07-11",
+     "date": "2026-08-08",
      "document_writes": null,
      "memories_created": null,
      "retrievals": null
     },
     {
      "available": false,
-     "date": "2026-07-12",
+     "date": "2026-08-09",
      "document_writes": null,
      "memories_created": null,
      "retrievals": null
@@ -483,18 +473,18 @@
      "documents_created": 1,
      "empty": 0,
      "errors": 0,
-     "last_active_at": "2026-10-08T01:56:08.013024+00:00",
+     "last_active_at": "2026-11-05T02:18:09.263072+00:00",
      "memories_created": 4,
      "memory_writes": 6,
-     "p50_ms": 36.92158401827328,
-     "p95_ms": 44.39330839959439,
+     "p50_ms": 317.6399749936536,
+     "p95_ms": 406.78932558512315,
      "retrievals": 3,
      "with_results": 3
     }
    ],
-   "as_of": "2026-10-08T01:56:08.047603+00:00",
+   "as_of": "2026-11-05T02:18:09.437098+00:00",
    "days": 90,
-   "period_start": "2026-07-11T00:00:00+00:00",
+   "period_start": "2026-08-08T00:00:00+00:00",
    "periods": {
     "30": {
      "agents": [
@@ -505,16 +495,16 @@
        "documents_created": 1,
        "empty": 0,
        "errors": 0,
-       "last_active_at": "2026-10-08T01:56:08.013024+00:00",
+       "last_active_at": "2026-11-05T02:18:09.263072+00:00",
        "memories_created": 4,
        "memory_writes": 6,
-       "p50_ms": 36.92158401827328,
-       "p95_ms": 44.39330839959439,
+       "p50_ms": 317.6399749936536,
+       "p95_ms": 406.78932558512315,
        "retrievals": 3,
        "with_results": 3
       }
      ],
-     "period_start": "2026-09-09T00:00:00+00:00",
+     "period_start": "2026-10-07T00:00:00+00:00",
      "strategies": [
       {
        "document_writes": 0,
@@ -523,8 +513,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 41.07254200789612,
-       "p95_ms": 44.80840419855667,
+       "p50_ms": 367.16739198891446,
+       "p95_ms": 411.74206728464924,
        "retrievals": 2,
        "strategy": "lexical",
        "with_results": 2
@@ -536,8 +526,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 14.102875022217631,
-       "p95_ms": 14.102875022217631,
+       "p50_ms": 139.1182841034606,
+       "p95_ms": 139.1182841034606,
        "retrievals": 1,
        "strategy": "resume",
        "with_results": 1
@@ -550,8 +540,8 @@
       "errors": 0,
       "memories_created": 4,
       "memory_writes": 6,
-      "p50_ms": 36.92158401827328,
-      "p95_ms": 44.39330839959439,
+      "p50_ms": 317.6399749936536,
+      "p95_ms": 406.78932558512315,
       "retrievals": 3,
       "reused_memories": 4,
       "with_results": 3
@@ -566,16 +556,16 @@
        "documents_created": 1,
        "empty": 0,
        "errors": 0,
-       "last_active_at": "2026-10-08T01:56:08.013024+00:00",
+       "last_active_at": "2026-11-05T02:18:09.263072+00:00",
        "memories_created": 4,
        "memory_writes": 6,
-       "p50_ms": 36.92158401827328,
-       "p95_ms": 44.39330839959439,
+       "p50_ms": 317.6399749936536,
+       "p95_ms": 406.78932558512315,
        "retrievals": 3,
        "with_results": 3
       }
      ],
-     "period_start": "2026-10-02T00:00:00+00:00",
+     "period_start": "2026-10-30T00:00:00+00:00",
      "strategies": [
       {
        "document_writes": 0,
@@ -584,8 +574,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 41.07254200789612,
-       "p95_ms": 44.80840419855667,
+       "p50_ms": 367.16739198891446,
+       "p95_ms": 411.74206728464924,
        "retrievals": 2,
        "strategy": "lexical",
        "with_results": 2
@@ -597,8 +587,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 14.102875022217631,
-       "p95_ms": 14.102875022217631,
+       "p50_ms": 139.1182841034606,
+       "p95_ms": 139.1182841034606,
        "retrievals": 1,
        "strategy": "resume",
        "with_results": 1
@@ -611,8 +601,8 @@
       "errors": 0,
       "memories_created": 4,
       "memory_writes": 6,
-      "p50_ms": 36.92158401827328,
-      "p95_ms": 44.39330839959439,
+      "p50_ms": 317.6399749936536,
+      "p95_ms": 406.78932558512315,
       "retrievals": 3,
       "reused_memories": 4,
       "with_results": 3
@@ -627,16 +617,16 @@
        "documents_created": 1,
        "empty": 0,
        "errors": 0,
-       "last_active_at": "2026-10-08T01:56:08.013024+00:00",
+       "last_active_at": "2026-11-05T02:18:09.263072+00:00",
        "memories_created": 4,
        "memory_writes": 6,
-       "p50_ms": 36.92158401827328,
-       "p95_ms": 44.39330839959439,
+       "p50_ms": 317.6399749936536,
+       "p95_ms": 406.78932558512315,
        "retrievals": 3,
        "with_results": 3
       }
      ],
-     "period_start": "2026-07-11T00:00:00+00:00",
+     "period_start": "2026-08-08T00:00:00+00:00",
      "strategies": [
       {
        "document_writes": 0,
@@ -645,8 +635,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 41.07254200789612,
-       "p95_ms": 44.80840419855667,
+       "p50_ms": 367.16739198891446,
+       "p95_ms": 411.74206728464924,
        "retrievals": 2,
        "strategy": "lexical",
        "with_results": 2
@@ -658,8 +648,8 @@
        "errors": 0,
        "memories_created": 0,
        "memory_writes": 0,
-       "p50_ms": 14.102875022217631,
-       "p95_ms": 14.102875022217631,
+       "p50_ms": 139.1182841034606,
+       "p95_ms": 139.1182841034606,
        "retrievals": 1,
        "strategy": "resume",
        "with_results": 1
@@ -672,8 +662,8 @@
       "errors": 0,
       "memories_created": 4,
       "memory_writes": 6,
-      "p50_ms": 36.92158401827328,
-      "p95_ms": 44.39330839959439,
+      "p50_ms": 317.6399749936536,
+      "p95_ms": 406.78932558512315,
       "retrievals": 3,
       "reused_memories": 4,
       "with_results": 3
@@ -684,9 +674,9 @@
     {
      "actor_type": "website",
      "agent_id": null,
-     "created_at": "2026-10-08T01:56:08.013024+00:00",
-     "duration_ms": 45.22349999751896,
-     "id": "ce154afa-24f4-41f7-bb78-c5573f0fc1e5",
+     "created_at": "2026-11-05T02:18:09.263072+00:00",
+     "duration_ms": 416.6948089841753,
+     "id": "4bf8f9c3-8338-45d1-95b5-96ad65259b4f",
      "item_count": 5,
      "kind": "retrieval",
      "new_items": 0,
@@ -697,18 +687,18 @@
     {
      "actor_type": "website",
      "agent_id": null,
-     "created_at": "2026-10-08T01:56:07.904882+00:00",
+     "created_at": "2026-11-05T02:18:08.309480+00:00",
      "duration_ms": null,
-     "id": "cddadb85-bae8-4725-a800-58ea9d43ae79",
+     "id": "15ab6f35-11de-49a0-b5d0-bc89be1e942d",
      "item_count": 1,
      "kind": "memory",
      "new_items": 1,
      "outcome": "success",
      "resource_exists": true,
-     "resource_id": "3bd12481-05da-4243-9c3b-cc453fd74a31"
+     "resource_id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15"
     }
    ],
-   "space_id": "704ffc7a-8ef2-4be4-931d-35f4d4f21933",
+   "space_id": "1b46d855-7c85-4547-a38b-af770e608f04",
    "strategies": [
     {
      "document_writes": 0,
@@ -717,8 +707,8 @@
      "errors": 0,
      "memories_created": 0,
      "memory_writes": 0,
-     "p50_ms": 41.07254200789612,
-     "p95_ms": 44.80840419855667,
+     "p50_ms": 367.16739198891446,
+     "p95_ms": 411.74206728464924,
      "retrievals": 2,
      "strategy": "lexical",
      "with_results": 2
@@ -730,8 +720,8 @@
      "errors": 0,
      "memories_created": 0,
      "memory_writes": 0,
-     "p50_ms": 14.102875022217631,
-     "p95_ms": 14.102875022217631,
+     "p50_ms": 139.1182841034606,
+     "p95_ms": 139.1182841034606,
      "retrievals": 1,
      "strategy": "resume",
      "with_results": 1
@@ -744,8 +734,8 @@
     "errors": 0,
     "memories_created": 4,
     "memory_writes": 6,
-    "p50_ms": 36.92158401827328,
-    "p95_ms": 44.39330839959439,
+    "p50_ms": 317.6399749936536,
+    "p95_ms": 406.78932558512315,
     "retrievals": 3,
     "reused_memories": 4,
     "with_results": 3
@@ -757,23 +747,34 @@
     "memories": 3,
     "tasks": 1
    },
-   "tracking_started_at": "2026-10-08T01:56:06.888301+00:00",
+   "tracking_started_at": "2026-11-05T02:17:58.567022+00:00",
    "usage": {
-    "item_limit": 10000,
+    "item_limit": null,
     "items": 10,
-    "model_request_limit": 2000,
+    "model_request_limit": null,
     "model_requests": 9,
     "plan": null,
-    "resets_at": "2026-11-01T00:00:00",
-    "retained_bytes": 17120,
-    "storage_limit_bytes": 536870912
+    "resets_at": "2026-12-01T00:00:00",
+    "retained_bytes": 11274,
+    "storage_limit_bytes": null
    }
   }
  },
  "get /v1/spaces/{space_id}/read-version": {
   "request": null,
   "response": {
-   "version": "1:0:owner:private"
+   "version": "1:0:owner:private",
+   "versions": {
+    "category": "2:category:0:owner:private",
+    "columns": "2:columns:0:owner:private",
+    "database": "2:database:0:owner:private",
+    "document": "2:document:0:owner:private",
+    "folder": "2:folder:0:owner:private",
+    "memory": "2:memory:0:owner:private",
+    "project": "2:project:0:owner:private",
+    "section": "2:section:0:owner:private",
+    "task": "2:task:0:owner:private"
+   }
   }
  },
  "get /v1/spaces/{space_id}/resources": {
@@ -781,11 +782,11 @@
   "response": {
    "items": [
     {
-     "author": "you",
+     "author": "agent",
      "author_agent": null,
      "author_client_id": null,
      "folder": null,
-     "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+     "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
      "kind": "task",
      "priority": "High",
      "project": null,
@@ -798,7 +799,7 @@
      "revision": 1,
      "status": "todo",
      "title": "Write the Atlas changelog",
-     "updated_at": "2026-10-08T01:56:07.009263+00:00"
+     "updated_at": "2026-11-05T02:17:59.547074+00:00"
     }
    ],
    "next_cursor": null
@@ -807,12 +808,12 @@
  "get /v1/spaces/{space_id}/resources/{resource_id}": {
   "request": null,
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "Summarize what changed.",
    "folder": null,
-   "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+   "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
    "kind": "task",
    "priority": "High",
    "project": null,
@@ -825,7 +826,7 @@
    "revision": 1,
    "status": "todo",
    "title": "Write the Atlas changelog",
-   "updated_at": "2026-10-08T01:56:07.009263+00:00"
+   "updated_at": "2026-11-05T02:17:59.547074+00:00"
   }
  },
  "get /v1/spaces/{space_id}/tasks/columns": {
@@ -847,31 +848,31 @@
  "get /v1/spaces/{space_id}/usage": {
   "request": null,
   "response": {
-   "item_limit": 10000,
+   "item_limit": null,
    "items": 0,
-   "model_request_limit": 2000,
+   "model_request_limit": null,
    "model_requests": 0,
    "plan": null,
    "resets_at": null,
    "retained_bytes": 0,
-   "storage_limit_bytes": 536870912
+   "storage_limit_bytes": null
   }
  },
  "get /v1/workspace": {
   "request": null,
   "response": {
    "agent_id": null,
-   "id": "704ffc7a-8ef2-4be4-931d-35f4d4f21933",
+   "id": "1b46d855-7c85-4547-a38b-af770e608f04",
    "is_default": true,
    "kind": "personal",
    "mcp_url": "https://api.example.com/mcp/",
    "name": "Private Space",
-   "organization_id": "118ab082-d79e-432d-b829-516b97ef04cf",
+   "organization_id": "caf3c630-a3db-433e-b0df-3326b15fed22",
    "role": "owner",
    "space_map": {
     "tool": "get_space_map"
    },
-   "tasks_collection_id": "e8bbd593-9888-4271-b78e-2b1286710c70",
+   "tasks_collection_id": "8fbdc440-f3d9-4bc2-ab5b-a9972c6d6187",
    "visibility": "private"
   }
  },
@@ -906,7 +907,7 @@
       "kind": "human"
      },
      "edited": false,
-     "entry_id": "400f9a95-be1a-5386-bfbb-47ceb37ab434",
+     "entry_id": "5b6f4429-460b-58ac-93e3-eac45e954331",
      "evidence_context": {
       "resource_title": "Memory: Atlas launch window",
       "scope": "unassigned",
@@ -915,7 +916,7 @@
       ]
      },
      "excerpt": "Atlas launches in November.",
-     "id": "3bd12481-05da-4243-9c3b-cc453fd74a31",
+     "id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15",
      "importance": 0,
      "kind": "document",
      "memory_type": "factual",
@@ -923,17 +924,17 @@
      "revision": 1,
      "sources": [
       {
-       "resource_id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+       "resource_id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
        "revision": 2,
-       "url": "https://app.example.com/resources/e9ddabe5-f2a7-477f-819d-8dfabafaabdf?space_id=704ffc7a-8ef2-4be4-931d-35f4d4f21933&revision=2"
+       "url": "https://app.example.com/resources/01c1ebc0-f934-42b8-8a51-52d2e1129235?space_id=1b46d855-7c85-4547-a38b-af770e608f04&revision=2"
       }
      ],
      "stale": false,
      "status": "todo",
      "title": "Atlas launch window",
      "truncated": false,
-     "updated_at": "2026-10-08T01:56:07.904882+00:00",
-     "url": "https://app.example.com/resources/3bd12481-05da-4243-9c3b-cc453fd74a31?space_id=704ffc7a-8ef2-4be4-931d-35f4d4f21933&revision=1#memory-400f9a95-be1a-5386-bfbb-47ceb37ab434",
+     "updated_at": "2026-11-05T02:18:08.309480+00:00",
+     "url": "https://app.example.com/resources/6a4c2f47-cd36-4bd0-8252-6aee5da2cf15?space_id=1b46d855-7c85-4547-a38b-af770e608f04&revision=1#memory-5b6f4429-460b-58ac-93e3-eac45e954331",
      "verification": "memory"
     },
     {
@@ -955,13 +956,13 @@
       "kind": "human"
      },
      "edited": false,
-     "entry_id": "36976ce0-886b-51af-822f-f3efd5d720d6",
+     "entry_id": "8b1e4d90-d605-5496-8875-27ab4a6d40ec",
      "evidence_context": {
       "resource_title": "Memory: Atlas launch facts",
       "scope": "unassigned"
      },
      "excerpt": "Sam owns the Atlas launch.",
-     "id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+     "id": "57226add-350f-4401-8ffd-22100deabc95",
      "importance": 1,
      "kind": "document",
      "memory_type": "factual",
@@ -972,8 +973,8 @@
      "status": "todo",
      "title": "Owner",
      "truncated": false,
-     "updated_at": "2026-10-08T01:56:07.586955+00:00",
-     "url": "https://app.example.com/resources/c2557f17-be42-4b5d-a91f-50477fcf5de7?space_id=704ffc7a-8ef2-4be4-931d-35f4d4f21933&revision=3#memory-36976ce0-886b-51af-822f-f3efd5d720d6",
+     "updated_at": "2026-11-05T02:18:05.542857+00:00",
+     "url": "https://app.example.com/resources/57226add-350f-4401-8ffd-22100deabc95?space_id=1b46d855-7c85-4547-a38b-af770e608f04&revision=3#memory-8b1e4d90-d605-5496-8875-27ab4a6d40ec",
      "verification": "memory"
     }
    ],
@@ -982,7 +983,7 @@
  },
  "post /v1/spaces/{space_id}/databases/{database_id}/query": {
   "request": {
-   "command_id": "3310a5f2-58cd-4000-be97-fac341535d27",
+   "command_id": "0db9d87c-6049-4c24-8960-ac5160cd8b0b",
    "expected_revision": 1,
    "params": [
     150,
@@ -997,7 +998,7 @@
     "updated": 1
    },
    "database": {
-    "id": "9d3b1d63-258d-4a4f-9e9e-6785d3c9a048",
+    "id": "46fd5197-eceb-4136-827d-71722f2e838a",
     "revision": 2
    },
    "results": [
@@ -1011,22 +1012,44 @@
   }
  },
  "post /v1/spaces/{space_id}/export": {
-  "request": {
-   "after": "r:d014e80a-06d2-4cc8-864e-15f1929ca81b:0000000001",
-   "snapshot": 5
-  },
+  "request": {},
   "response": {
    "entries": [
+    {
+     "current": true,
+     "entity": "resource",
+     "value": {
+      "author": "agent",
+      "author_agent": null,
+      "author_client_id": null,
+      "body": "Planned the launch.\n\n## Decisions\n- Use PostgreSQL\n\n## Progress\n\n\n## Unresolved questions\n\n\n## Next actions\n- Write the changelog",
+      "folder": null,
+      "id": "00ee1812-12df-417b-81d1-176b98fe11fe",
+      "kind": "document",
+      "priority": null,
+      "project": null,
+      "recall": {
+       "category": "handoff",
+       "excluded": false,
+       "sources": [],
+       "topics": []
+      },
+      "revision": 1,
+      "status": "todo",
+      "title": "Atlas session",
+      "updated_at": "2026-11-05T02:18:00.402692+00:00"
+     }
+    },
     {
      "current": false,
      "entity": "resource",
      "value": {
-      "author": "you",
+      "author": "agent",
       "author_agent": null,
       "author_client_id": null,
       "body": "Summarize what changed.",
       "folder": null,
-      "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+      "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
       "kind": "task",
       "priority": "High",
       "project": null,
@@ -1039,45 +1062,30 @@
       "revision": 1,
       "status": "todo",
       "title": "Write the Atlas changelog",
-      "updated_at": "2026-10-08T01:56:07.009263+00:00"
-     }
-    },
-    {
-     "current": true,
-     "entity": "resource",
-     "value": {
-      "author": "you",
-      "author_agent": null,
-      "author_client_id": null,
-      "body": "Summarize what changed.",
-      "folder": null,
-      "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
-      "kind": "task",
-      "priority": "High",
-      "project": null,
-      "recall": {
-       "category": "source",
-       "excluded": false,
-       "sources": [],
-       "topics": []
-      },
-      "revision": 2,
-      "status": "review",
-      "title": "Write the Atlas changelog",
-      "updated_at": "2026-10-08T01:56:07.070776+00:00"
+      "updated_at": "2026-11-05T02:17:59.547074+00:00"
      }
     }
    ],
-   "exported_at": "2026-10-08T01:56:07.174881+00:00",
+   "exported_at": "2026-11-05T02:18:01.316943+00:00",
    "format": "space.archive.v1",
    "next_cursor": null,
    "snapshot": 5,
-   "source_space": "704ffc7a-8ef2-4be4-931d-35f4d4f21933"
+   "source_space": "1b46d855-7c85-4547-a38b-af770e608f04",
+   "task_columns": [
+    {
+     "label": "To do",
+     "value": "todo"
+    },
+    {
+     "label": "In progress",
+     "value": "in_progress"
+    }
+   ]
   }
  },
  "post /v1/spaces/{space_id}/handoffs": {
   "request": {
-   "command_id": "f46d9ec6-08fb-444b-ba1c-a721b20b23f5",
+   "command_id": "ddac4d70-676d-4666-8864-6be0521b148c",
    "decisions": [
     "Use PostgreSQL"
    ],
@@ -1088,12 +1096,12 @@
    "title": "Atlas session"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "Planned the launch.\n\n## Decisions\n- Use PostgreSQL\n\n## Progress\n\n\n## Unresolved questions\n\n\n## Next actions\n- Write the changelog",
    "folder": null,
-   "id": "4ea50fd0-00ca-42ad-bd57-58e9b33ca381",
+   "id": "00ee1812-12df-417b-81d1-176b98fe11fe",
    "kind": "document",
    "priority": null,
    "project": null,
@@ -1106,38 +1114,38 @@
    "revision": 1,
    "status": "todo",
    "title": "Atlas session",
-   "updated_at": "2026-10-08T01:56:07.089073+00:00"
+   "updated_at": "2026-11-05T02:18:00.402692+00:00"
   }
  },
  "post /v1/spaces/{space_id}/items": {
   "request": {
-   "command_id": "1fc6756b-2ec5-4338-b2d7-1cd961210e5c",
+   "command_id": "99a70a5a-ff49-4268-acce-e105aaccbff4",
    "data": {
     "name": "Beacon",
-    "section_id": "fde5224d-38ab-4b85-8cff-44f268d8b48b"
+    "section_id": "0b63680d-e0df-4c91-8d08-010588668e80"
    },
    "expected_revision": 0,
-   "item_id": "5c81be14-1e68-42d2-a4d4-48b684198713",
+   "item_id": "feddbffd-f344-4ffb-aa0d-91e417976ea9",
    "kind": "project"
   },
   "response": {
    "author_agent": null,
    "deleted": false,
    "description": "",
-   "id": "5c81be14-1e68-42d2-a4d4-48b684198713",
+   "id": "feddbffd-f344-4ffb-aa0d-91e417976ea9",
    "kind": "project",
    "name": "Beacon",
    "revision": 1,
-   "section_id": "fde5224d-38ab-4b85-8cff-44f268d8b48b",
+   "section_id": "0b63680d-e0df-4c91-8d08-010588668e80",
    "status": "todo",
-   "updated_at": "2026-10-08T01:56:07.806410+00:00"
+   "updated_at": "2026-11-05T02:18:07.369577+00:00"
   }
  },
  "post /v1/spaces/{space_id}/memory/build": {
   "request": {
-   "command_id": "6a873255-b075-4ce8-b4b3-047150db601d",
+   "command_id": "e19bc88c-ade0-492a-bedc-8e6318d46c3c",
    "source": {
-    "resource_id": "d014e80a-06d2-4cc8-864e-15f1929ca81b",
+    "resource_id": "51b3b811-14dd-449a-9404-496c0a4098b5",
     "revision": 6
    }
   },
@@ -1146,19 +1154,19 @@
  "post /v1/spaces/{space_id}/memory/change": {
   "request": {
    "action": "edit",
-   "command_id": "ae2a674c-820e-451e-82f4-4f5f7831688a",
-   "entry_id": "cec465b1-0330-5209-8518-9c4ee6b52841",
+   "command_id": "712dfd25-d782-4f08-a114-a31588eb024c",
+   "entry_id": "eba67b70-2398-5684-8dec-7794c84aef83",
    "expected_revision": 1,
-   "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+   "resource_id": "57226add-350f-4401-8ffd-22100deabc95",
    "value": "Atlas launches in early November."
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "## Launch month\nAtlas launches in early November.\n\n## Owner\nSam owns the Atlas launch.",
    "folder": null,
-   "id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+   "id": "57226add-350f-4401-8ffd-22100deabc95",
    "kind": "document",
    "memory": {
     "claims": [
@@ -1171,7 +1179,7 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
@@ -1179,7 +1187,7 @@
       },
       "edited": true,
       "generated_value": "Atlas launches in November.",
-      "id": "cec465b1-0330-5209-8518-9c4ee6b52841",
+      "id": "eba67b70-2398-5684-8dec-7794c84aef83",
       "importance": 0,
       "index": "Launch month",
       "memory_type": "factual",
@@ -1198,14 +1206,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
        "kind": "human"
       },
       "edited": false,
-      "id": "36976ce0-886b-51af-822f-f3efd5d720d6",
+      "id": "8b1e4d90-d605-5496-8875-27ab4a6d40ec",
       "importance": 1,
       "index": "Owner",
       "memory_type": "factual",
@@ -1230,7 +1238,7 @@
    "revision": 2,
    "status": "todo",
    "title": "Memory: Atlas launch facts",
-   "updated_at": "2026-10-08T01:56:07.538071+00:00"
+   "updated_at": "2026-11-05T02:18:05.128904+00:00"
   }
  },
  "post /v1/spaces/{space_id}/memory/claims": {
@@ -1246,16 +1254,16 @@
      "value": "Sam owns the Atlas launch."
     }
    ],
-   "command_id": "eee334ff-8b62-4f0c-af7b-6b0cdf65ed25",
+   "command_id": "fdcda44c-8180-458f-b05d-bfc4e15931bd",
    "title": "Atlas launch facts"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "## Launch month\nAtlas launches in November.\n\n## Owner\nSam owns the Atlas launch.",
    "folder": null,
-   "id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+   "id": "57226add-350f-4401-8ffd-22100deabc95",
    "kind": "document",
    "memory": {
     "claims": [
@@ -1268,14 +1276,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
        "kind": "human"
       },
       "edited": false,
-      "id": "cec465b1-0330-5209-8518-9c4ee6b52841",
+      "id": "eba67b70-2398-5684-8dec-7794c84aef83",
       "importance": 0,
       "index": "Launch month",
       "memory_type": "factual",
@@ -1294,14 +1302,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
        "kind": "human"
       },
       "edited": false,
-      "id": "36976ce0-886b-51af-822f-f3efd5d720d6",
+      "id": "8b1e4d90-d605-5496-8875-27ab4a6d40ec",
       "importance": 1,
       "index": "Owner",
       "memory_type": "factual",
@@ -1326,26 +1334,26 @@
    "revision": 1,
    "status": "todo",
    "title": "Memory: Atlas launch facts",
-   "updated_at": "2026-10-08T01:56:07.340491+00:00"
+   "updated_at": "2026-11-05T02:18:03.356061+00:00"
   }
  },
  "post /v1/spaces/{space_id}/memory/creator": {
   "request": {
-   "command_id": "acb3d601-94e7-4fb9-987a-eb85b9a1b6d5",
+   "command_id": "b5612a29-fe20-4efa-bb0a-811803b14ce9",
    "creator_agent_id": null,
    "entry_ids": [
-    "36976ce0-886b-51af-822f-f3efd5d720d6"
+    "8b1e4d90-d605-5496-8875-27ab4a6d40ec"
    ],
    "expected_revision": 2,
-   "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7"
+   "resource_id": "57226add-350f-4401-8ffd-22100deabc95"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "## Launch month\nAtlas launches in early November.\n\n## Owner\nSam owns the Atlas launch.",
    "folder": null,
-   "id": "c2557f17-be42-4b5d-a91f-50477fcf5de7",
+   "id": "57226add-350f-4401-8ffd-22100deabc95",
    "kind": "document",
    "memory": {
     "claims": [
@@ -1358,7 +1366,7 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
@@ -1366,7 +1374,7 @@
       },
       "edited": true,
       "generated_value": "Atlas launches in November.",
-      "id": "cec465b1-0330-5209-8518-9c4ee6b52841",
+      "id": "eba67b70-2398-5684-8dec-7794c84aef83",
       "importance": 0,
       "index": "Launch month",
       "memory_type": "factual",
@@ -1385,14 +1393,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.311000+00:00",
+      "created_at": "2026-11-05T02:18:03.048442+00:00",
       "creator": {
        "agent": null,
        "basis": "user_attributed",
        "kind": "human"
       },
       "edited": false,
-      "id": "36976ce0-886b-51af-822f-f3efd5d720d6",
+      "id": "8b1e4d90-d605-5496-8875-27ab4a6d40ec",
       "importance": 1,
       "index": "Owner",
       "memory_type": "factual",
@@ -1417,19 +1425,19 @@
    "revision": 3,
    "status": "todo",
    "title": "Memory: Atlas launch facts",
-   "updated_at": "2026-10-08T01:56:07.586955+00:00"
+   "updated_at": "2026-11-05T02:18:05.542857+00:00"
   }
  },
  "post /v1/spaces/{space_id}/memory/jobs": {
   "request": {
-   "command_id": "a322f538-22cc-4895-bc0b-08fb9302a97f",
+   "command_id": "6e0f3fd6-5fab-4bd8-9e75-914e1bad85d2",
    "text": "Atlas ships soon.",
    "title": "Atlas notes"
   },
   "response": {
    "attempts": 0,
    "error_code": null,
-   "id": "a322f538-22cc-4895-bc0b-08fb9302a97f",
+   "id": "6e0f3fd6-5fab-4bd8-9e75-914e1bad85d2",
    "recall_ready": false,
    "result": null,
    "source_saved": true,
@@ -1438,27 +1446,27 @@
  },
  "post /v1/spaces/{space_id}/memory/remember": {
   "request": {
-   "command_id": "75cc00c5-c5dd-469b-9c24-b66121080b45",
+   "command_id": "eae38e33-2f60-4cc1-be61-a0099cf7055c",
    "links": [
     {
      "relation": "expands_on",
-     "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7"
+     "resource_id": "57226add-350f-4401-8ffd-22100deabc95"
     }
    ],
    "source": {
-    "resource_id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+    "resource_id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
     "revision": 2
    },
    "text": "Atlas launches in November.",
    "title": "Atlas launch window"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "## Atlas launch window\nAtlas launches in November.",
    "folder": null,
-   "id": "3bd12481-05da-4243-9c3b-cc453fd74a31",
+   "id": "6a4c2f47-cd36-4bd0-8252-6aee5da2cf15",
    "kind": "document",
    "memory": {
     "claims": [
@@ -1471,14 +1479,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.876587+00:00",
+      "created_at": "2026-11-05T02:18:08.064649+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
        "kind": "human"
       },
       "edited": false,
-      "id": "400f9a95-be1a-5386-bfbb-47ceb37ab434",
+      "id": "5b6f4429-460b-58ac-93e3-eac45e954331",
       "importance": 0,
       "index": "Atlas launch window",
       "memory_type": "factual",
@@ -1492,7 +1500,7 @@
     "links": [
      {
       "relation": "expands_on",
-      "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7"
+      "resource_id": "57226add-350f-4401-8ffd-22100deabc95"
      }
     ],
     "version": 2
@@ -1504,7 +1512,7 @@
     "excluded": false,
     "sources": [
      {
-      "resource_id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+      "resource_id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
       "revision": 2
      }
     ],
@@ -1513,25 +1521,25 @@
    "revision": 1,
    "status": "todo",
    "title": "Memory: Atlas launch window",
-   "updated_at": "2026-10-08T01:56:07.904882+00:00"
+   "updated_at": "2026-11-05T02:18:08.309480+00:00"
   }
  },
  "post /v1/spaces/{space_id}/resources": {
   "request": {
    "body": "Summarize what changed.",
-   "command_id": "4c765100-000c-4f7b-823b-9ce8a3c68c59",
+   "command_id": "adaafa10-213c-4163-b178-8c3e724ecf9e",
    "expected_revision": 0,
    "kind": "task",
    "priority": "High",
    "title": "Write the Atlas changelog"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "Summarize what changed.",
    "folder": null,
-   "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+   "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
    "kind": "task",
    "priority": "High",
    "project": null,
@@ -1544,7 +1552,7 @@
    "revision": 1,
    "status": "todo",
    "title": "Write the Atlas changelog",
-   "updated_at": "2026-10-08T01:56:07.009263+00:00"
+   "updated_at": "2026-11-05T02:17:59.547074+00:00"
   }
  },
  "post /v1/spaces/{space_id}/search": {
@@ -1555,19 +1563,19 @@
    "items": [
     {
      "description": "Planned the launch.\n\n## Decisions\n- Use PostgreSQL\n\n## Progress\n\n\n## Unresolved questions\n\n\n## Next actions\n- Write the changelog",
-     "id": "4ea50fd0-00ca-42ad-bd57-58e9b33ca381",
+     "id": "00ee1812-12df-417b-81d1-176b98fe11fe",
      "kind": "document",
      "status": "todo",
      "title": "Atlas session",
-     "updated_at": "2026-10-08T01:56:07.089073+00:00"
+     "updated_at": "2026-11-05T02:18:00.402692+00:00"
     },
     {
-     "description": "Atlas launches in November with PostgreSQL.",
-     "id": "d014e80a-06d2-4cc8-864e-15f1929ca81b",
-     "kind": "document",
-     "status": "todo",
-     "title": "Atlas launch plan",
-     "updated_at": "2026-10-08T01:56:06.988777+00:00"
+     "description": "Summarize what changed.",
+     "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
+     "kind": "task",
+     "status": "review",
+     "title": "Write the Atlas changelog",
+     "updated_at": "2026-11-05T02:18:00.200031+00:00"
     }
    ],
    "next_cursor": null,
@@ -1577,7 +1585,7 @@
  },
  "post /v1/spaces/{space_id}/tasks/columns": {
   "request": {
-   "command_id": "4df69b04-5205-45c9-bb5a-1b0494b709b8",
+   "command_id": "72bd05a1-9b4c-4663-817a-79030c664794",
    "expected_revision": 1,
    "label": "Review",
    "value": "review"
@@ -1598,17 +1606,17 @@
  },
  "post /v1/spaces/{space_id}/tasks/{resource_id}/status": {
   "request": {
-   "command_id": "1d2444b4-0d77-4eb1-9b44-1eef07671406",
+   "command_id": "9a4870f1-ded7-4727-8c75-f96960254402",
    "expected_revision": 1,
    "status": "review"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "Summarize what changed.",
    "folder": null,
-   "id": "e9ddabe5-f2a7-477f-819d-8dfabafaabdf",
+   "id": "01c1ebc0-f934-42b8-8a51-52d2e1129235",
    "kind": "task",
    "priority": "High",
    "project": null,
@@ -1621,28 +1629,28 @@
    "revision": 2,
    "status": "review",
    "title": "Write the Atlas changelog",
-   "updated_at": "2026-10-08T01:56:07.070776+00:00"
+   "updated_at": "2026-11-05T02:18:00.200031+00:00"
   }
  },
  "put /v1/spaces/{space_id}/memories/{resource_id}/links": {
   "request": {
-   "command_id": "13fa4532-64f1-4438-a68b-f15faf7eb509",
+   "command_id": "bb791a1b-ded5-4b73-96e4-105a6f1863ba",
    "expected_revision": 1,
    "links": [
     {
      "relation": "related",
-     "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7"
+     "resource_id": "57226add-350f-4401-8ffd-22100deabc95"
     }
    ],
-   "resource_id": "a2ad0cf1-3a3b-48ab-9367-adbdd1d3a726"
+   "resource_id": "29da8541-7577-4b21-8dae-5e055afad82f"
   },
   "response": {
-   "author": "you",
+   "author": "agent",
    "author_agent": null,
    "author_client_id": null,
    "body": "## Atlas database\nAtlas uses PostgreSQL.",
    "folder": null,
-   "id": "a2ad0cf1-3a3b-48ab-9367-adbdd1d3a726",
+   "id": "29da8541-7577-4b21-8dae-5e055afad82f",
    "kind": "document",
    "memory": {
     "claims": [
@@ -1655,14 +1663,14 @@
        "scope": "unassigned",
        "section_ids": []
       },
-      "created_at": "2026-10-08T01:56:07.262204+00:00",
+      "created_at": "2026-11-05T02:18:02.467162+00:00",
       "creator": {
        "agent": null,
        "basis": "captured",
        "kind": "human"
       },
       "edited": false,
-      "id": "4ffef875-7766-549d-85ea-6fd02d0639ff",
+      "id": "8d77bec1-5b6c-5d7c-9340-621e4a67a82d",
       "importance": 2,
       "index": "Atlas database",
       "memory_type": "factual",
@@ -1676,7 +1684,7 @@
     "links": [
      {
       "relation": "related",
-      "resource_id": "c2557f17-be42-4b5d-a91f-50477fcf5de7"
+      "resource_id": "57226add-350f-4401-8ffd-22100deabc95"
      }
     ],
     "version": 2
@@ -1692,7 +1700,7 @@
    "revision": 2,
    "status": "todo",
    "title": "Memory: Atlas database",
-   "updated_at": "2026-10-08T01:56:07.431195+00:00"
+   "updated_at": "2026-11-05T02:18:04.196745+00:00"
   }
  }
 }

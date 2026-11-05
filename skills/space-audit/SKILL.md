@@ -21,7 +21,7 @@ Be exact about this before proposing anything. An audit that promises a deletion
 
 | Finding | Action available to you | Reversible |
 |---|---|---|
-| A claim is wrong, duplicated, forbidden or a one-off | `change_memory` with `action="forget"`, one claim per call | No. The claim leaves recall immediately, though its text survives in the previous immutable revision |
+| A claim is wrong, duplicated, forbidden or a one-off | `forget_memory_claim`, one claim per call | No. The claim leaves recall immediately, though its text survives in the previous immutable revision |
 | A category, section, project or database is unused, duplicated or wrong | `set_workspace_item_deleted` with `deleted=true` | Yes. Restore with `deleted=false` |
 | A label that should have been another kind | Archive it and create the right kind, because a kind cannot change | The archive is reversible; the new item is not the old one |
 | A source document is wrong or holds a secret | Nothing for you. The user deletes it on the website | Permanent |
@@ -29,7 +29,7 @@ Be exact about this before proposing anything. An audit that promises a deletion
 | A memory record as a whole, including an empty one left by forgetting its claims | `delete_memory` with the record's ID and current revision | No. The record, its claims and its index rows are removed |
 | A session handoff | Nothing for you. No delete tool is exposed for it | The user acts on the website |
 
-The website delete path is `DELETE /v1/spaces/{space_id}/resources/{resource_id}` with the current revision. It needs a signed-in session with write access, refuses a delegated agent identity, applies to a source document or a task, and is idempotent. Generated memory is refused there and is changed with `change_memory` instead. No other route removes a resource.
+The website delete path is `DELETE /v1/spaces/{space_id}/resources/{resource_id}` with the current revision. It needs a signed-in session with write access, refuses a delegated agent identity, applies to a source document or a task, and is idempotent. Generated memory is refused there and is changed with the memory claim tools, such as `forget_memory_claim`, or removed with `delete_memory` instead. No other route removes a resource.
 
 Never describe an archive as a deletion, and never describe a forget as reversible or the claim's text as erased.
 
@@ -59,7 +59,7 @@ A credential found in a document or a task is the one case that justifies urgenc
 
 ## Perform an approved repair
 
-- Claims: one `change_memory` call per claim, with `resource_id`, the current `expected_revision`, the claim's `entry_id` and `action="forget"`.
+- Claims: one `forget_memory_claim` call per claim, with `resource_id`, the current `expected_revision` and the claim's `entry_id`.
 - A whole memory record, or the empty record that forgetting leaves behind: one `delete_memory` call with the record's `resource_id` and its current revision. It journals every claim first, so a restored backup cannot resurrect them. Both IDs come from the listing: `resource_id` is the memory record's `id`, not the claim's `source`, and `entry_id` is the claim's `id`. A forget takes no `value`, and passing the `source` value as `resource_id` returns not-found.
 - Items: one `set_workspace_item_deleted` call per item, with the current revision and `deleted=true`.
 - Re-read the target before acting, because a revision may have changed since the audit.
@@ -80,7 +80,7 @@ Every tool below is an MCP tool. A client that surfaces MCP tools calls them as 
 
 `list_resources(space_id, kind, after)`: returns `{items, next_cursor}` with at most 50 documents or tasks per page; handoffs and generated memory are never listed here.
 
-`change_memory(space_id, change)` with `action="forget"`: `command_id`, `resource_id`, `expected_revision` (>= 1), `entry_id`, and no `value`. The claim is removed from the index immediately and is not recoverable.
+`forget_memory_claim(space_id, change)`: `command_id`, `resource_id`, `expected_revision` (>= 1) and `entry_id`. The claim is removed from the index immediately and is not recoverable.
 
 `set_workspace_item_deleted(space_id, item_id, change)`: `command_id`, `expected_revision` (>= 1), `deleted` (`true` archives, `false` restores).
 

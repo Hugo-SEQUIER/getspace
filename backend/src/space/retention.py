@@ -67,12 +67,26 @@ WHERE ctid IN (
 )
 """
 
+# Parts of an upload that never became a document. document_files attaches them within
+# 50 minutes, so an hour is past any upload still in progress.
+STAGED_FILE_PARTS_MINUTES = 60
 
-def _delete_in_batches(connection, statement: str, days: int, batch_size: int) -> int:
+STAGED_FILE_PARTS_SQL = """
+DELETE FROM space.file_parts
+WHERE ctid IN (
+    SELECT ctid FROM space.file_parts
+    WHERE resource_id IS NULL
+      AND created_at < now() - make_interval(mins => %s)
+    LIMIT %s
+)
+"""
+
+
+def _delete_in_batches(connection, statement: str, parameters: tuple, batch_size: int) -> int:
     """Runs one delete statement until it stops finding rows.
 
-    Parameters: an owner-role connection, the delete statement, the retention window in
-        days and the batch size.
+    Parameters: an owner-role connection, the delete statement, the statement's own
+        parameters ahead of the batch size and the batch size.
     What it does: commits each batch on its own, so no single statement holds locks
         across the whole table while a long delete runs.
     Output: the number of rows deleted in total.
@@ -80,7 +94,7 @@ def _delete_in_batches(connection, statement: str, days: int, batch_size: int) -
     removed = 0
     while True:
         with connection.transaction():
-            deleted = connection.execute(statement, (days, batch_size)).rowcount
+            deleted = connection.execute(statement, (*parameters, batch_size)).rowcount
         removed += deleted
         if deleted < batch_size:
             return removed
@@ -91,25 +105,30 @@ def purge(connection, *, days: int = COMMAND_RETENTION_DAYS, batch_size: int = B
 
     Parameters: an owner-role connection, the retention window in days and the batch size.
     What it does: removes the events of expired commands, then the commands themselves,
-        each in committed batches.
-    Output: a dict with the `events` and `commands` counts removed. A command ID older
+        each in committed batches, then the staged parts of uploads that never committed.
+    Output: a dict with the `events`, `commands`, `activity_events`,
+        `retired_claim_vectors` and `staged_file_parts` counts removed. A command ID older
         than the window is forgotten, so a retry that late is applied again.
     """
     if days < 1:
         raise ValueError("days must be at least 1")
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
-    events = _delete_in_batches(connection, EVENTS_SQL, days, batch_size)
-    commands = _delete_in_batches(connection, COMMANDS_SQL, days, batch_size)
-    activity = _delete_in_batches(connection, ACTIVITY_SQL, ACTIVITY_RETENTION_DAYS, batch_size)
+    events = _delete_in_batches(connection, EVENTS_SQL, (days,), batch_size)
+    commands = _delete_in_batches(connection, COMMANDS_SQL, (days,), batch_size)
+    activity = _delete_in_batches(connection, ACTIVITY_SQL, (ACTIVITY_RETENTION_DAYS,), batch_size)
     vectors = _delete_in_batches(
-        connection, RETIRED_VECTORS_SQL, RETIRED_VECTOR_RETENTION_DAYS, batch_size
+        connection, RETIRED_VECTORS_SQL, (RETIRED_VECTOR_RETENTION_DAYS,), batch_size
+    )
+    file_parts = _delete_in_batches(
+        connection, STAGED_FILE_PARTS_SQL, (STAGED_FILE_PARTS_MINUTES,), batch_size
     )
     return {
         "events": events,
         "commands": commands,
         "activity_events": activity,
         "retired_claim_vectors": vectors,
+        "staged_file_parts": file_parts,
     }
 
 
@@ -139,6 +158,7 @@ def main(argv=None) -> int:
     )
     print(f"Removed {counts['activity_events']} activity events older than 90 days.")
     print(f"Removed {counts['retired_claim_vectors']} retired recall vectors older than 1 day.")
+    print(f"Removed {counts['staged_file_parts']} file parts staged over an hour ago.")
     return 0
 
 

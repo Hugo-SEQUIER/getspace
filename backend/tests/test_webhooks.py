@@ -133,23 +133,33 @@ def event_payloads(service, owner, space):
 
 
 def test_row_diffs_ignore_order_noop_snapshot_and_timestamps():
-    before = database_data()
+    before = database_data()["records"]
     after = deepcopy(before)
-    after["records"].reverse()
-    for row in after["records"]:
+    after.reverse()
+    for row in after:
         row["updatedAt"] = "2026-10-01T12:00:00Z"
-    after["name"] = "Renamed database"
-    assert list(webhook_events.record_changes(before, after)) == []
-    after["records"][1]["values"]["stage"] = "Review"
-    changes = list(webhook_events.record_changes(before, after))
-    assert len(changes) == 1
-    diff, _, _ = changes[0]
-    assert diff == {
-        "record_id": "selected",
-        "operation": "updated",
-        "changed_fields": ["stage"],
-        "changed_properties": [],
-    }
+    changes = webhook_events.snapshot_changes(before, after)
+    assert [id_ for id_, _, _ in changes] == sorted(r["id"] for r in before)
+    assert [webhook_events.row_change(*change) for change in changes] == [None, None]
+    after[1]["values"]["stage"] = "Review"
+    diffs = [
+        diff
+        for diff in (
+            webhook_events.row_change(*change)
+            for change in webhook_events.snapshot_changes(before, after)
+        )
+        if diff is not None
+    ]
+    assert diffs == [
+        {
+            "record_id": "selected",
+            "operation": "updated",
+            "changed_fields": ["stage"],
+            "changed_properties": [],
+        }
+    ]
+    assert webhook_events.row_change("new", None, after[0])["operation"] == "created"
+    assert webhook_events.row_change("old", before[0], None)["operation"] == "deleted"
 
 
 def test_projection_only_discloses_approved_select_transition_and_supports_reentry():

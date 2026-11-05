@@ -1,0 +1,53 @@
+/* The ··· menu of one item: a small white sheet under its trigger, above everything else. */
+.sp-menu {
+  z-index: 60;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-pop);
+}
+.sp-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13.5px;
+  text-align: left;
+  white-space: nowrap;
+}
+.sp-menu-item > svg {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.sp-menu-item:hover:not(:disabled),
+.sp-menu-item:focus-visible {
+  background: var(--color-hover);
+}
+.sp-menu-item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+.sp-menu-item.is-danger {
+  color: #b1474c;
+}
+.sp-menu-item.is-danger > svg {
+  color: inherit;
+}
+.sp-menu-item:disabled {
+  color: var(--color-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+.sp-menu-trigger[aria-expanded="true"] {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}

@@ -25,6 +25,7 @@ class Models:
     enabled = True
     chat_fingerprint = "fixture-chat-v1"
     embedding_fingerprint = "fixture-embedding-v1"
+    decision_fingerprint = "fixture-decision-v1"
     embedding_model = "fixture-embedding"
 
     def __init__(self):

@@ -18,45 +18,10 @@
   background: var(--color-selection);
   color: var(--color-ink);
 }
-.sp-doc-library {
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 44px 42px 72px;
-}
-.sp-doc-library-heading {
-  height: auto;
-  padding: 0;
-  border: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 38px;
-}
 .sp-doc-eyebrow {
   color: var(--color-muted);
   font-size: var(--text-meta);
   letter-spacing: 0.045em;
-}
-.sp-doc-library-heading h1 {
-  color: var(--color-ink);
-  margin: 10px 0 9px;
-  font-size: 2rem;
-  font-weight: 590;
-  letter-spacing: -0.035em;
-}
-.sp-doc-library-heading p {
-  margin: 0;
-  font-size: var(--text-body);
-  color: var(--color-muted);
-}
-.sp-doc-private {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-muted);
-  font-size: var(--text-meta);
-  margin-top: 10px;
 }
 .sp-doc-section-title {
   display: flex;
@@ -130,8 +95,7 @@
   color: var(--color-faint);
   background: var(--color-paper);
 }
-.sp-doc-file.is-handoff,
-.sp-doc-row-icon.is-handoff {
+.sp-doc-file.is-handoff {
   color: #609c91;
   background: var(--color-panel);
   border-color: var(--color-border);
@@ -175,133 +139,6 @@
 .sp-doc-card-footer > span:last-child svg {
   margin-left: 4px;
   color: var(--color-faint);
-}
-.sp-doc-library-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 13px;
-}
-.sp-doc-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.sp-doc-tabs button {
-  background: transparent;
-  border-color: transparent;
-  font-size: var(--text-small);
-  color: var(--color-muted);
-  padding: 7px 9px;
-}
-.sp-doc-tabs button[aria-pressed="true"] {
-  color: var(--color-ink);
-  background: var(--color-selection);
-}
-.sp-doc-tabs button > span {
-  font-size: var(--text-meta);
-  color: var(--color-faint);
-}
-.sp-doc-library-controls {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.sp-doc-library-controls .sp-search {
-  min-width: 0;
-  width: 183px;
-}
-.sp-doc-library-controls .sp-search input {
-  width: 100%;
-  min-width: 0;
-  font-size: var(--text-small);
-}
-.sp-doc-library-controls select {
-  font-size: var(--text-meta);
-  max-width: 132px;
-  color: var(--color-text);
-  min-height: 31px;
-}
-.sp-doc-table {
-  min-width: 600px;
-  font-size: var(--text-small);
-}
-.sp-doc-table thead {
-  background: var(--color-paper);
-}
-.sp-doc-table th {
-  font-size: var(--text-meta);
-  font-weight: 400;
-  padding: 10px 14px;
-  color: var(--color-muted);
-}
-.sp-doc-table td {
-  height: 66px;
-  padding: 10px 14px;
-  border-color: var(--color-rule);
-}
-.sp-doc-table th:first-child,
-.sp-doc-table td:first-child {
-  padding-left: 12px;
-  width: 40%;
-}
-.sp-doc-table th:last-child,
-.sp-doc-table td:last-child {
-  text-align: right;
-  padding-right: 16px;
-}
-.sp-doc-table .sp-document-link {
-  gap: 11px;
-  font-size: var(--text-ui);
-}
-.sp-doc-table .sp-document-link > span:last-child {
-  overflow-wrap: anywhere;
-}
-.sp-doc-table .sp-document-link small {
-  display: block;
-  color: var(--color-muted);
-  font-size: var(--text-meta);
-  margin-top: 4px;
-}
-.sp-doc-row-icon {
-  display: inline-flex;
-  width: 31px;
-  height: 34px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  border-radius: 5px;
-  color: var(--color-faint);
-}
-.sp-doc-project-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-meta);
-  color: var(--color-muted);
-}
-.sp-doc-version {
-  color: var(--color-faint);
-  font-size: var(--text-meta);
-  font-family: ui-monospace, monospace;
-}
-.sp-doc-library-footer {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 4px;
-  color: var(--color-muted);
-  font-size: var(--text-meta);
-}
-.sp-doc-library-footer > span:last-child {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 .sp-doc-reading-layout {
   display: grid;
@@ -1036,16 +873,6 @@
   display: none;
 }
 @media (max-width: 1200px) {
-  .sp-doc-library {
-    padding: 34px 30px 60px;
-  }
-  .sp-doc-library-toolbar {
-    flex-wrap: wrap;
-  }
-  .sp-doc-library-controls {
-    flex: 1;
-    justify-content: flex-end;
-  }
   .sp-doc-reader.sp-document-reader {
     padding-right: 30px;
     padding-left: 30px;
@@ -1072,9 +899,6 @@
     max-width: 780px;
     padding: 38px 40px 60px;
   }
-  .sp-doc-private {
-    display: none;
-  }
   .sp-doc-recent-grid {
     gap: 10px;
   }
@@ -1083,11 +907,6 @@
   }
 }
 @media (max-width: 760px) {
-  .sp-doc-library-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
   .sp-doc-topbar .sp-actions {
     gap: 3px;
   }
@@ -1097,18 +916,6 @@
   }
   .sp-doc-panel-button {
     padding: 5px;
-  }
-  .sp-doc-library {
-    padding: 30px 22px 45px;
-  }
-  .sp-doc-library-heading {
-    margin-bottom: 30px;
-  }
-  .sp-doc-library-heading h1 {
-    font-size: 1.875rem;
-  }
-  .sp-doc-library-heading p {
-    font-size: var(--text-ui);
   }
   .sp-doc-recent-grid {
     display: flex;
@@ -1125,45 +932,6 @@
   }
   .sp-doc-section-title > span {
     font-size: var(--text-caption);
-  }
-  .sp-doc-library-controls {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 8px;
-  }
-  .sp-doc-library-controls .sp-search {
-    width: 100%;
-    flex-basis: 100%;
-  }
-  .sp-doc-library-controls select {
-    max-width: none;
-    flex: 1;
-  }
-  .sp-doc-table {
-    min-width: 0;
-  }
-  .sp-doc-table th:nth-child(2),
-  .sp-doc-table td:nth-child(2),
-  .sp-doc-table th:nth-child(3),
-  .sp-doc-table td:nth-child(3),
-  .sp-doc-table th:last-child,
-  .sp-doc-table td:last-child {
-    display: none;
-  }
-  .sp-doc-table th:first-child,
-  .sp-doc-table td:first-child {
-    width: auto;
-    padding-left: 4px;
-  }
-  .sp-doc-table td:nth-child(4),
-  .sp-doc-table th:nth-child(4) {
-    white-space: nowrap;
-    font-size: var(--text-meta);
-    padding: 8px 2px 8px 8px;
-    text-align: right;
-  }
-  .sp-doc-library-footer > span:last-child {
-    display: none;
   }
   .sp-doc-reader.sp-document-reader {
     padding: 30px 24px 50px;

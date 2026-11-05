@@ -1,3 +1,5 @@
+import type { DocumentFile } from "./document-files";
+
 export type Status = string;
 export type TaskColumn = { value: Status; label: string };
 export type TaskColumns = { columns: TaskColumn[]; revision: number };
@@ -21,6 +23,8 @@ export type Resource = {
   project?: string;
   folder?: string;
   priority?: "High" | "Medium" | "Low";
+  /** The original file a document keeps; its text, when readable, is the body. */
+  file?: DocumentFile;
   recall?: {
     category: string;
     sources?: { resource_id: string; revision: number }[];

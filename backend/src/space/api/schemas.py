@@ -71,6 +71,40 @@ class TaskColumn(Closed):
 # Documents and tasks
 
 
+class FileThumbnail(Closed):
+    id: UUID
+    type: Literal["image/webp", "image/jpeg"]
+    bytes: int = Field(ge=1, description="The thumbnail's size in bytes, at most 64 KiB.")
+    sha256: str = Field(description="The SHA-256 digest of the thumbnail, in hexadecimal.")
+    width: int = Field(ge=1)
+    height: int = Field(ge=1)
+    parts: int = Field(ge=1, description="Always 1: a thumbnail is one part.")
+
+
+class DocumentFile(Closed):
+    id: UUID
+    name: str = Field(description="The original file name.")
+    type: str = Field(description="The file's media type, such as application/pdf.")
+    bytes: int = Field(ge=1, description="The file's size in bytes.")
+    sha256: str = Field(description="The SHA-256 digest of the file, in hexadecimal.")
+    parts: int = Field(ge=1, description="How many parts of up to 1 MiB store the file.")
+    width: int | None = Field(
+        default=None,
+        description="A picture's or video's width in pixels, when the browser read it.",
+    )
+    height: int | None = Field(default=None, description="Its height in pixels.")
+    duration: float | None = Field(
+        default=None,
+        description="A video's or recording's length in seconds, when the browser read it.",
+    )
+    thumbnail: FileThumbnail | None = Field(
+        default=None,
+        description="A small picture of a picture, video or PDF the browser made at upload, "
+        "which the website's file grid shows. Its bytes are stored like the file's parts and "
+        "are shown on the website only.",
+    )
+
+
 class ResourceSummary(Closed):
     id: UUID
     kind: Literal["document", "task"]
@@ -89,6 +123,12 @@ class ResourceSummary(Closed):
     folder: UUID | None
     priority: Literal["High", "Medium", "Low"] | None
     recall: Recall
+    file: DocumentFile | None = Field(
+        default=None,
+        description="Present on a document that keeps an original file uploaded on the website, "
+        "such as a PDF, a presentation, a picture or a video. The body holds the text extracted "
+        "from it; the file itself is viewed and downloaded on the website.",
+    )
 
 
 class ExplicitLink(Closed):
@@ -420,7 +460,13 @@ class WorkspaceItem(Closed):
     project_id: UUID | None = Field(default=None, description="Folders and databases.")
     status: str | None = Field(default=None, description="Projects: a task column value.")
     fields: list[DatabaseField] | None = Field(default=None, description="Databases.")
-    records: list[DatabaseRecord] | None = Field(default=None, description="Databases.")
+    records: list[DatabaseRecord] | None = Field(
+        default=None,
+        description="Databases, when one item is read; listings carry record_count instead.",
+    )
+    record_count: int | None = Field(
+        default=None, description="Databases: how many records the database holds."
+    )
     view: str | None = Field(default=None, description="Databases: table or board.")
     groupBy: str | None = Field(default=None, description="Databases: the board's field.")
     tasks: TaskTracking | None = Field(
@@ -554,6 +600,26 @@ class SearchPage(Closed):
     next_cursor: str | None = Field(description="Continue until null, even after empty pages.")
 
 
+class VerdictSystem(Closed):
+    id: UUID
+    name: str
+
+
+class RecallVerdict(Closed):
+    """A lab entry promoted in the Systems area; only verdicts reach recall."""
+
+    label: Literal["works", "does_not_work"] = Field(
+        description="works for a validated rule or tactic, does_not_work for an anti-pattern."
+    )
+    status: Literal["validated", "invalidated"]
+    evidence: str = Field(description="The evidence level, such as Measured or Owner's call.")
+    system: VerdictSystem
+    domain: str
+    entry_id: UUID = Field(description="The lab entry the verdict was promoted from.")
+    promoted_at: datetime
+    url: str = Field(description="A link to the lab entry in the Space website.")
+
+
 class RecallItem(Open):
     """One cited result. Open: assessed results add relevance and evidence details."""
 
@@ -566,6 +632,9 @@ class RecallItem(Open):
     url: str = Field(description="A link to this exact revision in the Space website.")
     excerpt: str
     truncated: bool
+    verdict: RecallVerdict | None = Field(
+        default=None, description="Present when the memory is a verdict from the Systems area."
+    )
 
 
 class RecallResult(Open):

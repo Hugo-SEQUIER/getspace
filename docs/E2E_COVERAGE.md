@@ -18,26 +18,31 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Home: greeting, quick actions, Jump back in | `surfaces`, `workspace` | `attention` | |
 | Home: Needs you, New since you looked, badge, mark seen | `attention` | `attention` | Real stack writes as a client through a personal API key |
 | First-run tour | `auth.setup` (dismissed) | | Content of the tour not yet asserted |
-| Documents: create, list, open | `workspace`, `documents` | | |
+| Documents: create, list, open | `workspace`, `documents` | `documents` | |
+| Documents: directory (folder tiles by section, folder and section pages, Recently opened, type facets, search in bodies through the index, unread marks and the Unread filter, sortable headers, the 50-row pager, the row menu's Move to folder, a folder renamed from its tile, List or Grid) | | `documents` | `tests/document-library.test.mjs` unit-tests the locations, facets, search, sorting, folder groups, paths and recently opened; `tests/support/space-api.ts` answers folders, sections and document updates |
 | Documents: edit, revisions, history, delete | `documents` | | Folders, sections, drag into folder and upload are not covered |
+| Documents: original files (upload in parts, preview, download, convert to a page, discard after a failed upload), pictures and videos with thumbnails, several files at once, drop onto the library, the Files tab | `stack/document-files` (a three-part file read back intact after a reload, deleted with its parts; a staged part discarded through the proxy; a picture's thumbnail and size kept on the backend, read back by the Files tab after a reload and removed with the document) | `document-files` (PDF pages, Word and PowerPoint in the sandboxed frame, a multi-part download, conversion, a failed upload discarded, a large file previewed on request; a picture kept with its thumbnail and shown in Files, a video's frame and duration, three files saved together, a failed file in a batch, files dropped on the library, a picture converted to an image page) | `tests/document-files.test.mjs` unit-tests names, types, parts, base64, text bounds, slide order, thumbnail sizes, media details and the thumbnail download; the backend's parts, thumbnails and cleanup are in `backend/tests/test_document_files.py` |
 | Tasks: create, detail, status | `workspace`, `projects` | `tasks` | |
 | Tasks: board drag, keyboard moves, columns, bulk actions, view-only | | `tasks` | |
 | Tasks board: database rows planned for today | | `today-plan` | |
 | Search: titles answer before the index, body matches after one index read, type tabs, the palette reuses the index | `workspace` | `search` | |
 | Projects: create, rename, task filter, linked databases | `projects` | `project-databases` | Trash and sections: not yet |
 | Databases: create, records, reload, record panel | `databases` | `database-record-panel` | Properties, board view and import are not covered |
+| Databases: rows load on open, an edit saves one row | | `database-rows` | Against the fake API: the listing shows `record_count` and no rows, opening a database reads it once, a cell edit sends one `upsert` and no `data`, a view change sends the schema alone, a deletion sends the row's ID |
 | Databases: row selection | | `database-row-selection` | The checkbox cell selects a record; while any record is selected, a click on a row selects or clears it instead of editing or opening it, while the keyboard and the row menu keep their actions |
 | Databases: set a select value on selected rows | | `database-bulk-option` | The selection bar's menu lists only select properties; choosing an option or the empty choice saves every selected record at once and leaves unselected and unchanged records' edit times alone |
 | Databases: an edited row keeps its place | | `database-row-order` | Saving a cell no longer moves the row to the top under Last edited |
+| Systems: health band, systems list, the Lab tab and its evidence filter, one system's page with its lab lanes, promote with a note, record a use, back to testing, the timeline | | `systems` | Against the fake API: the promotion gate refuses an untested entry, the archive is refused while agents recall a verdict, and every move is one command at the entry's revision; creating and editing a system are not covered |
+| Systems: create a system, add a lab entry, refuse to promote it untested, retire it, read its history | `stack/systems` | | The stack has no memory provider, so the verdict memory a promotion writes is not covered |
 | Webhooks: create with signing secret, inbox subscription without a secret, inbox receipts | `databases` | `webhooks` | Rotate and remove: not yet |
-| Agents: create identity | `agents` | | |
+| Agents: list and rename an identity | `agents` | | The Agents page has no create form (an agent is named when its connection is approved), so the stack test creates the identity through the proxy; connections, assignment, revocation: not yet |
 | Agents: connect an agent with a token | | `agent-tokens` | The token is shown once with client setups |
 | Agents: connector address for apps that sign in | | `agent-tokens` | Key mode only; absent in private mode |
 | Device-code connection | | `connect-code` | Includes unlocking before reviewing the code |
-| App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token |
+| App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token; after Allow access the Return button is on the first screen of a small laptop and phone, above the memory setup |
 | Memory page renders, extraction status only while a job runs | `surfaces` | `settings` | Memory needs a model provider; browsing and editing memory are not covered |
 | Overview renders | `surfaces` | | |
-| Settings: account profile, picture upload and removal | | `settings` | The name comes from `SPACE_OWNER_NAME` |
+| Settings: account profile, picture upload and removal; on a wide window the panel fills the page and a field stays within 600px | | `settings` | The name comes from `SPACE_OWNER_NAME` |
 | Settings: API keys create, copy, revoke | `attention` (create) | `api-keys` | |
 | Settings: security, processing, data render | `surfaces` | `settings` (processing loads by itself, export hint, restore picker) | Export download and restore: not yet |
 | Workspace polish: Home waits for agents and seen marks, dialog widths on valley pages, agents connected never created, search close button, project overview columns, wide categories dialog, Needs you always a column | | `workspace-polish` | |

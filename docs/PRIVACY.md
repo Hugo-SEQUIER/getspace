@@ -7,6 +7,7 @@ A self-hosted installation keeps its data on the machine that runs it, under the
 Almost everything lives in the PostgreSQL database, in the `db-data` Docker volume:
 
 - **Content.** Documents, tasks, projects, folders, sections, categories, databases and their records, handoffs and memories, each with every revision.
+- **Original files.** A document that keeps its uploaded file stores it in parts of at most 1 MiB. Files are parsed and previewed in the browser, never on the server: Word and PowerPoint previews render in a frame that runs no scripts and loads nothing from the network, and SVG files are only downloaded.
 - **The memory index.** For each current memory claim: its embedding, SHA-256 hashes of the claim text and of its cue labels, its type, declared importance, embedding model, source reference and identifiers.
 - **Search fingerprints.** Keyed fingerprints of every word in each current revision, used to find candidates for recall.
 - **Agents and access.** Agent identities (a name and a harness), agent connections and whether they may write, SHA-256 digests of agent tokens and API keys, API key names and prefixes, and webhook subscriptions with their receiver URLs and signing secrets.
@@ -34,7 +35,7 @@ By default nothing does: with `SPACE_MEMORY_PROVIDER=disabled` no text is sent t
 
 **A model provider**, when `SPACE_MEMORY_PROVIDER` is `openai_compatible` or `ollama`. Space calls it only while handling a request from an agent or the website, or a job such a request queued:
 
-- When memory is written or edited (`remember`, `remember_claims`, `change_memory`, a Memora import), the text of each claim is sent to be embedded.
+- When memory is written or edited (`remember`, `remember_claims`, a claim edit, a Memora import), the text of each claim is sent to be embedded.
 - When an agent asks for extraction (`extract_memory`, `build_memory`), the source text, at most 12,000 characters, is sent to the text model, and the resulting claims are embedded.
 - During recall with the `semantic`, `prompt` or `auto` strategy, the query is embedded. For evidence assessment, up to 50 candidate claims and passages of at most 2,000 characters each are sent to the assessing model, with the titles of their sources and the names of the projects, categories and sections they belong to. The `prompt` strategy also lets the text model expand the query over candidate claims. The `lexical` strategy and `mode="resume"` call no model.
 
@@ -48,6 +49,8 @@ Chat requests to an OpenAI-compatible endpoint ask the provider not to store the
 
 **Caddy** obtains its HTTPS certificate from a public certificate authority such as Let's Encrypt, which learns your domain name.
 
+Inside the database, `space.database_records` and `space.database_record_revisions` hold one row per database record, with its own history. The operator of a self-hosted Space reads them like any other stored row: the record ID the writer chose, the database revision each version was written at, a deleted flag, the row's insertion position, and a payload holding the record's name, notes and values. A database export therefore contains how many records a database has, when each was written or deleted, and what they say.
+
 Agents connected to Space receive whatever they read through MCP. What an agent and its model provider keep is outside Space's control.
 
 ## Logs
@@ -57,7 +60,7 @@ The containers log request outcomes and fixed error categories, never document c
 ## Deleting data
 
 - **Documents and tasks.** Deleting one, on the website or through the REST API, removes it with every revision and its command records. Agents can delete tasks but not documents. Editing a document keeps its earlier revisions, so text removed in an edit stays in the history until the document itself is deleted.
-- **Memory.** `change_memory` with `action="forget"` removes one claim from the current memory and deletes its row in the memory index, embedding and hashes included, so recall stops returning it; earlier revisions of that memory still contain the claim's text. Deleting a whole memory (`delete_memory`, or on the website) removes it with every revision, its index rows and its command records.
+- **Memory.** `forget_memory_claim`, or `/memory/change` with `action="forget"`, removes one claim from the current memory and deletes its row in the memory index, embedding and hashes included, so recall stops returning it; earlier revisions of that memory still contain the claim's text. Deleting a whole memory (`delete_memory`, or on the website) removes it with every revision, its index rows and its command records.
 - **Projects, folders, sections, categories and databases.** Removing one moves it to the trash, where it keeps its revisions and can be restored. Nothing deletes it permanently except resetting the Space.
 - **Agent identities** are retired rather than erased: their names stay attached to the revisions they wrote.
 - **Logs of activity.** `python -m space.retention` removes command and event rows older than 180 days and Overview activity older than 90 days, and `python -m space.webhook_retention` removes finished webhook deliveries older than 30 days. Neither runs on its own; see [Operations](OPERATIONS.md#retention).

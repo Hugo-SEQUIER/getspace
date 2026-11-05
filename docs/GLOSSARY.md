@@ -40,11 +40,14 @@ How to read this page:
 | memory_kind | A readable marker on the resource so recall can select memory in SQL: `NULL` for a source document or task, `handoff` or `memory`. | `backend/migrations/versions/0006_memory_marker.sql` |
 | Source document | Evidence a memory may cite. It is never memory itself. | `docs/MEMORY.md` |
 | Handoff | Saved session state: summary, decisions, progress, unresolved questions and next actions. It is read through `resume` recall, stays lexically searchable as evidence, and has no claim index rows. | `SaveHandoff` in `backend/src/space/memory.py`, `0006_memory_marker.sql` |
-| Memory | A resource whose payload carries a memory record of claims. It is written by `remember`, `remember_claims`, `build_memory` or `change_memory`, and it is marked `memory_kind = 'memory'`. | `Workspace._save`, `memory_pipeline.prepared` |
+| Memory | A resource whose payload carries a memory record of claims. It is written by `remember`, `remember_claims`, `build_memory` or a claim change (`Workspace.change_memory`), and it is marked `memory_kind = 'memory'`. | `Workspace._save`, `memory_pipeline.prepared` |
 | Recall metadata | The block that describes how a resource is recalled: `category` (`source`, `handoff` or `memory`), `topics`, `sources` and `excluded`. | `RecallMetadata` in `backend/src/space/memory.py` |
 | Command | One client operation with one `command_id`, for example one `extract_memory` call. | `Workspace._save`, `jobs.enqueue` |
 | Command ID / idempotent replay | Repeating a `command_id` with the same payload returns the originally committed revision and spends no model call. The same ID with a different payload raises 409 `This command ID was already used for another operation.` The queue applies the same rule to a job ID and says `This job ID was already used for another request or grant`. | `Workspace._previous`, `jobs.enqueue` |
 | Command fingerprint | An HMAC of the request under the Space key. A reused command ID is compared by fingerprint, so a different payload cannot replay an old result. | `Workspace._save`, `Workspace._memory_retry` |
+| Original file | A file a person uploaded on the website that a document keeps, up to 250 MiB, such as a PDF, a Word document or a presentation. The document's `file` field gives its name, media type, size, SHA-256 digest and part count, a picture's or video's `width` and `height`, a recording's `duration` and its `thumbnail` when the browser read them, and its body holds the text the browser extracted from it. Edits keep the file; it cannot be replaced or removed. | `backend/src/space/document_files.py`, `Workspace.save_file` |
+| File part | Up to 1 MiB of an original file, stored in its own `space.file_parts` row with a digest bound to the file ID and part number. A part is staged when it arrives and attached in the transaction that creates its document. | `space.file_parts` in `backend/migrations/versions/0041_document_files.sql` |
+| Thumbnail | A WebP or JPEG of at most 64 KiB the browser made at upload from a picture, a video frame or a PDF's first page, stored as a one-part file under its own ID beside the original and attached to the same document. | `document_files.Thumbnail`, `read_part(thumbnail=True)` |
 
 ## Memory anatomy
 
@@ -95,6 +98,9 @@ A memory is one record. The record holds claims, the entries they were extracted
 | Verification | The evidence class of an item: `memory` for a claim, `handoff` for a handoff, `user_authored` for everything a person wrote directly. | `memory_pipeline.virtual_memories`, `memory._entry` |
 | Evidence assessment | A second, bounded model pass over at most 50 candidates of at most 2000 characters each. It labels each candidate `direct`, `irrelevant`, `historical` or `conflicting` and returns verbatim answer quotes. It is gated by the retrieval setting `assess_relevance`, on by default. | `backend/src/space/relevance.py` |
 | Related tier | Claims that share a generated cue with a matched claim. They are not ranked by relevance to the query, they live under their own response key, they are capped at 5, and they are only delivered when the caller sets `include_related`, although the internal `expanding` switch defaults on. They never displace a ranked item. | `brain.expand`, `memory.MAX_RELATED`, `RetrievalConfig.expanding` |
+| System | A recurring activity, such as a posting routine or an outreach campaign, with a goal metric, target, current value, counter-metric, source of truth, review cadence, health status and playbook document. A workspace item of kind `system`. | `backend/src/space/systems.py` |
+| Lab entry | A hypothesis or lesson a system tests, with a domain, status (`testing`, `validated`, `invalidated`, `retired`), evidence level, why, how to apply, source and uses. A workspace item of kind `lab_entry`; never recalled. | `systems.LabEntryData` |
+| Verdict | A lab entry promoted to `validated` (label `works`) or `invalidated` (label `does_not_work`) with Measured or Owner's call evidence and a source. Its memory is recalled with a `verdict` object linking back to the entry; demotion keeps that memory out of recall. | `systems.promote`, `memory._entry` |
 | Stale | The item cites a source revision that is no longer current. It stays readable, and a current-state answer must not use it. | `Workspace._stale`, `relevance.PROMPT` |
 | Excerpt, `truncated`, `has_more`, `max_chars` | Output budgeting: each item is excerpted around the query within 4000 characters, and the response respects `max_chars`. | `memory.excerpt`, `memory.bounded_result` |
 | Engine | The name of the ranking path that produced the response: `memora-brain-pgvector-v1` or `memora-brain-lexical-v1`. | `brain.ENGINE`, `memory.ENGINE` |
@@ -116,10 +122,10 @@ A memory is one record. The record holds claims, the entries they were extracted
 | Recovery-only attempt | At most one further lease that may only look up the command receipt, never start new model work. If it also expires, or if children keep dying before the attempt check, the queue marks the job `failed` with `recovery_failed`, which means the outcome could not be confirmed. | `jobs.MAX_RECOVERY_ATTEMPTS`, `jobs.claim`, `backend/tests/test_memory_jobs.py` |
 | Backoff | The delay before a retry is eligible: `min(60, 2 ** attempts)` seconds. | `jobs.finish` |
 | Error code | The machine-readable outcome on a failed job: `access_revoked`, `source_or_revision_changed`, `extraction_failed`, `context_changed`, `temporarily_unavailable` or `recovery_failed`. | `jobs.process`, `jobs.claim` |
-| Provider pin | The `provider_fingerprint` stored on a job: a hash of the provider, its endpoint and the text model. A job whose pin differs from the configured chat provider does no new model work; unless its result was already committed, it fails with `Extraction provider changed; submit a new job`. | `MemoryModels.chat_fingerprint`, `jobs.process` |
+| Provider pin | The `provider_fingerprint` stored on a job: a hash of the provider, its endpoint and the text model. A job whose pin differs from the configured chat provider does no new model work; unless its result was already committed, it fails with `Extraction provider changed; submit a new job`. A reclassification catch-up stores the decision model's fingerprint instead, so each decision model gets one catch-up per Space. | `MemoryModels.chat_fingerprint`, `reclassify_jobs.enqueue`, `jobs.process` |
 | Queue bound | At most 100 unfinished jobs per Space. Beyond it, enqueue fails with 503 `This Space's extraction queue is full; retry after jobs finish`. The bound is per Space. | `jobs.MAX_PENDING_PER_SPACE` |
 | Idle check | While the queue is empty, a continuously running worker asks one cheap question every 3 seconds (`--poll-interval`) and starts an attempt only when a job is eligible: queued and due, or holding an expired lease. This also picks up delayed retries and crashed attempts. | `job_worker.PENDING_SQL`, `backend/src/space/queue_watch.py` |
-| Drain and once | Worker batch flags: `--drain --max-jobs N` runs at most N attempts and exits; `--once` runs at most one. A failed or killed attempt counts toward the batch, and the supervisor exits nonzero when a batch contained one. | `job_worker.main` |
+| Drain and once | Worker batch flags: `--drain --max-jobs N` runs at most N attempts and exits; `--once` runs at most one. A failed or killed attempt counts toward the batch, and the supervisor exits nonzero when a batch contained one. A yielded turn of a Memora import or catch-up does not count; `--max-seconds` (720 by default in a drain) stops the batch from starting an attempt that could end later. | `job_worker.main` |
 
 ## Index row versus revision
 
@@ -130,6 +136,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Claim IDs, memory IDs, revisions, entry indices, timestamps | Claim text (`value`) and the memory title |
 | `embedding` vector and `embedding_model` name | Cue labels, before hashing |
 | `text_hash` and `cue_hashes` | The memory record's `entries` text |
+| File part IDs, sizes and digests | Original file and thumbnail bytes, file names, media types, pixel sizes and durations |
 | Claim type and declared importance | Creator, classification and links |
 
 [Data and privacy](PRIVACY.md) lists what is stored and who can read it.
@@ -156,14 +163,17 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Memories per list, and per recall load | 200 listed. Recall loads `max(32, its selected order)`, so the load bound never truncates the ranked or cue-expanded order; the shipped guide states an effective bound of 40 at the default multiplier. | `MAX_MEMORY_LIST`, `MAX_MEMORY_LOAD`, `Workspace.context` |
 | Recall request | query at most 500 characters, limit 1 to 10 (default 5), `max_chars` 2000 to 20000 (default 12000) | `RecallRequest` |
 | Evidence assessment | 50 records of at most 2000 characters | `relevance.MAX_EVIDENCE`, `MAX_EVIDENCE_CHARS` |
+| Database records | 10,000 per database; a record has a name of at most 200 characters, notes of at most 20,000 and values of at most 2,000 characters in at most 30 fields; each record is stored as its own revision | `workspace_items.MAX_DATABASE_RECORDS`, `DatabaseRecord`, `database_records.py` |
 | Recall lane | 12 active, 128 waiting, 5-second queue deadline | `Workspace.__init__` |
 | Memory write lane | 2 active, 32 waiting, 5-second queue deadline | `Workspace.__init__` |
 | Job queue per Space | 100 unfinished jobs | `jobs.MAX_PENDING_PER_SPACE` |
 | Job lease | 300 seconds | `jobs.LEASE_SECONDS` |
 | Job deadline per attempt | 240 seconds, 1 to 270 allowed | `job_worker.JOB_DEADLINE_SECONDS` |
 | Job attempts | 3 work attempts, plus at most 1 recovery-only attempt | `jobs.MAX_ATTEMPTS`, `jobs.MAX_RECOVERY_ATTEMPTS` |
-| Worker batch | 1 to 100 attempts, default 20 | `job_worker.main` |
+| Worker batch | 1 to 100 attempts, default 20; a drain also stops after 720 seconds by default | `job_worker.main`, `job_worker.DRAIN_SECONDS` |
 | Database statement, lock and idle-transaction timeouts | 15 s, 5 s, 30 s | `backend/src/space/database_setup.py`, `worker_setup.py` |
+| Original file | 250 MiB in at most 250 parts of 1 MiB, committed within 50 minutes of the parts' upload | `document_files.MAX_FILE_BYTES`, `PART_BYTES`, `STAGED_MINUTES` |
+| Thumbnail | 64 KiB in one part, WebP or JPEG, at most 1,024 pixels a side as stored | `document_files.THUMBNAIL_BYTES`, `THUMBNAIL_SIDE` |
 
 ## Words that are easy to confuse
 
@@ -178,7 +188,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | provider versus model | The provider is the endpoint and credential; the model is the pinned name. The provider fingerprint covers both, plus the URL. |
 | source versus evidence | A source is a specific resource revision. Evidence is any item a recall returned that supports an answer, including memory. |
 | selected | At write time, "selected for indexing" means which claims enter the index. At read time, "selected claims" means the ranking's winners. They are different sets. |
-| attempt versus job | One job may be attempted several times: three work attempts plus one recovery-only attempt. `--max-jobs` bounds attempts in a batch, not distinct jobs. |
+| attempt versus job | One job may be attempted several times: three work attempts plus one recovery-only attempt. `--max-jobs` bounds attempts in a batch, not distinct jobs. A Memora import or reclassification catch-up also runs in turns; a turn that yields is neither a failed attempt nor counted toward `--max-jobs`. |
 
 ## Where to read more
 

@@ -21,7 +21,7 @@ const clients = [
   { name: "Hermes", logo: "hermes-portrait.png" },
 ];
 
-export function AgentMemorySetup({ heading = "Agent setup", hideHeading = false }: { heading?: string; hideHeading?: boolean }) {
+export function AgentMemorySetup({ heading = "Agent setup" }: { heading?: string }) {
   const id = useId();
   const [tab, setTab] = useState(0);
   const [selected, setSelected] = useState<CopyChoice>("instructions");
@@ -87,7 +87,7 @@ export function AgentMemorySetup({ heading = "Agent setup", hideHeading = false 
     }
   }
   return <section className={styles.setup} aria-label={heading} aria-busy={busy}>
-    {!hideHeading && <h3 className={styles.title}>{heading}</h3>}
+    <h3 className={styles.title}>{heading}</h3>
     <p className={styles.intro}>Make Space part of the way your agent works. Set up its memory instructions once, then keep useful context between sessions.</p>
     <div className={styles.tabs} role="tablist" aria-label="Agent setup options">
       {setupTabs.map((label, index) => <button

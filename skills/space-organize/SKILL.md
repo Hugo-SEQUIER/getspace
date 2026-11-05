@@ -37,13 +37,13 @@ Memory claims carry assignments: a `scope`, and lists of category, project and s
 - `scope="global"` marks a claim that applies everywhere, and it must carry no `project_ids`.
 - `scope="unassigned"` is the default, and it must also carry no `project_ids`.
 
-Every ID must name a live item of the right kind, the lists must be unique, and each list holds at most 32 IDs. Apply assignments with `change_memory` and `action="classify"`, passing the memory resource ID, the current revision and the claim's `entry_id`.
+Every ID must name a live item of the right kind, the lists must be unique, and each list holds at most 32 IDs. Apply assignments with `classify_memory_claim`, passing the memory resource ID, the current revision and the claim's `entry_id`.
 
 Classifying a project also adds that project's parent section to `section_ids`, when the section is still active. The 32-section limit is applied after that addition, so a request can fail on a count the caller did not send. Count the parent sections of the projects you select before sending.
 
 The two failures are different and worth reporting apart: an ID that names nothing returns not-found, while an ID of the wrong kind, or an archived one, is refused as an inactive selection. A section count over the limit is refused separately.
 
-A manual classification survives later edits and rebuilds, which is why it is worth setting deliberately. A classify with no `classification` hands the claim back to the configured classifier, which replaces the assignments; when no classifier is configured the write is rejected, and when the classifier cannot answer, the existing assignments are kept and the write fails as temporarily unavailable.
+A manual classification survives later edits and rebuilds, which is why it is worth setting deliberately. A `classify_memory_claim` call with no `classification` hands the claim back to the configured classifier, which replaces the assignments; when no classifier is configured the write is rejected, and when the classifier cannot answer, the existing assignments are kept and the write fails as temporarily unavailable.
 
 Read the claim first with `list_memories`, so you classify the claim that exists rather than the one you remember. Correct a wrong claim before organising it, and never reclassify a user's correction without their request.
 
@@ -51,7 +51,7 @@ Read the claim first with `list_memories`, so you classify the claim that exists
 
 A project takes a `section_id` and must name an active section in the same Space. A folder may take a `section_id` and a `project_id`, and a database a `project_id` or `section_id`; a project wins over a section in the map. A folder's project places the folder only: the documents inside keep their own `project` and `folder`. A task or document takes a `project` field and must name a project in the same Space. All of these are references, so all are resolved from a read, and all are rejected when the target does not exist.
 
-When you create or merge containers, or the user says what belongs where, save that placement rule with `remember` and `routes_to` naming the containers, or move an existing rule with `change_memory` and `action="route"`. Check the result in `get_space_map`.
+When you create or merge containers, or the user says what belongs where, save that placement rule with `remember` and `routes_to` naming the containers, or move an existing rule with `route_memory_claim`. Check the result in `get_space_map`.
 
 Attaching a record to a project or a section does not change who can read it. Every record in a Space inherits that Space's access.
 
@@ -73,7 +73,7 @@ Every tool below is an MCP tool. A client that surfaces MCP tools calls them as 
 | `kind` | `category` or `section` | Cannot change after creation |
 | `data` | object | `name` (string, 1-200) and `description` (string, up to 1000) |
 
-`change_memory(space_id, change)` with `action="classify"`:
+`classify_memory_claim(space_id, change)`:
 
 | Field | Type | Notes |
 |---|---|---|
@@ -81,10 +81,11 @@ Every tool below is an MCP tool. A client that surfaces MCP tools calls them as 
 | `resource_id` | UUID | The memory resource holding the claim |
 | `expected_revision` | int >= 1 | The revision just read |
 | `entry_id` | UUID | The claim to classify |
-| `action` | `classify` | Required for an assignment |
-| `classification` | object | `scope`, `category_ids`, `project_ids`, `section_ids` |
+| `classification` | object | `scope`, `category_ids`, `project_ids`, `section_ids`; omit it to let the classifier decide |
 
 `classification.scope` is `global`, `project` or `unassigned`. Each ID list holds at most 32 unique IDs. Project scope requires at least one `project_ids` entry; `global` and `unassigned` must have none.
+
+`route_memory_claim(space_id, change)`: `command_id`, `resource_id`, `expected_revision` (>= 1), `entry_id`, and `routes_to`, up to 8 container IDs from `get_space_map`. It replaces the rule's current containers; an empty list clears them and keeps automatic routing from setting them again.
 
 `list_workspace_items(space_id, kind, after, deleted)` lists the structure, at most 25 items per page, ordered by item ID. `set_workspace_item_deleted` archives or restores a label, which removes it from the classifier's active catalog.
 

@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { message } from "../../../lib/client";
 import { useFeedback } from "../notifications";
 import { documentBlocks, documentText } from "../../../lib/space/document-content";
+import { fileKind, fileLabel } from "../../../lib/space/document-files";
+import { listedDocuments, unreadDocuments } from "../../../lib/space/document-library";
 import {
   categoryColors,
   statuses,
@@ -21,7 +23,8 @@ import { PageIcon } from "./sidebar-preferences";
 import { DocumentIconButton } from "./sidebar-navigation";
 import { DocumentTree } from "./document-tree";
 import { DocumentDragProvider } from "./document-drag";
-import { DocumentRecentCard, DocumentTableRow } from "./document-list-items";
+import { DocumentLibrary } from "./document-library";
+import { useOrganizationDialogs } from "./document-organization";
 
 function DocumentRail({
   panel,
@@ -56,6 +59,9 @@ function DocumentRail({
 const ImportDocumentDialog = dynamic(() =>
   import("./import-dialogs").then((m) => m.ImportDocumentDialog),
 );
+const DocumentFileView = dynamic(() =>
+  import("./document-file-view").then((m) => m.DocumentFileView),
+);
 
 export function DocumentsView({ base, id }: { base: string; id?: string }) {
   const data = useSpace(),
@@ -67,12 +73,10 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
     Number.isSafeInteger(Number(revisionValue))
       ? Number(revisionValue)
       : undefined;
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState("updated");
   const projectFilter = params.get("project") ?? "";
   const folderFilter = params.get("folder") ?? "";
   const sectionFilter = params.get("section") ?? "";
-  const [tab, setTab] = useState("all");
+  const unreadFilter = params.get("unread") === "1";
   const [editing, setEditing] = useState<"new" | "edit" | null>(null);
   const [newProject, setNewProject] = useState("");
   const [newFolder, setNewFolder] = useState("");
@@ -81,6 +85,8 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [importing, setImporting] = useState(false);
+  // Files dropped on the directory, handed to the Upload dialog.
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [selected, setSelected] = useState<Resource | null>(null);
   const [current, setCurrent] = useState<Resource | null>(null);
   const [error, setError] = useState("");
@@ -90,45 +96,15 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
   );
   const [historyLimit, setHistoryLimit] = useState(50);
   const [memoryLimit, setMemoryLimit] = useState(8);
-  const [loadingMore, setLoadingMore] = useState(false);
   useFeedback({
     error: error || deleteError || (panel === "context" ? data.memoryError : ""),
-    loading: deleting ? "Deleting document…" : loading ? "Loading document…" : loadingMore ? "Loading more documents…" : panel === "context" && data.memoryLoading ? "Loading linked memory…" : null,
+    loading: deleting ? "Deleting document…" : loading ? "Loading document…" : panel === "context" && data.memoryLoading ? "Loading linked memory…" : null,
     clearError: () => { setError(""); setDeleteError(""); },
   });
-  const documents = data.resources.filter(
-    (r) => r.kind === "document" && r.recall?.category !== "memory",
-  );
+  const documents = listedDocuments(data.resources);
   const folders = data.folders.filter((folder) => !folder.deleted);
-  const locationDocuments = documents.filter((r) => {
-    if (projectFilter === "unfiled") {
-      if (r.project && data.projects.some((project) => project.id === r.project)) return false;
-    } else if (projectFilter && r.project !== projectFilter) return false;
-    const folder = folders.find((item) => item.id === r.folder);
-    if (folderFilter === "unfiled") return !folder;
-    if (folderFilter) return folder?.id === folderFilter;
-    return !sectionFilter || folder?.section_id === sectionFilter;
-  });
-  const matchingDocuments = locationDocuments.filter((r) =>
-    r.title.toLowerCase().includes(query.toLowerCase()),
-  );
-  const recent = [...matchingDocuments]
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    .slice(0, 3);
-  const handoffs = matchingDocuments.filter((r) => r.recall?.category === "handoff");
-  const items = matchingDocuments
-    .filter((r) => tab !== "handoffs" || r.recall?.category === "handoff")
-    .sort((a, b) =>
-      sort === "name"
-        ? a.title.localeCompare(b.title)
-        : b.updated_at.localeCompare(a.updated_at),
-    );
-  const filtered = !!query || !!projectFilter || !!folderFilter || !!sectionFilter || tab !== "all";
-  const locationName = folderFilter
-    ? folderFilter === "unfiled" ? "Unfiled" : folders.find((folder) => folder.id === folderFilter)?.name
-    : sectionFilter
-      ? data.organizationItems.find((item) => item.kind === "section" && !item.deleted && item.id === sectionFilter)?.name
-      : projectFilter === "unfiled" ? "No project" : data.projects.find((project) => project.id === projectFilter)?.name;
+  const sections = data.organizationItems.filter((item) => item.kind === "section" && !item.deleted);
+  const unreadCount = unreadDocuments(documents, data.views).length;
   const project = data.projects.find((p) => p.id === selected?.project);
   const linkedMemories = useMemo(() => {
     const matches = data.memories.filter((m) => m.sourceId === selected?.id);
@@ -149,10 +125,11 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         (r) => r.kind === "task" && r.project === selected.project,
       )
     : [];
+  // A file's text is read from the file, not written as Markdown, so it has no outline.
   const headings = useMemo(
     () =>
-      documentBlocks(selected?.body ?? "").filter((b) => b.type === "heading"),
-    [selected?.body],
+      selected?.file ? [] : documentBlocks(selected?.body ?? "").filter((b) => b.type === "heading"),
+    [selected?.body, selected?.file],
   );
   const readableText = documentText(selected?.body ?? "").trim();
   const words = readableText ? readableText.split(/\s+/).length : 0;
@@ -198,23 +175,15 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
       scroll: false,
     });
   }
-  function selectProject(projectId: string) {
-    setTreeOpen(false);
-    const search = new URLSearchParams(params.toString());
-    search.delete("revision");
-    if (projectId) search.set("project", projectId);
-    else search.delete("project");
-    router.push(`${base}/documents${search.size ? `?${search}` : ""}`);
-  }
   function selectFolder(folderId: string) {
     setTreeOpen(false);
     router.push(`${base}/documents?folder=${encodeURIComponent(folderId)}`);
   }
-  function clearFilters() {
-    setQuery("");
-    setTab("all");
-    router.replace(`${base}/documents`);
-  }
+  // The section and folder dialogs are shared by the tree rail and the directory's tiles.
+  const dialogs = useOrganizationDialogs({
+    base, selectedId: id, folderFilter, sectionFilter,
+    onFolderSaved: (folder) => { if (!id) selectFolder(folder.id); },
+  });
   function createDocument(folderId = "") {
     setNewFolder(folders.some((folder) => folder.id === folderId) ? folderId : "");
     setNewProject(projectFilter === "unfiled" ? "" : projectFilter);
@@ -232,7 +201,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
             <span>{selected?.id === id ? selected.title : "Document"}</span>
           </div>
           <div className="sp-actions">
-            <button className="sp-doc-browse" aria-label="Browse pages" aria-expanded={treeOpen} aria-controls="document-tree-pane" onClick={() => setTreeOpen(!treeOpen)}>
+            <button className="sp-doc-browse" aria-label="Browse folders" aria-expanded={treeOpen} aria-controls="document-tree-pane" onClick={() => setTreeOpen(!treeOpen)}>
               <Icon name="folder" size={15} /><span>Browse</span>
             </button>
             {!loading && selected && (
@@ -310,190 +279,33 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
             projectFilter={projectFilter}
             folderFilter={folderFilter}
             sectionFilter={sectionFilter}
-            query={query}
-            onQueryChange={setQuery}
+            unreadFilter={unreadFilter}
+            unreadCount={unreadCount}
+            dialogs={dialogs}
             onNewDocument={createDocument}
-            onFolderSelect={selectFolder}
             onNavigate={() => setTreeOpen(false)}
           />
         </div>
         <div className="sp-doc-main">
       {!id ? (
-        <div className="sp-doc-library">
-          <header className="sp-doc-library-heading">
-            <div>
-              <h1>{locationName ?? "Documents"}</h1>
-              <p>A home for your notes, plans, and ideas.</p>
-            </div>
-            <div className="sp-doc-library-actions">
-              <button className="sp-doc-browse" aria-label="Browse pages" aria-expanded={treeOpen} aria-controls="document-tree-pane" onClick={() => setTreeOpen(!treeOpen)}>
-                <Icon name="folder" size={16} /><span>Browse</span>
-              </button>
-              <button
-                className="sp-doc-upload"
-                aria-label="Upload document"
-                disabled={!data.canWrite}
-                onClick={() => setImporting(true)}
-              >
-                <Icon name="upload" size={15} />
-                <span>Upload</span>
-              </button>
-              <Link
-                className="sp-button sp-doc-new-database"
-                aria-label="New database"
-                href={`${base}/databases?new=1`}
-              >
-                <Icon name="database" size={15} />
-                <span>New database</span>
-              </Link>
-              <button className="sp-primary" disabled={!data.canWrite} onClick={() => createDocument(folderFilter)}>
-                <Icon name="plus" size={15} />
-                New document
-              </button>
-            </div>
-          </header>
-          {!filtered && recent.length > 0 && (
-            <section
-              className="sp-doc-recents"
-              aria-label="Recently updated documents"
-            >
-              <div className="sp-doc-section-title">
-                <h2>Recently updated</h2>
-                <span className="sp-doc-private"><Icon name="lock" size={12} />{data.space?.name}</span>
-              </div>
-              <div className="sp-doc-recent-grid">
-                {recent.map((doc) => (
-                  <DocumentRecentCard key={doc.id} document={doc} base={base} />
-                ))}
-              </div>
-            </section>
-          )}
-          <section className="sp-doc-collection" aria-label="Document library">
-            <div className="sp-doc-library-toolbar">
-              <div className="sp-doc-tabs" aria-label="Document type">
-                <button
-                  aria-pressed={tab === "all"}
-                  onClick={() => setTab("all")}
-                >
-                  All documents<span>{matchingDocuments.length}</span>
-                </button>
-                <button
-                  aria-pressed={tab === "handoffs"}
-                  onClick={() => setTab("handoffs")}
-                >
-                  Handoffs<span>{handoffs.length}</span>
-                </button>
-              </div>
-              <div className="sp-doc-library-controls">
-                <label className="sp-search">
-                  <Icon name="search" size={15} />
-                  <input
-                    aria-label="Search documents"
-                    placeholder="Search documents…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </label>
-                {data.projects.length > 0 && (
-                  <select
-                    aria-label="Filter documents by project"
-                    value={projectFilter}
-                    onChange={(e) => selectProject(e.target.value)}
-                  >
-                    <option value="">All projects</option>
-                    <option value="unfiled">No project</option>
-                    {data.projects.map((p) => (
-                      <option value={p.id} key={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <select
-                  aria-label="Sort documents"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                >
-                  <option value="updated">Last updated</option>
-                  <option value="name">Name A–Z</option>
-                </select>
-              </div>
-            </div>
-            {items.length ? (
-              <div className="sp-table-wrap">
-                <table className="sp-table sp-doc-table">
-                  <thead>
-                    <tr>
-                      <th>Document</th>
-                      <th>Folder</th>
-                      <th>Updated by</th>
-                      <th>Last updated</th>
-                      <th>
-                        <span className="sr-only">Version</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
-                      <DocumentTableRow key={item.id} document={item} base={base} folderName={folders.find(folder => folder.id === item.folder)?.name} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <Empty
-                valley={!filtered}
-                title={
-                  filtered
-                    ? "No documents found"
-                    : "A place for your first idea"
-                }
-              >
-                <p>
-                  {filtered
-                    ? "Try another title or broaden your filters."
-                    : "Write a note, save a plan, or leave context for your next session."}
-                </p>
-                <button
-                  onClick={filtered ? clearFilters : () => createDocument()}
-                >
-                  {filtered ? "Clear filters" : "Create a document"}
-                </button>
-              </Empty>
-            )}
-            <div className="sp-doc-library-footer">
-              <span>
-                {items.length} {items.length === 1 ? "document" : "documents"}
-                {data.cursors.document ? " loaded" : ""}
-              </span>
-              {filtered && (
-                <button className="sp-text-button" onClick={clearFilters}>
-                  Clear filters
-                </button>
-              )}
-              <span>
-                <Icon name="lock" size={11} />
-                Only you and your authorized agents
-              </span>
-            </div>
-            {data.cursors.document && (
-              <button
-                className="sp-load-more"
-                disabled={loadingMore}
-                onClick={async () => {
-                  setLoadingMore(true);
-                  try {
-                    await data.loadMore("document");
-                  } finally {
-                    setLoadingMore(false);
-                  }
-                }}
-              >
-                {loadingMore ? "Loading…" : "Load more documents"}
-              </button>
-            )}
-          </section>
-        </div>
+        // The drag provider is keyed by the Space, so the directory (and anything typed in its
+        // search) waits for the Space instead of being remounted when the bootstrap answers.
+        !data.space ? <div className="sp-doc-library" aria-busy="true" /> :
+        <DocumentLibrary
+          base={base}
+          documents={documents}
+          folders={folders}
+          sections={sections}
+          projectFilter={projectFilter}
+          folderFilter={folderFilter}
+          sectionFilter={sectionFilter}
+          unreadFilter={unreadFilter}
+          dialogs={dialogs}
+          treeOpen={treeOpen}
+          onToggleTree={() => setTreeOpen(!treeOpen)}
+          onCreateDocument={createDocument}
+          onUpload={(files) => { setDroppedFiles(files ?? []); setImporting(true); }}
+        />
       ) : (
         <div
           className={`sp-doc-reading-layout ${panel !== "outline" ? "has-panel" : ""}`}
@@ -534,7 +346,9 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                     <span>
                       {selected.recall?.category === "handoff"
                         ? "Session handoff"
-                        : "Document"}
+                        : selected.file
+                          ? { image: "Picture", video: "Video", audio: "Recording" }[fileKind(selected.file) as string] ?? `${fileLabel(selected.file)} file`
+                          : "Document"}
                     </span>
                     {project && (
                       <>
@@ -569,7 +383,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                     <button onClick={() => setPanel("history")}>
                       Revision {selected.revision}
                     </button>
-                    {words > 0 && (
+                    {words > 0 && !selected.file && (
                       <>
                         <span>·</span>
                         <span>
@@ -578,7 +392,17 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                       </>
                     )}
                   </div>
-                  {selected.body?.trim() ? (
+                  {selected.file ? (
+                    <>
+                      <DocumentFileView resource={selected} revision={revision} />
+                      {selected.body?.trim() && (
+                        <details className="sp-file-extracted">
+                          <summary>Text for search and agents · {words.toLocaleString()} {words === 1 ? "word" : "words"}</summary>
+                          <div className="sp-file-text">{selected.body}</div>
+                        </details>
+                      )}
+                    </>
+                  ) : selected.body?.trim() ? (
                     <DocumentMarkdown text={selected.body} anchors />
                   ) : (
                     <div className="sp-doc-empty-body">
@@ -685,7 +509,9 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                           ))
                         ) : (
                           <p className="sp-doc-rail-note">
-                            Headings will appear here as your document grows.
+                            {selected.file
+                              ? "This document keeps its original file. Download it to keep a copy."
+                              : "Headings will appear here as your document grows."}
                           </p>
                         )}
                       </nav>
@@ -930,6 +756,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         </div>
       </div>
       </DocumentDragProvider>
+      {dialogs.element}
       {deleteOpen && selected && (
         <ConfirmModal
           title="Delete document?"
@@ -959,10 +786,19 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         <ImportDocumentDialog
           initialProject={projectFilter === "unfiled" ? "" : projectFilter}
           initialFolder={folders.some(folder => folder.id === folderFilter) ? folderFilter : ""}
-          close={() => setImporting(false)}
-          created={(saved) => {
+          initialFiles={droppedFiles}
+          close={() => { setImporting(false); setDroppedFiles([]); }}
+          created={(saved, options) => {
             setImporting(false);
-            router.push(`${base}/documents/${saved.id}`);
+            setDroppedFiles([]);
+            // One reviewed file opens; a batch lands on the Files facet together.
+            if (!options?.batch && saved.length === 1) router.push(`${base}/documents/${saved[0].id}`);
+            else {
+              const search = new URLSearchParams(params.toString());
+              search.delete("revision");
+              search.set("type", "files");
+              router.push(`${base}/documents?${search}`);
+            }
           }}
         />
       )}

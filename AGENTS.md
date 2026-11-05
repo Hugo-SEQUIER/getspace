@@ -19,7 +19,7 @@ Several agents and the operator can work in this checkout at the same time, so t
 
 ## Agent skills
 
-`skills/` is a copy of [space-skills](https://github.com/Hugo-SEQUIER/space-skills), and `skills/.source` records the commit it came from. Edit the skills in space-skills, then run `scripts/sync-skills.sh` here and commit the result. Never edit `skills/` directly: `scripts/sync-skills.sh --check` fails on any difference.
+`skills/` is a copy of [space-skills](https://github.com/Hugo-SEQUIER/space-skills), and `skills/.source` records the commit it came from. Edit the skills in space-skills, then run `scripts/sync-skills.sh` here and commit the result. Never edit `skills/` directly: `scripts/sync-skills.sh --check` fails on any difference. The script leaves `space-skill-library` out: it drives the hosted edition's Space skill library, and this edition keeps no skill items.
 
 ## Hermes review loop
 

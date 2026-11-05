@@ -54,7 +54,7 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
   const [searchAttempt, setSearchAttempt] = useState(0);
   useFeedback({
     error: error || searchError || data.memoryError || data.jobError,
-    loading: busy ? "Updating memory…" : searching ? "Searching memory…" : data.memoryLoading || data.memoryMoreLoading ? "Loading memory…" : null,
+    loading: busy ? "Updating memory…" : searching ? "Searching memory…" : data.memoryLoading || data.memoryAllLoading ? "Loading memory…" : null,
     clearError: () => setError(""),
   });
   const activeJobs = data.memoryJobs.filter(job => job.status === "queued" || job.status === "processing").length;
@@ -69,6 +69,13 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
   useEffect(() => {
     return data.watchMemories();
   }, [data.watchMemories]);
+  // Both views page over the Space, so every memory page is read once after the first.
+  // A watch update can supersede a walk in flight; rerun when that walk clears its flag
+  // so the list never stays stuck on a partial cursor.
+  useEffect(() => {
+    if (!data.memoryCursor || data.memoryAllLoading) return;
+    void data.loadAllMemories();
+  }, [data.memoryCursor, data.memoryAllLoading, data.loadAllMemories]);
   useEffect(() => {
     if (data.memoryLoaded && id && !data.memories.some(m => m.id === id)) {
       void data.loadSelectedMemory(id.split(":")[0]).catch(e => setError(message(e)));
@@ -467,19 +474,6 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
               <ListPageControls {...memoryListPage} />
             </div>
           )}
-              {/* A page holds what the server sent. Older memory is one page away, and the
-                  server only offers a cursor when no search is running. */}
-              {data.memoryCursor && !query.trim() && (
-                <div className="sp-memory-more">
-                  <p className="sp-muted">Filters apply to loaded memories. Load older memory to include more.</p>
-                  <button
-                    onClick={() => void data.loadMoreMemories()}
-                    disabled={data.memoryMoreLoading}
-                  >
-                    {data.memoryMoreLoading ? "Loading older memory…" : "Load older memory"}
-                  </button>
-                </div>
-              )}
 
           <div className="sp-network-caption">
             <strong>{visible.length.toLocaleString()} memories</strong>

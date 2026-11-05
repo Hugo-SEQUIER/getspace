@@ -66,6 +66,17 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "SELECT count(*) FROM space.restore_objects WHERE organization_id=%s AND space_id=%s",
     ),
     (
+        "database_record_revisions",
+        "DELETE FROM space.database_record_revisions WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) FROM space.database_record_revisions "
+        "WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
+        "database_records",
+        "DELETE FROM space.database_records WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) FROM space.database_records WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
         "workspace_item_commands",
         "DELETE FROM space.workspace_item_commands WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) FROM space.workspace_item_commands "
@@ -136,6 +147,11 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "DELETE FROM space.resource_terms WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) AS rows FROM space.resource_terms "
         "WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
+        "file_parts",
+        "DELETE FROM space.file_parts WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) AS rows FROM space.file_parts WHERE organization_id=%s AND space_id=%s",
     ),
     (
         "resource_revisions",

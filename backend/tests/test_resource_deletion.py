@@ -57,7 +57,7 @@ def test_delete_preserves_memories_and_they_remain_editable(commands):
     service, owner, space, source, request = setup(commands)
     memory = service.build_memory(owner, space, request)
     rid = UUID(source["id"])
-    with pytest.raises(CommandError, match="change_memory"):
+    with pytest.raises(CommandError, match="forget_memory_claim"):
         delete_resource(service, owner, space, UUID(memory["id"]), 1)
     delete_resource(service, owner, space, rid, 1)
     saved = service.get_resource(owner, space, UUID(memory["id"]))
@@ -192,7 +192,7 @@ def test_memory_record_delete_refuses_other_kinds_and_a_stale_revision(commands)
 def test_memory_record_delete_accepts_a_writer_grant(commands):
     """A memory record follows the write grant, unlike a source document.
 
-    An agent may already remove a claim permanently with change_memory, so removing the
+    An agent may already remove a claim permanently with forget_memory_claim, so removing the
     whole record grants no new capability.
     """
     service, owner, space, _ = commands

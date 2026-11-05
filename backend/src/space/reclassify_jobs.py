@@ -1,4 +1,5 @@
-"""One automatic catch-up per Space for claims the old catalog limit left unassigned.
+"""One automatic catch-up per Space and decision model, for claims that a classification
+limit or an unavailable decision model left unassigned.
 
 Space has no background authority of its own. The catch-up is queued by the next memory
 write and runs under that writer's grant, through the ordinary job queue and quotas.
@@ -14,19 +15,23 @@ from space.job_context import active_job
 
 logger = logging.getLogger(__name__)
 
-LIMIT_REASONS = frozenset({"catalog_limit", "input_limit"})
+CATCH_UP_REASONS = frozenset({"catalog_limit", "input_limit", "unavailable"})
 MEMORIES_PER_TURN = 5
-# A failed catch-up may be queued again by a later write, at most once a day.
+# One catch-up runs at a time, and each decision model gets one: replacing a retired
+# model sorts what it left unassigned. A failed catch-up may be queued again by a later
+# write, at most once a day. provider_fingerprint holds the decision fingerprint.
 EXISTING = (
     "SELECT count(*) AS n FROM space.memory_jobs WHERE request_kind='reclassify' "
-    "AND (status<>'failed' OR updated_at>now()-interval '1 day')"
+    "AND (status IN ('queued','processing') OR (provider_fingerprint=%s "
+    "AND (status<>'failed' OR updated_at>now()-interval '1 day')))"
 )
 
 
 def limited(claim):
+    """A claim a limit or an unavailable decision model left unassigned, never a pin."""
     classification = claim.get("classification") or {}
     return classification.get("method") != "manual" and classification.get("reason") in (
-        LIMIT_REASONS
+        CATCH_UP_REASONS
     )
 
 
@@ -57,13 +62,14 @@ def enqueue(workspace, identity, space_id):
     """One transaction: a cheap existence check on every write, the insert only once."""
     from space.workspace import encode
 
+    decision = workspace.memory_models.decision_fingerprint
     with workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id, write=True)
-        if connection.execute(EXISTING).fetchone()["n"]:
+        if connection.execute(EXISTING, (decision,)).fetchone()["n"]:
             return None
         # Serializes concurrent writers, so a Space gets one catch-up at a time.
         connection.execute("SELECT id FROM space.spaces FOR UPDATE")
-        if connection.execute(EXISTING).fetchone()["n"]:
+        if connection.execute(EXISTING, (decision,)).fetchone()["n"]:
             return None
         pending = connection.execute(
             "SELECT count(*) AS n FROM space.memory_jobs WHERE status IN ('queued','processing')"
@@ -104,7 +110,7 @@ def enqueue(workspace, identity, space_id):
                 hmac.digest(
                     key.key.material, b"space.reclassify-job.v1\0" + encode(payload), "sha256"
                 ),
-                workspace.memory_models.chat_fingerprint,
+                decision,
                 len(ids),
             ),
         ).fetchone()

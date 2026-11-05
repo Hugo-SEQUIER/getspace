@@ -65,7 +65,11 @@ test('the record panel shows a task in full and expands to a page', async ({ app
   await expect(panel.getByText('Saved record')).toBeVisible();
   expect(stored(space).values.owner).toBe('Hugo\nSteering group');
   expect(stored(space).name).toBe(longName);
-  expect(space.itemCommands.at(-1)).toMatchObject({ item_id: databaseId, kind: 'database', expected_revision: 1 });
+  await expect.poll(() => space.databaseCommands.length).toBe(1);
+  const command = space.databaseCommands[0] as { expected_revision: number; upsert: { id: string }[]; delete: string[] };
+  expect(command.expected_revision).toBe(1);
+  expect(command.upsert.map((row) => row.id)).toEqual(['task-1']);
+  expect(command.delete).toEqual([]);
 
   await panel.getByRole('button', 'Expand record').tap();
   await expect(table).toBeVisible();

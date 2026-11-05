@@ -89,29 +89,43 @@ test("shared readers render semantic tables with safe inline content and alignme
   }
 });
 
+// The budgets count CPU time, the work the parser and readers do. Elapsed time also
+// counts waiting on a busy shared runner: on 21 October 2026 the parse below took 1.7 s
+// there beside the backend suite, and 54 ms on an idle laptop.
+function cpuMilliseconds(since) {
+  const used = process.cpuUsage(since);
+  return (used.user + used.system) / 1000;
+}
+
 test("maximum-size hostile Markdown stays responsive through actual rendering", () => {
-  // A subprocess deadline also bounds a regression to synchronous quadratic work.
+  // A subprocess deadline also bounds a regression to synchronous quadratic work. It is
+  // elapsed time, so it leaves a busy runner room; a quadratic parse would take minutes.
   const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", `
     import assert from "node:assert/strict";
     import { documentInline, documentBlocks } from ${JSON.stringify(new URL("../lib/space/document-content.ts", import.meta.url).href)};
     const start = performance.now();
+    const cpu = process.cpuUsage();
     for (const pattern of ["[", "[a](", "*", "\x60"]) {
       const text = pattern.repeat(Math.ceil(700000 / pattern.length)).slice(0, 700000);
       assert.deepEqual(documentInline(text), [{ type: "text", text }]);
     }
     const headings = "## x\\n".repeat(140000);
     assert.deepEqual(documentBlocks(headings), [{ type: "plain", text: headings }]);
-    console.log(JSON.stringify({ milliseconds: performance.now() - start }));
-  `], { encoding: "utf8", timeout: 5000 });
+    const used = process.cpuUsage(cpu);
+    console.log(JSON.stringify({
+      cpuMilliseconds: (used.user + used.system) / 1000, elapsedMilliseconds: performance.now() - start,
+    }));
+  `], { encoding: "utf8", timeout: 15000 });
   assert.equal(result.error, undefined, String(result.error));
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(JSON.parse(result.stdout).milliseconds < 1500, result.stdout);
+  assert.ok(JSON.parse(result.stdout).cpuMilliseconds < 1500, result.stdout);
 
   for (const Component of [DocumentMarkdown, Markdown]) {
     for (const text of ["## x\n".repeat(140000), "[".repeat(700000)]) {
-      const started = performance.now();
+      const started = process.cpuUsage();
       const html = renderToStaticMarkup(createElement(Component, { text }));
-      assert.ok(performance.now() - started < 1500);
+      const used = cpuMilliseconds(started);
+      assert.ok(used < 1500, `${used} ms of CPU`);
       assert.ok(html.includes(text));
       assert.ok(!html.includes("<h2"));
       if (text.startsWith("##")) assert.ok(html.includes("Shown as plain text"));

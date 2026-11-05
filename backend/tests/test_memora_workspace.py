@@ -210,7 +210,7 @@ def test_build_is_idempotent_readable_and_rejects_forged_memory(commands):
         for internal in ("text_hash", "vectors"):
             assert internal.encode() not in value
     # Ordinary writes cannot forge generated memory or bypass the index.
-    with pytest.raises(CommandError, match="change_memory"):
+    with pytest.raises(CommandError, match="edit_memory_claim"):
         service.save(
             writer,
             space,
@@ -462,9 +462,22 @@ def test_vector_recall_recovers_a_synonym_and_respects_the_configured_provider(c
     assert service.memory_models.calls == []
     # An explicit semantic request fails clearly without a configured provider.
     service.memory_models = MemoryModels(Settings(environment="test"))
-    with pytest.raises(CommandError) as error:
+    with pytest.raises(CommandError, match="No memory provider is configured") as error:
         service.context(owner, space, RecallRequest(query="automobile", strategy="semantic"))
     assert error.value.status == 409
+
+
+def test_semantic_recall_in_a_space_without_memory_does_not_blame_the_provider(commands):
+    service, owner, space, _, _ = setup(commands)
+    # The provider works; a new Space simply has nothing saved yet.
+    for strategy in ("semantic", "prompt"):
+        with pytest.raises(CommandError, match="no saved memory yet") as error:
+            service.context(owner, space, RecallRequest(query="automobile", strategy=strategy))
+        assert error.value.status == 409
+        assert "provider" not in error.value.message
+    # The suggested auto strategy answers without memory and makes no model call.
+    result = service.context(owner, space, RecallRequest(query="automobile", strategy="auto"))
+    assert result["items"] == [] and service.memory_models.calls == []
 
 
 def test_rebuild_refreshes_source_provenance_without_reembedding_unchanged_claims(commands):
@@ -952,7 +965,8 @@ def test_mcp_and_rest_share_memory_without_a_review_interface(commands, signing)
         ]
         assert {
             "remember",
-            "change_memory",
+            "edit_memory_claim",
+            "forget_memory_claim",
             "build_memory",
             "remember_claims",
             "extract_memory",

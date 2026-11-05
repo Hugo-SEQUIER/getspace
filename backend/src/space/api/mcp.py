@@ -6,11 +6,13 @@ from typing import Any, Literal
 from uuid import UUID
 
 from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.middleware.bearer_auth import RequireAuthMiddleware
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from starlette.routing import Route
 
 from space import (
     __version__,
@@ -19,6 +21,7 @@ from space import (
     guide,
     resource_deletion,
     space_map,
+    systems,
     tasks,
     webhook_inbox,
     workspace_items,
@@ -27,21 +30,66 @@ from space import (
 from space.admission import AdmissionError, dispatch
 from space.memory import (
     MAX_MEMORY_LIST,
-    ChangeMemory,
+    ClassifyMemoryClaim,
+    EditMemoryClaim,
+    ForgetMemoryClaim,
     RecallRequest,
     RememberClaims,
     RememberMemory,
+    RouteMemoryClaim,
     SaveHandoff,
     SetMemoryLinks,
 )
 from space.memory_pipeline import BuildMemory
 from space.model_provider import MemoryModels
 from space.oauth_server import issuer_url, resource_url
+from space.openai_discovery import SECURITY_SCHEMES, OpenAIDiscovery
 from space.private_access import PrivateConnections
 from space.read_timing import collect_read_timings
 from space.security.auth import Identity, TokenVerifier
 from space.settings import Settings
 from space.workspace import CommandError, SaveResource, Workspace
+
+
+class SpaceMCP(FastMCP):
+    """FastMCP that lists tools in the form the connector directories check, and lets
+    OpenAI's clients list them before signing in.
+    """
+
+    def streamable_http_app(self):
+        app = super().streamable_http_app()
+        # OpenAI's clients list the tools without a token (space.openai_discovery).
+        app.router.routes = [
+            Route(route.path, endpoint=OpenAIDiscovery(route.endpoint))
+            if isinstance(route, Route) and isinstance(route.endpoint, RequireAuthMiddleware)
+            else route
+            for route in app.router.routes
+        ]
+        return app
+
+    async def list_tools(self):
+        # Claude's directory reads the title from the annotations, and flags a parameter with
+        # no type, which a request model referenced only by $ref has. OpenAI reads whether a
+        # tool needs sign-in from securitySchemes, and older clients from _meta.
+        return [
+            tool.model_copy(
+                update={
+                    "annotations": (tool.annotations or ToolAnnotations()).model_copy(
+                        update={"title": tool.title}
+                    ),
+                    "inputSchema": tool.inputSchema
+                    | {
+                        "properties": {
+                            name: {"type": "object"} | schema if "$ref" in schema else schema
+                            for name, schema in tool.inputSchema.get("properties", {}).items()
+                        }
+                    },
+                    "securitySchemes": SECURITY_SCHEMES,
+                    "meta": (tool.meta or {}) | {"securitySchemes": SECURITY_SCHEMES},
+                }
+            )
+            for tool in await super().list_tools()
+        ]
 
 
 def create_mcp(
@@ -53,7 +101,7 @@ def create_mcp(
     # identity gets its own connection (see space.private_access).
     private = bool(verifier and verifier.private)
     protected = verifier is not None and not private
-    server = FastMCP(
+    server = SpaceMCP(
         "Space",
         instructions=guide.operating_instructions(
             models,
@@ -110,12 +158,13 @@ def create_mcp(
         )
 
     @server.tool(
+        title="Show Space server info",
         annotations=ToolAnnotations(
             readOnlyHint=True,
             destructiveHint=False,
             idempotentHint=True,
             openWorldHint=False,
-        )
+        ),
     )
     def server_info() -> dict[str, str | bool]:
         """Return non-sensitive build information; does not access a workspace."""
@@ -177,9 +226,10 @@ def create_mcp(
         )
 
         @server.tool(
+            title="Identify this agent",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def identify_agent(
             agent_id: UUID | None = None, name: str | None = None, harness: str | None = None
@@ -212,12 +262,12 @@ def create_mcp(
                 lambda actor: agents.identify(workspace, actor, agent_id=agent_id, profile=profile)
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List agent identities", annotations=read)
         async def list_agent_identities() -> dict[str, Any]:
             """List this Space's saved agent identities to reuse one when connecting."""
             return await command(lambda actor: agents.list_profiles(workspace, actor))
 
-        @server.tool(annotations=read)
+        @server.tool(title="Show Space details", annotations=read)
         async def workspace_info(agent_id: UUID | None = None) -> dict[str, Any]:
             """Get the Private Space, Tasks collection, and assigned agent_id.
 
@@ -226,7 +276,7 @@ def create_mcp(
             """
             return await command(workspace.info, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read the Space map", annotations=read)
         async def get_space_map(
             space_id: UUID,
             request: space_map.MapRequest | None = None,
@@ -252,7 +302,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="Search the Space", annotations=read)
         async def search_workspace(
             space_id: UUID, request: workspace_search.Search, agent_id: UUID | None = None
         ) -> dict[str, Any]:
@@ -267,7 +317,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List workspace items", annotations=read)
         async def list_workspace_items(
             space_id: UUID,
             kind: Literal["project", "database", "category", "section", "folder"],
@@ -278,33 +328,39 @@ def create_mcp(
             """Parameters: Space, item kind, optional cursor and deleted state.
             What it does: lists projects, folders, databases, categories or sections.
             Databases are listed with their schema and record_count, never their
-            records: read and change rows with query_database.
+            records: read rows with read_database and change them with query_database.
             Output: one page of items; follow next_cursor for the complete list.
             """
             return await command(
                 lambda actor: workspace_items.listing(
-                    workspace, actor, space_id, kind, after, deleted, records=False
+                    workspace, actor, space_id, kind, after, deleted
                 ),
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read a workspace item", annotations=read)
         async def get_workspace_item(
             space_id: UUID, item_id: UUID, revision: int | None = None, agent_id: UUID | None = None
         ) -> dict[str, Any]:
             """Parameters: Space, item ID and optional historical revision.
             What it does: reads a project, folder, database, category or section.
+            A database comes with its schema and record_count, never its records: read
+            rows with read_database and change them with query_database.
             Output: the item and its revision.
             """
             return await command(
-                lambda actor: workspace_items.get(workspace, actor, space_id, item_id, revision),
+                lambda actor: workspace_items.get(
+                    workspace, actor, space_id, item_id, revision, records=False
+                ),
                 agent_id=agent_id,
             )
 
+        # Destructive: records replaces a whole table, deleting the rows it omits.
         @server.tool(
+            title="Save a workspace item",
             annotations=ToolAnnotations(
-                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
         )
         async def save_workspace_item(
             space_id: UUID, change: workspace_items.SaveItem, agent_id: UUID | None = None
@@ -316,40 +372,74 @@ def create_mcp(
             project places it in the Space map and never moves its documents.
             New section or project assignments must name an active item in this Space.
             Categories and sections use name and description; use user-defined labels.
-            Databases use name, description, fields, records, view, groupBy and optional
-            project_id, section_id and tasks. tasks marks the rows as tasks: status is a
-            select field ID, done lists the options that close a row, and planned is a
-            date field ID for the day a row is planned for. Change records with
-            query_database.
-            Read the current item first and preserve field/record IDs. Limits are
-            30 fields, 1,000 records and 900 KiB per snapshot. Create at revision zero.
-            Output: the saved item and its new revision.
+            Databases use name, description, fields, view, groupBy and optional
+            project_id, section_id, tasks and records. tasks marks the rows as tasks:
+            status is a select field ID, done lists the options that close a row, and
+            planned is a date field ID for the day a row is planned for. Leave records
+            out to change the schema and keep every stored row; change rows with
+            query_database. Pass records only to replace the whole table, such as a
+            bulk import: rows it omits are deleted, and only rows that differ are
+            stored, each as its own revision.
+            Read the current item first and preserve field IDs. Limits are 30 fields,
+            10,000 records per database and 2,000 characters per value. Create at
+            revision zero.
+            Output: the saved item, with its record_count for a database, and its new
+            revision.
             """
             return await command(
-                lambda actor: workspace_items.save(workspace, actor, space_id, change),
+                lambda actor: workspace_items.save(
+                    workspace, actor, space_id, change, records=False
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Read database rows", annotations=read)
+        async def read_database(
+            space_id: UUID,
+            database_id: UUID,
+            request: database_sql.Read,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, database item ID and a SQL read.
+            What it does: runs SQLite SELECT on one table named records, with columns id,
+            name, notes, created_at, updated_at and one column per field, named after the
+            field (quote names with spaces). Send sql with params bound to ? placeholders, or
+            a statements batch of up to 20. Reads the current revision and never changes
+            it: INSERT, UPDATE and DELETE are refused. Checkbox columns hold 0 or 1.
+            include_schema returns the column map.
+            Output: results per statement and the revision read.
+            """
+            return await command(
+                lambda actor: database_sql.execute(
+                    workspace, actor, space_id, database_id, request
+                ),
                 agent_id=agent_id,
             )
 
         @server.tool(
+            title="Change database rows",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def query_database(
             space_id: UUID,
             database_id: UUID,
-            request: database_sql.Query,
+            request: database_sql.Change,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Parameters: Space, database item ID and a SQL request.
-            What it does: runs SQLite SQL on one table named records, with columns id, name,
+            """Parameters: Space, database item ID and a SQL change.
+            What it does: changes rows of one table named records, with columns id, name,
             notes, created_at, updated_at and one column per field, named after the field
-            (quote names with spaces). Send sql with params bound to ? placeholders, or a
-            statements batch of up to 20 that succeed or fail together. SELECT reads the
-            current revision. INSERT, UPDATE and DELETE need command_id and the current
-            expected_revision; the whole change is validated and saved as one revision.
-            Omit id on INSERT to have one assigned; id, created_at and updated_at cannot be
-            updated. Checkbox columns hold 0 or 1. include_schema returns the column map.
+            (quote names with spaces). Send INSERT, UPDATE or DELETE as sql with params
+            bound to ? placeholders, or a statements batch of up to 20 that succeed or fail
+            together; a SELECT in a batch sees the earlier changes. command_id and the
+            current expected_revision are required; the change is validated as a whole
+            and saved as one revision that stores only the rows it changed. A request
+            without INSERT, UPDATE or DELETE is refused;
+            read rows with read_database. Omit id on INSERT to have one assigned; id,
+            created_at and updated_at cannot be updated. Checkbox columns hold 0 or 1.
+            include_schema returns the column map.
             Output: results per statement, the revision and change counts. A retried write
             returns the committed revision with replayed=true and no rows.
             """
@@ -361,9 +451,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Archive or restore a workspace item",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_workspace_item_deleted(
             space_id: UUID,
@@ -382,7 +473,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List documents or tasks", annotations=read)
         async def list_resources(
             space_id: UUID,
             kind: Literal["document", "task"],
@@ -396,22 +487,33 @@ def create_mcp(
             """
             return await command(workspace.list_resources, space_id, kind, after, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read a document or task", annotations=read)
         async def get_resource(
             space_id: UUID,
             resource_id: UUID,
             revision: int | None = None,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Read a document or task, optionally at an immutable historical revision."""
+            """Read a document or task, optionally at an immutable historical revision.
+
+            A document with a `file` field keeps an original file the person uploaded on the
+            website, such as a PDF, Word document, presentation, picture or video. Its body
+            holds the text extracted from that file; a picture or video has none, so its
+            title is what describes it. `file` gives the name, media type, size, digest
+            and part count, a picture's or video's dimensions and a recording's duration
+            when the browser read them, and the details of the thumbnail the website shows.
+            The file itself is viewed and downloaded on the website and cannot be read
+            through this tool.
+            """
             return await command(
                 workspace.get_resource, space_id, resource_id, revision, agent_id=agent_id
             )
 
         @server.tool(
+            title="Save memory claims",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def remember_claims(
             space_id: UUID, change: RememberClaims, agent_id: UUID | None = None
@@ -432,9 +534,10 @@ def create_mcp(
             return await command(workspace.remember_claims, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Start a memory extraction",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def extract_memory(
             space_id: UUID, change: RememberMemory | BuildMemory, agent_id: UUID | None = None
@@ -449,7 +552,7 @@ def create_mcp(
             """
             return await command(workspace.extract_memory, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Check a memory extraction", annotations=read)
         async def memory_job(
             space_id: UUID, job_id: UUID, agent_id: UUID | None = None
         ) -> dict[str, Any]:
@@ -457,9 +560,10 @@ def create_mcp(
             return await command(workspace.memory_job, space_id, job_id, agent_id=agent_id)
 
         @server.tool(
+            title="Save a document or task",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def save_resource(
             space_id: UUID, change: SaveResource, agent_id: UUID | None = None
@@ -473,8 +577,10 @@ def create_mcp(
             documents and are independent of projects. New folder assignments must name
             an active folder in this Space; unchanged archived references may remain.
             A project must name an existing project in this Space. Kind cannot change.
-            Tasks cannot carry recall.category="handoff". Generated memory is never
-            edited here: use remember, remember_claims, extract_memory or change_memory.
+            Tasks cannot carry recall.category="handoff". Updating a document that keeps
+            an original file keeps the file; only the website uploads one. Generated
+            memory is never edited here: use remember, remember_claims, extract_memory or
+            edit_memory_claim.
             Prefer a status from task_columns; a new status value is saved as a column
             labelled from it (add_task_column picks the label), and set_task_status moves
             a task without resending its body. Set status
@@ -487,7 +593,7 @@ def create_mcp(
             """
             return await command(workspace.save, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="List task statuses", annotations=read)
         async def task_columns(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
             """Parameters: Space ID and optional agent identity.
             What it does: lists configured task status values and display labels.
@@ -498,9 +604,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Add a task status",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def add_task_column(
             space_id: UUID, change: tasks.AddColumn, agent_id: UUID | None = None
@@ -515,9 +622,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Change a task's status",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_task_status(
             space_id: UUID,
@@ -538,9 +646,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Delete a task",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def delete_task(
             space_id: UUID,
@@ -564,9 +673,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Pull database change events",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
-            )
+            ),
         )
         async def pull_events(
             space_id: UUID,
@@ -581,7 +691,7 @@ def create_mcp(
             transition such as Stage → Review. Each item carries a stable delivery_id
             and the event: database_id, record_id, operation, revisions, changed field
             IDs and, for a filtered subscription, the before/after values of that one
-            field. Read the current record with query_database before acting; the
+            field. Read the current record with read_database before acting; the
             event is a hint, not the record. Call ack_events with each delivery_id once
             the work is done; an unacknowledged lease returns to the queue, and after
             five pulls without acknowledgement the delivery fails and the owner can
@@ -596,9 +706,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Acknowledge database change events",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def ack_events(
             space_id: UUID,
@@ -617,10 +728,228 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        write_once = ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        )
+
+        @server.tool(title="List systems and their lab", annotations=read)
+        async def list_systems(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
+            """Parameters: Space and optional agent identity.
+            What it does: reads every system (a recurring activity such as a posting
+            routine or an outreach campaign, with its goal metric, target, current value,
+            counter-metric, source of truth, review cadence, health status and playbook
+            document) and every lab entry: a hypothesis or lesson with its system, domain,
+            status (testing, validated, invalidated, retired), evidence (untested,
+            suggestive, measured, owner_call), why, how to apply, source and uses. Only
+            verdicts (validated = works, invalidated = does not work) reach get_context;
+            testing entries are ideas, never rules. Read this before adding an entry, so
+            you do not duplicate one. Output: systems with stats (entries, verdicts,
+            reused_30d, reuse_share), entries newest first, and the domain names.
+            """
+            return await command(
+                lambda actor: systems.overview(workspace, actor, space_id), agent_id=agent_id
+            )
+
+        @server.tool(title="List verdicts", annotations=read)
+        async def list_verdicts(
+            space_id: UUID,
+            query: systems.VerdictQuery | None = None,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space and optional system_id or domain.
+            What it does: lists the live verdicts, validated rules and tactics (label
+            works) and invalidated anti-patterns (label does_not_work), with their
+            evidence level, system, domain, how to apply and a link to the lab entry, plus
+            each system's statistics. Read the verdicts of your system or domain before
+            doing that work, and call record_verdict_use when you apply one.
+            Output: {systems, verdicts}.
+            """
+            return await command(
+                lambda actor: systems.verdicts(
+                    workspace, actor, space_id, query or systems.VerdictQuery()
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Create a system", annotations=write_once)
+        async def create_system(
+            space_id: UUID,
+            command_id: UUID,
+            data: systems.SystemData,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, a new command ID and the system: name, description,
+            status (healthy, needs_attention, broken, not_measured, paused), goal_metric,
+            goal_target, current_value, counter_metric, source_of_truth, review_cadence
+            (weekly, per_cohort, monthly, quarterly), last_review, next_decision and
+            playbook_id, the ID of a document in this Space.
+            What it does: creates one system. Reuse command_id unchanged on retry.
+            Output: the system with its revision and lab statistics.
+            """
+            request = systems.SaveSystem(command_id=command_id, expected_revision=0, data=data)
+            return await command(
+                lambda actor: systems.save_system(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
         @server.tool(
+            title="Update a system",
+            # Every field is replaced, so one left out is cleared.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def update_system(
+            space_id: UUID,
+            system_id: UUID,
+            expected_revision: int,
+            command_id: UUID,
+            data: systems.SystemData,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, system, the revision just read, a new command ID and the
+            complete system fields as in create_system.
+            What it does: saves a new revision of the system, such as a new current value,
+            status or last review. Read it with list_systems first and keep the fields you
+            do not change. Output: the saved system.
+            """
+            request = systems.SaveSystem(
+                command_id=command_id,
+                system_id=system_id,
+                expected_revision=expected_revision,
+                data=data,
+            )
+            return await command(
+                lambda actor: systems.save_system(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Add a lab entry", annotations=write_once)
+        async def add_lab_entry(
+            space_id: UUID,
+            command_id: UUID,
+            data: systems.LabEntryInput,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, a new command ID and the entry: name (the hypothesis or
+            lesson in one sentence), system_id, domain, evidence, why, apply (how to apply
+            it), applies_to, source, captured and an optional note.
+            What it does: adds the entry to its system's lab in testing. A testing entry is
+            never recalled; it becomes a verdict only through promote_lab_entry. Propose
+            freely here instead of saving untested ideas as memory.
+            Output: the entry with its revision.
+            """
+            request = systems.SaveLabEntry(command_id=command_id, expected_revision=0, data=data)
+            return await command(
+                lambda actor: systems.save_entry(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Update a lab entry",
+            # Every field is replaced, so one left out is cleared.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def update_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            expected_revision: int,
+            command_id: UUID,
+            data: systems.LabEntryInput,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry, the revision just read, a new command ID and the
+            complete entry fields as in add_lab_entry, with a note saying what changed,
+            such as a new measurement.
+            What it does: saves a new revision; status, uses and the verdict are kept. A
+            verdict is not edited: move it back to testing with demote_lab_entry first.
+            Output: the saved entry.
+            """
+            request = systems.SaveLabEntry(
+                command_id=command_id,
+                entry_id=entry_id,
+                expected_revision=expected_revision,
+                data=data,
+            )
+            return await command(
+                lambda actor: systems.save_entry(workspace, actor, space_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Promote a lab entry to a verdict",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+            ),
+        )
+        async def promote_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.Promote,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry and command_id, expected_revision, verdict
+            (validated: it works; invalidated: it does not work) and an optional note.
+            What it does: the review step. Refused unless the evidence is measured or
+            owner_call, the source is set and the system is active. Writes a verdict
+            memory that get_context returns with its label, evidence and a link to the
+            entry. Promote only on evidence, never on your own judgement of an idea; the
+            memory provider embeds and organizes it. Reuse command_id unchanged on retry.
+            Output: the entry as a verdict.
+            """
+            return await command(
+                lambda actor: systems.promote(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Demote a verdict or retire an entry",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def demote_lab_entry(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.Demote,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, entry and command_id, expected_revision, status (testing
+            to test it again, retired to stop) and an optional note on why.
+            What it does: a verdict leaves get_context at once; its memory and the entry's
+            history are kept. Use it when new evidence contradicts a verdict.
+            Output: the entry.
+            """
+            return await command(
+                lambda actor: systems.demote(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="Record a verdict's use", annotations=write_once)
+        async def record_verdict_use(
+            space_id: UUID,
+            entry_id: UUID,
+            request: systems.RecordUse,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, verdict entry and command_id, expected_revision and
+            used_in: where you applied it, such as a post, campaign or pull request.
+            What it does: records the use with today's date, which sets last_used and
+            counts toward the system's reuse rate. Call it whenever a verdict shaped your
+            output. Output: the entry.
+            """
+            return await command(
+                lambda actor: systems.record_use(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Save a session handoff",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def save_handoff(
             space_id: UUID, change: SaveHandoff, agent_id: UUID | None = None
@@ -634,9 +963,10 @@ def create_mcp(
             return await command(workspace.save_handoff, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Recall context",
             annotations=ToolAnnotations(
                 readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def get_context(
             space_id: UUID,
@@ -677,15 +1007,16 @@ def create_mcp(
                 "tool_total_ms": round((perf_counter() - started) * 1000, 1),
             }
 
-        @server.tool(annotations=read)
+        @server.tool(title="Show memory model settings", annotations=read)
         async def memory_info(space_id: UUID, agent_id: UUID | None = None) -> dict[str, Any]:
             """Show the configured memory model provider and models, without secrets."""
             return await command(workspace.memory_info, space_id, agent_id=agent_id)
 
         @server.tool(
+            title="Set memory links",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def set_memory_links(
             space_id: UUID, change: SetMemoryLinks, agent_id: UUID | None = None
@@ -699,7 +1030,7 @@ def create_mcp(
             """
             return await command(workspace.set_memory_links, space_id, change, agent_id=agent_id)
 
-        @server.tool(annotations=read)
+        @server.tool(title="Read memory links", annotations=read)
         async def get_memory_links(
             space_id: UUID,
             resource_id: UUID,
@@ -719,7 +1050,7 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
-        @server.tool(annotations=read)
+        @server.tool(title="List memories", annotations=read)
         async def list_memories(
             space_id: UUID,
             query: str = "",
@@ -733,8 +1064,9 @@ def create_mcp(
             matched word is; a search returns its best matches and no cursor. Without a
             query, follow next_cursor to page through the Space. Excluded memory resources
             are also listed, with recall.excluded=true, but cannot be recalled. Stale memory
-            is flagged and remains recallable unless excluded. Use change_memory to edit,
-            reclassify or forget one claim.
+            is flagged and remains recallable unless excluded. To change one claim, use
+            edit_memory_claim, forget_memory_claim, classify_memory_claim or
+            route_memory_claim.
             """
             # A bound call keeps the keyword-only page parameters out of `command`'s
             # positional contract with the admission queue.
@@ -746,9 +1078,10 @@ def create_mcp(
             )
 
         @server.tool(
+            title="Build memory from a document",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def build_memory(
             space_id: UUID, change: BuildMemory, agent_id: UUID | None = None
@@ -764,9 +1097,10 @@ def create_mcp(
             return await command(workspace.build_memory, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Save a memory",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
         async def remember(
             space_id: UUID, change: RememberMemory, agent_id: UUID | None = None
@@ -790,9 +1124,10 @@ def create_mcp(
             return await command(workspace.remember, space_id, change, agent_id=agent_id)
 
         @server.tool(
+            title="Delete a memory",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
-            )
+            ),
         )
         async def delete_memory(
             space_id: UUID,
@@ -808,7 +1143,7 @@ def create_mcp(
             its index rows and its command history are removed. Deletion is permanent.
             Read the memory with list_memories first to get its current revision. Deleting
             an already absent record is a success. To remove a single claim and keep the
-            rest, use change_memory with action="forget" instead.
+            rest, use forget_memory_claim instead.
             """
             return await command(
                 lambda actor: resource_deletion.delete_memory(
@@ -817,29 +1152,94 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        # One tool per kind of claim change, because the directories refuse a tool that
+        # selects among operations. Each overwrites or removes the claim, so all are
+        # destructive; edit and automatic classification call the configured models.
         @server.tool(
+            title="Edit a memory claim",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
-            )
+            ),
         )
-        async def change_memory(
-            space_id: UUID, change: ChangeMemory, agent_id: UUID | None = None
+        async def edit_memory_claim(
+            space_id: UUID, change: EditMemoryClaim, agent_id: UUID | None = None
         ) -> dict[str, Any]:
-            """Edit, reclassify or permanently remove one claim, using its current IDs.
+            """Replace the text of one memory claim, using its current IDs.
 
-            resource_id is the memory record and entry_id is the claim; both come from
-            list_memories. action is edit, forget, classify or route. route sets routes_to,
-            the containers this claim governs; an empty list clears and pins it. A forget
-            removes the claim from the index immediately and is not a reversible exclusion,
-            though its text
-            remains in the previous immutable revision. classify pins manual assignments:
-            scope, category_ids, project_ids and section_ids, each list holding at most 32
-            unique IDs, and a project's active parent section is added automatically.
-            classify without classification replaces the assignments using the decision model when
-            configured. Never replace a user correction without their request. Read
-            list_memories first to get current entry IDs and values.
+            resource_id is the memory record and entry_id is the claim; read both, with the
+            current revision and value, from list_memories first. The new value, at most
+            2,000 characters, is re-indexed through the configured providers, and the
+            previous text remains in the earlier immutable revision. Never replace a user
+            correction without their request. Reuse command_id unchanged on retry.
             """
-            return await command(workspace.change_memory, space_id, change, agent_id=agent_id)
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Forget a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def forget_memory_claim(
+            space_id: UUID, change: ForgetMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Permanently remove one claim from a memory and keep its other claims.
+
+            resource_id is the memory record and entry_id is the claim; read both, with the
+            current revision, from list_memories first. The claim leaves the index at once,
+            so recall stops returning it. This is not a reversible exclusion, though its text
+            remains in the earlier immutable revision. To remove a whole memory record, use
+            delete_memory. Reuse command_id unchanged on retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Classify a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
+            ),
+        )
+        async def classify_memory_claim(
+            space_id: UUID, change: ClassifyMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Set the scope, categories, projects and sections of one memory claim.
+
+            Pass classification to pin a manual assignment: scope, category_ids,
+            project_ids and section_ids, each list holding at most 32 unique IDs; a
+            project's active parent section is added automatically. Omit classification to
+            have the decision model reclassify the claim, when one is configured. Either
+            replaces the claim's current assignments, so never replace a user correction
+            without their request. Read the IDs and current revision from list_memories
+            first, and reuse command_id unchanged on retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Route a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def route_memory_claim(
+            space_id: UUID, change: RouteMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Set the containers one memory claim governs as a placement rule.
+
+            routes_to holds up to 8 container IDs from get_space_map, where what the claim
+            describes belongs. It replaces the claim's current routing; an empty list clears
+            it and pins the clear, so automatic routing leaves the claim alone. Read the IDs
+            and current revision from list_memories first, and reuse command_id unchanged on
+            retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
 
     # SDK-generated argument models otherwise include rejected input in errors.
     # Keep this covered by the transport regression test when upgrading the SDK.

@@ -1,0 +1,706 @@
+/* The Documents directory: the shared page heading, the folders of the Space as tiles, and one
+   dense list with facets, search, sortable headers and the shared pager. */
+.sp-app .sp-main .sp-doc-library {
+  max-width: 1380px;
+  margin: 0;
+  padding: 24px 48px 72px;
+}
+.sp-app .sp-main .sp-doc-library-heading {
+  margin-bottom: 24px;
+}
+.sp-app .sp-main .sp-doc-library-actions {
+  padding-top: 4px;
+}
+/* New document and the ways to create beside it share one green pill. */
+.sp-app .sp-main .sp-doc-new {
+  display: inline-flex;
+  align-items: stretch;
+}
+.sp-app .sp-main .sp-doc-new > .sp-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 12px;
+}
+.sp-app .sp-main .sp-doc-new > .sp-doc-new-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 32px;
+  padding: 0 4px 0 2px;
+  border: 1px solid var(--color-accent);
+  border-left-color: rgb(255 255 255 / 0.35);
+  border-radius: 0 999px 999px 0;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.sp-app .sp-main .sp-doc-new > .sp-doc-new-more:hover:not(:disabled),
+.sp-app .sp-main .sp-doc-new > .sp-doc-new-more[aria-expanded="true"] {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  border-left-color: rgb(255 255 255 / 0.35);
+  color: var(--color-on-accent);
+}
+.sp-app .sp-main .sp-doc-new > .sp-doc-new-more:disabled {
+  opacity: 0.6;
+}
+
+/* The scope line and the header of an open folder or section. */
+.sp-app .sp-doc-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 16px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.sp-app .sp-doc-scope > a {
+  color: var(--color-muted);
+  padding: 2px 4px;
+  margin-inline: -4px;
+  border-radius: 4px;
+}
+.sp-app .sp-doc-scope > a:hover {
+  color: var(--color-ink);
+  background: var(--color-hover);
+}
+.sp-app .sp-doc-scope > svg {
+  color: var(--color-selection-border);
+}
+.sp-app .sp-doc-scope > span {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.sp-app .sp-doc-folder-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--sp-card-radius, 12px);
+  background: var(--color-surface);
+  box-shadow: var(--sp-card-soft-shadow, var(--shadow-card));
+}
+.sp-app .sp-doc-folder-head-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-selection);
+  color: var(--color-accent);
+}
+.sp-app .sp-doc-folder-head-copy {
+  flex: 1;
+  min-width: 0;
+}
+.sp-app .sp-doc-folder-head-copy h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+  overflow-wrap: anywhere;
+}
+.sp-app .sp-doc-folder-head-copy p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sp-app .sp-doc-folder-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 12.5px;
+}
+.sp-app .sp-doc-folder-head > .sp-menu-trigger {
+  flex-shrink: 0;
+}
+
+/* Recently opened: small cards, two or four across. */
+.sp-app .sp-doc-recents {
+  margin-bottom: 28px;
+}
+.sp-app .sp-doc-section-title h2 > span {
+  margin-left: 2px;
+}
+.sp-app .sp-main .sp-doc-recent-compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.sp-app .sp-main .sp-doc-card.sp-doc-card-compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.sp-app .sp-main .sp-doc-card-compact .sp-doc-file {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-selection);
+  color: var(--color-accent);
+}
+.sp-app .sp-main .sp-doc-card-compact-text {
+  min-width: 0;
+}
+.sp-app .sp-main .sp-doc-card-compact h3 {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.sp-app .sp-main .sp-doc-card-compact small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+/* Folder tiles, grouped by section. */
+.sp-app .sp-doc-folders {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+.sp-app .sp-doc-folder-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.sp-app .sp-doc-folder-group-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sp-app .sp-doc-folder-group-head h2 a {
+  color: var(--color-ink);
+}
+.sp-app .sp-doc-folder-group-head h2 a:hover {
+  color: var(--color-accent);
+}
+.sp-app .sp-doc-folder-group-meta {
+  color: var(--color-muted);
+  font-size: 12.5px;
+}
+.sp-app .sp-doc-folder-group-head > .sp-menu-trigger {
+  margin-left: auto;
+}
+.sp-app .sp-main .sp-doc-folder-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sp-app .sp-doc-folder-card-wrap {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--sp-card-radius, 12px);
+}
+.sp-app .sp-doc-folder-card-wrap.sp-doc-drop-folder {
+  outline-offset: 2px;
+}
+.sp-app .sp-doc-folder-card-wrap.is-drop-target {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.sp-app .sp-doc-folder-card-wrap.is-drop-target > .sp-doc-folder-card {
+  background: var(--color-selection);
+}
+.sp-app .sp-doc-folder-card-wrap > .sp-doc-drop-label {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sp-app .sp-main .sp-doc-folder-card {
+  position: relative;
+  padding: 16px;
+}
+.sp-app .sp-main .sp-doc-folder-card:hover {
+  border-color: var(--color-selection-border);
+  box-shadow: var(--sp-card-hover-shadow);
+}
+/* The name stretches over the whole tile; the ··· stays above it. */
+.sp-app .sp-main .sp-doc-folder-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.sp-app .sp-main .sp-doc-folder-link {
+  color: inherit;
+}
+.sp-app .sp-main .sp-doc-folder-link:focus-visible {
+  outline: none;
+}
+.sp-app .sp-main .sp-doc-folder-card:has(.sp-doc-folder-link:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.sp-app .sp-main .sp-doc-folder-card .sp-db-card-top > .sp-menu-trigger {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+}
+.sp-app .sp-main .sp-doc-folder-card:is(:hover, :focus-within) .sp-db-card-top > .sp-menu-trigger,
+.sp-app .sp-main .sp-doc-folder-card .sp-db-card-top > .sp-menu-trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sp-app .sp-main .sp-doc-folder-card .sp-db-card-top > .sp-menu-trigger { opacity: 1; }
+}
+.sp-app .sp-main .sp-doc-folder-card h3 {
+  font-size: 15px;
+}
+.sp-app .sp-main .sp-doc-folder-card .sp-db-card-footer b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.sp-app .sp-main .sp-doc-add-folder {
+  min-height: 150px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.sp-app .sp-main .sp-doc-add-folder strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.sp-app .sp-doc-folders-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 24px;
+  color: var(--color-muted);
+  font-size: 13.5px;
+}
+.sp-app .sp-doc-folders-hint > svg {
+  color: var(--color-accent);
+}
+
+/* The list: facets on the left, controls on the right, then the table. */
+.sp-app .sp-doc-collection-title {
+  margin-bottom: 4px;
+}
+.sp-app .sp-doc-library-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.sp-app .sp-doc-tabs {
+  display: flex;
+  gap: 20px;
+  min-height: 36px;
+}
+.sp-app .sp-doc-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  transition: color 120ms ease;
+}
+.sp-app .sp-doc-tabs button::after {
+  content: "";
+  position: absolute;
+  bottom: -13px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.sp-app .sp-doc-tabs button:hover {
+  color: var(--color-ink);
+}
+.sp-app .sp-doc-tabs button:hover::after {
+  background: var(--color-selection-border);
+}
+.sp-app .sp-doc-tabs button[aria-pressed="true"] {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.sp-app .sp-doc-tabs button[aria-pressed="true"]::after {
+  background: var(--color-accent);
+}
+.sp-app .sp-doc-tabs button > span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.sp-app .sp-doc-library-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-app .sp-doc-library-controls .sp-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+.sp-app .sp-doc-library-controls .sp-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.sp-app .sp-doc-library-controls .sp-search input:focus-visible {
+  outline: none;
+}
+.sp-app .sp-doc-library-controls select {
+  min-height: 32px;
+  max-width: 170px;
+  padding: 0 28px 0 10px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.sp-app .sp-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+.sp-app .sp-doc-chip > span:last-child {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.sp-app .sp-doc-chip:hover {
+  background: var(--color-hover);
+}
+.sp-app .sp-doc-chip.is-on {
+  border-color: var(--color-selection-border);
+  background: var(--color-selection);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.sp-app .sp-doc-chip.is-on > span:last-child {
+  color: var(--color-accent);
+}
+.sp-app .sp-doc-view-switch button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 28px;
+  padding: 0;
+}
+.sp-app .sp-doc-unread-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+.sp-app .sp-doc-tree-unread {
+  color: var(--color-accent);
+}
+.sp-app .sp-doc-tree-unread > .sp-doc-unread-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin: 0 4px;
+}
+.sp-app .sp-main .sp-doc-folder-card .sp-db-card-footer {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.sp-app .sp-main .sp-doc-folder-card .sp-db-card-footer > span {
+  white-space: nowrap;
+}
+
+/* The dense table: 48px rows, the folder path under the title, a ··· that shows on hover. */
+.sp-app .sp-doc-list-wrap {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.sp-app .sp-doc-table {
+  width: 100%;
+  min-width: 560px;
+  font-size: 13px;
+}
+.sp-app .sp-doc-table thead {
+  background: transparent;
+}
+.sp-app .sp-doc-table th {
+  padding: 10px 10px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 450;
+  white-space: nowrap;
+}
+.sp-app .sp-doc-table th:first-child,
+.sp-app .sp-doc-table td:first-child {
+  padding-left: 0;
+}
+.sp-app .sp-doc-table th:last-child,
+.sp-app .sp-doc-table td:last-child {
+  width: 36px;
+  padding-right: 0;
+  text-align: right;
+}
+.sp-app .sp-doc-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.sp-app .sp-doc-sort:hover {
+  color: var(--color-ink);
+  background: var(--color-hover);
+}
+.sp-app .sp-doc-sort.is-active {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.sp-app .sp-doc-sort .is-up {
+  transform: rotate(-90deg);
+}
+.sp-app .sp-doc-table td {
+  height: 48px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-rule);
+}
+.sp-app .sp-doc-table tbody tr:hover td {
+  background: var(--color-hover);
+}
+.sp-app .sp-doc-table .sp-doc-title-cell {
+  gap: 2px;
+}
+.sp-app .sp-doc-table .sp-document-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+.sp-app .sp-doc-table .sp-doc-row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+}
+.sp-app .sp-doc-table .sp-doc-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.sp-app .sp-doc-table .sp-doc-row-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sp-app .sp-doc-table .sp-doc-row-file,
+.sp-app .sp-doc-table .sp-doc-row-path {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.sp-app .sp-doc-table .sp-doc-row-file {
+  white-space: nowrap;
+}
+.sp-app .sp-doc-table .sp-doc-row-path {
+  display: block;
+  margin-top: 1px;
+}
+.sp-app .sp-doc-table tr.is-unread .sp-document-link {
+  font-weight: 600;
+}
+.sp-app .sp-doc-table .sp-doc-row-project {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-app .sp-doc-table .sp-with-avatar {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.sp-app .sp-doc-table .sp-doc-row-actions .sp-menu-trigger {
+  opacity: 0;
+}
+.sp-app .sp-doc-table tr:is(:hover, :focus-within) .sp-doc-row-actions .sp-menu-trigger,
+.sp-app .sp-doc-table .sp-doc-row-actions .sp-menu-trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sp-app .sp-doc-table .sp-doc-row-actions .sp-menu-trigger { opacity: 1; }
+}
+.sp-app .sp-doc-table tr.is-dragging {
+  opacity: 0.5;
+}
+.sp-app .sp-main .sp-doc-grid {
+  margin-top: 16px;
+}
+.sp-app .sp-main .sp-doc-card.is-unread h3 {
+  font-weight: 650;
+}
+.sp-app .sp-doc-library-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.sp-app .sp-doc-library-footer > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.sp-app .sp-doc-move-note {
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1200px) {
+  .sp-app .sp-main .sp-doc-library {
+    padding-inline: 32px;
+  }
+  .sp-app .sp-main .sp-doc-folder-grid,
+  .sp-app .sp-main .sp-doc-recent-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1000px) {
+  .sp-app .sp-doc-library-actions .sp-doc-browse {
+    display: inline-flex;
+  }
+  /* The grids stay grids on narrow screens; only the old recent cards scrolled sideways. */
+  .sp-app .sp-main .sp-doc-recent-compact,
+  .sp-app .sp-main .sp-doc-grid {
+    display: grid;
+    overflow: visible;
+    scroll-snap-type: none;
+    padding: 0;
+  }
+  .sp-app .sp-main .sp-doc-grid .sp-doc-card-wrap,
+  .sp-app .sp-main .sp-doc-recent-compact .sp-doc-card {
+    flex: none;
+  }
+  .sp-app .sp-doc-library-controls {
+    flex: 1 1 100%;
+  }
+  .sp-app .sp-doc-library-controls .sp-search {
+    flex: 1;
+    width: auto;
+  }
+  .sp-app .sp-doc-table {
+    min-width: 0;
+  }
+  .sp-app .sp-doc-table .sp-doc-row-project {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .sp-app .sp-main .sp-doc-library {
+    padding: 16px 16px 48px;
+  }
+  .sp-app .sp-main .sp-doc-folder-grid,
+  .sp-app .sp-main .sp-doc-recent-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-app .sp-doc-folder-head {
+    flex-wrap: wrap;
+    padding: 14px 16px;
+  }
+  .sp-app .sp-doc-library-toolbar {
+    gap: 12px;
+  }
+  .sp-app .sp-doc-tabs {
+    gap: 16px;
+    overflow-x: auto;
+  }
+  .sp-app .sp-doc-library-controls .sp-search {
+    flex-basis: 100%;
+  }
+  .sp-app .sp-doc-library-controls select {
+    flex: 1;
+    max-width: none;
+  }
+  .sp-app .sp-doc-table th:nth-child(2),
+  .sp-app .sp-doc-table td:nth-child(2) {
+    display: none;
+  }
+  .sp-app .sp-doc-table .sp-with-avatar {
+    display: none;
+  }
+  .sp-app .sp-doc-table th:nth-last-child(3),
+  .sp-app .sp-doc-table td:nth-last-child(3) {
+    display: none;
+  }
+  .sp-app .sp-doc-table .sp-doc-row-actions .sp-menu-trigger {
+    opacity: 1;
+  }
+  .sp-app .sp-doc-library-footer > span:last-child {
+    display: none;
+  }
+}

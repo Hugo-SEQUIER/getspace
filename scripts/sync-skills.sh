@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copy the agent skills from the space-skills repository into skills/.
+# Copy the agent skills from the skills/ folder of the space-skills repository into skills/.
 # space-skills is the only place the skills are edited; skills/ is a copy, and
 # skills/.source records the commit it came from.
 #
@@ -24,9 +24,14 @@ trap 'rm -rf "$work"' EXIT
 git -C "$work" init --quiet
 git -C "$work" fetch --quiet --depth 1 "$repo" "$ref"
 commit="$(git -C "$work" rev-parse FETCH_HEAD)"
-mkdir "$work/skills"
-git -C "$work" archive FETCH_HEAD | tar -x -C "$work/skills"
-rm -rf "$work/skills/.github" "$work/skills/.gitignore" "$work/skills/.gitattributes"
+git -C "$work" cat-file -e "FETCH_HEAD:skills" 2>/dev/null \
+  || { echo "space-skills $commit has no skills/ folder." >&2; exit 1; }
+git -C "$work" archive FETCH_HEAD skills | tar -x -C "$work"
+# The skill library works the hosted edition's Space skills, which this edition does not keep,
+# so it is left out of the copy and of the README band that lists it.
+rm -rf "$work/skills/space-skill-library"
+sed -i '\#](space-skill-library/SKILL\.md)#d' "$work/skills/README.md"
+sed -i 's/^The pack contains .* skills\./The pack contains eighteen skills./' "$work/skills/README.md"
 
 if $check; then
   if ! diff -r --exclude=.source "$work/skills" skills; then

@@ -1,10 +1,22 @@
+import asyncio
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 
 from space.api.mcp import create_mcp
 from space.app import create_app
+from space.memory import ClassifyMemoryClaim, EditMemoryClaim, ForgetMemoryClaim, RouteMemoryClaim
 from space.settings import Settings
 from space.workspace import Workspace
+
+# Each claim tool, its request model and the fields it adds to the claim's IDs.
+CLAIM_TOOLS = {
+    "edit_memory_claim": (EditMemoryClaim, {"value": "Ships on 3 November"}),
+    "forget_memory_claim": (ForgetMemoryClaim, {}),
+    "classify_memory_claim": (ClassifyMemoryClaim, {"classification": None}),
+    "route_memory_claim": (RouteMemoryClaim, {"routes_to": []}),
+}
 
 
 @pytest.fixture
@@ -60,6 +72,8 @@ def test_official_mcp_initialize_and_tool_roundtrip(client):
     assert initialized["result"]["serverInfo"]["name"] == "Space"
     tools = rpc(client, "tools/list")["result"]["tools"]
     assert [tool["name"] for tool in tools] == ["server_info"]
+    assert tools[0]["title"] == "Show Space server info"
+    assert tools[0]["annotations"]["title"] == "Show Space server info"
     assert tools[0]["annotations"]["readOnlyHint"] is True
     result = rpc(client, "tools/call", {"name": "server_info", "arguments": {}})
     assert result["result"]["structuredContent"]["resource_access"] is False
@@ -111,9 +125,74 @@ def test_memory_tool_annotations_describe_forgetting_and_external_model_access()
     workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
     server = create_mcp(Settings(environment="test"), workspace)
     annotations = {tool.name: tool.annotations for tool in server._tool_manager.list_tools()}
-    assert annotations["change_memory"].destructiveHint is True
-    assert annotations["change_memory"].idempotentHint is True
-    for name in ("remember", "build_memory", "change_memory", "get_context"):
+    for name in CLAIM_TOOLS:
+        assert annotations[name].destructiveHint is True
+        assert annotations[name].idempotentHint is True
+    for name in ("remember", "build_memory", "edit_memory_claim", "classify_memory_claim"):
         assert annotations[name].openWorldHint is True
-    for name in ("save_resource", "save_handoff", "list_memories"):
+    assert annotations["get_context"].openWorldHint is True
+    for name in ("save_resource", "save_handoff", "list_memories", "forget_memory_claim"):
         assert annotations[name].openWorldHint is False
+    assert annotations["route_memory_claim"].openWorldHint is False
+
+
+def test_each_memory_claim_change_is_its_own_tool():
+    """OpenAI's directory refuses a tool that picks its operation from an argument."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = {
+        tool.name: tool
+        for tool in create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    }
+    assert "change_memory" not in tools
+    claim = {"command_id": uuid4(), "resource_id": uuid4(), "expected_revision": 3}
+    claim["entry_id"] = uuid4()
+    for name, (model, fields) in CLAIM_TOOLS.items():
+        schema = tools[name].parameters["$defs"][model.__name__]
+        assert set(schema["properties"]) == set(claim) | set(fields), name
+        assert "action" not in schema["properties"], name
+        change = model(**claim, **fields).as_change()
+        assert change.action == name.removesuffix("_memory_claim"), name
+        assert change.model_dump(include=set(claim)) == claim, name
+
+
+def test_every_tool_lists_what_the_connector_directories_require():
+    """Claude's directory flags a tool without an annotations title, a hint or parameter types."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = asyncio.run(create_mcp(Settings(environment="test"), workspace).list_tools())
+    assert len({tool.title for tool in tools}) == len(tools)
+    assert set(CLAIM_TOOLS) <= {tool.name for tool in tools}
+    for tool in tools:
+        hints = tool.annotations
+        assert tool.title and hints.title == tool.title, tool.name
+        assert hints.readOnlyHint is not None and hints.destructiveHint is not None, tool.name
+        assert not (hints.readOnlyHint and hints.destructiveHint), tool.name
+        for name, schema in tool.inputSchema["properties"].items():
+            assert "type" in schema or "anyOf" in schema, (tool.name, name)
+
+
+def test_saving_a_workspace_item_is_destructive():
+    """OpenAI's scan flags a tool that can delete data without destructiveHint: a save with
+    records replaces a whole table and deletes the rows the list omits."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = {
+        tool.name: tool
+        for tool in create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    }
+    hints = tools["save_workspace_item"].annotations
+    assert hints.destructiveHint is True and hints.readOnlyHint is False
+
+
+def test_database_reads_and_changes_are_separate_tools():
+    """The directories reject one tool that both reads and changes data."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = {
+        tool.name: tool
+        for tool in create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    }
+    reader, changer = tools["read_database"], tools["query_database"]
+    assert reader.annotations.readOnlyHint is True
+    assert changer.annotations.destructiveHint is True
+    assert "command_id" not in reader.parameters["$defs"]["Read"]["properties"]
+    assert {"command_id", "expected_revision"} <= set(
+        changer.parameters["$defs"]["Change"]["required"]
+    )

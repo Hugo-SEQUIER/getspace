@@ -49,6 +49,8 @@ test('a webhook subscription on a database is created with a one-time signing se
 
   await app.open('/app/settings/webhooks');
   await screen.getByRole('combobox', 'Database').selectOption(name);
+  // The agent inbox is the default destination; the endpoint field appears for a receiver.
+  await screen.getByLabel('Deliver to').selectOption('An HTTPS receiver you run');
   await screen.getByRole('textbox', 'HTTPS endpoint').fill('https://example.org/space-hook');
   await screen.getByRole('button', 'Create webhook').tap();
   const secret = screen.getByRole('region', 'One-time signing secret');

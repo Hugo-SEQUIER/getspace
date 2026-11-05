@@ -17,6 +17,7 @@ const navigation: { path: string; title: string; icon: IconName }[] = [
   { path: "documents", title: "Documents", icon: "document" },
   { path: "memory", title: "Memory", icon: "memory" },
   { path: "databases", title: "Databases", icon: "database" },
+  { path: "systems", title: "Systems", icon: "system" },
   { path: "overview", title: "Overview", icon: "chart" },
   { path: "projects", title: "Projects", icon: "folder" },
   { path: "agents", title: "Agents", icon: "agents" },
@@ -140,8 +141,8 @@ export function SidebarNavigation({
             <span>Home</span>
             {attentionCount > 0 && <span className="sp-nav-badge" aria-label={`${attentionCount} items need attention`}>{attentionCount}</span>}
           </Link>
-          {navigationLinks(navigation.slice(0, 4))}
-          <SidebarGroup id="workspace" title="Workspace">{navigationLinks(navigation.slice(4))}</SidebarGroup>
+          {navigationLinks(navigation.slice(0, 5))}
+          <SidebarGroup id="workspace" title="Workspace">{navigationLinks(navigation.slice(5))}</SidebarGroup>
         </nav>
         <SidebarGroup
           id="favorites"

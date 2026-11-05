@@ -71,7 +71,7 @@ Show the exact claims and the exact items you intend to create, then wait for ap
 1. Sections, then categories, with `save_workspace_item`. Generate each `item_id` yourself, because the server does not, and send `expected_revision=0`.
 2. Projects, the same way, with a name, a one-line description, a status and an optional section. A project's `section_id` must name an active section in this Space, so create the sections first and pass their IDs.
 3. The claims, in one `remember_claims` call with a `title`, the claims, `topics` and a fresh `command_id`.
-4. Classify the saved claims with `change_memory` and `action="classify"`, using the IDs you just created.
+4. Classify the saved claims with `classify_memory_claim`, using the IDs you just created.
 
 The claim write already runs the classifier when a provider and a classifier are configured, so step 4 does not classify for the first time: it pins the vocabulary the user approved. That is worth doing, because a manual assignment survives later edits and rebuilds while an automatic one can be replaced.
 
@@ -91,7 +91,7 @@ Every tool below is an MCP tool. A client that surfaces MCP tools calls them as 
 
 `remember_claims(space_id, change)`: `command_id`, `title` (1-300), `claims` (1-24), optional `topics` (up to 12). Each claim takes `index` (1-300, unique in the request, and without `||`), `value` (1-2000), `memory_type` (`factual` or `procedural`) and `importance` (0-3, where 0 means undeclared).
 
-`change_memory(space_id, change)` with `action="classify"`: `command_id`, `resource_id`, `expected_revision` (>= 1), `entry_id`, and `classification` with `scope` (`global`, `project` or `unassigned`), `category_ids`, `project_ids` and `section_ids`. Each ID list holds at most 32 unique IDs. Project scope requires at least one `project_id`; `global` and `unassigned` must have none.
+`classify_memory_claim(space_id, change)`: `command_id`, `resource_id`, `expected_revision` (>= 1), `entry_id`, and `classification` with `scope` (`global`, `project` or `unassigned`), `category_ids`, `project_ids` and `section_ids`. Each ID list holds at most 32 unique IDs. Project scope requires at least one `project_id`; `global` and `unassigned` must have none.
 
 ## Boundaries
 

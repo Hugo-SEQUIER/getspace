@@ -11,7 +11,7 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-from space.jobs import LEASE_SECONDS, claim, process
+from space.jobs import LEASE_SECONDS, YIELDED, claim, process
 from space.model_provider import MemoryModels
 from space.providers import LocalKeys
 from space.queue_watch import QueueWatch, wait
@@ -19,7 +19,12 @@ from space.settings import CONFIG_FILE, Settings, database_connection_options
 from space.workspace import Database, Workspace
 
 JOB_DEADLINE_SECONDS = 240
+# A drain starts no attempt that could end after this many seconds, so a batch left to
+# run unattended stays inside a bounded window even while long jobs keep yielding.
+DRAIN_SECONDS = 720
 EXIT_IDLE = 10
+# The child ran one bounded turn of a Memora import or reclassification catch-up.
+EXIT_YIELDED = 11
 EXIT_TIMEOUT = 124
 # Eligible work, read without claiming it: queued and due, or a crashed attempt's lease.
 PENDING_SQL = (
@@ -79,7 +84,8 @@ def run_attempt(queue_env_file=None):
             job = claim(queue)
             if job is None:
                 return EXIT_IDLE
-            process(workspace, queue, job)
+            if process(workspace, queue, job) is YIELDED:
+                return EXIT_YIELDED
     finally:
         asyncio.run(workspace.aclose())
         database.close()
@@ -122,7 +128,17 @@ def main(argv=None):
         default=3,
         help="seconds between queue checks while idle when running continuously (default: 3)",
     )
-    parser.add_argument("--max-jobs", type=int, default=20, help="maximum attempts in a drain run")
+    parser.add_argument(
+        "--max-jobs",
+        type=int,
+        default=20,
+        help="maximum attempts in a drain run, not counting yielded turns",
+    )
+    parser.add_argument(
+        "--max-seconds",
+        type=int,
+        help=f"start no attempt that could end after this many seconds (drain: {DRAIN_SECONDS})",
+    )
     parser.add_argument("--queue-env-file", type=Path, help="worker-only queue connection settings")
     parser.add_argument(
         "--job-deadline",
@@ -136,6 +152,10 @@ def main(argv=None):
         parser.error("--max-jobs must be between 1 and 100")
     if not 1 <= args.job_deadline <= LEASE_SECONDS - 30:
         parser.error(f"--job-deadline must be between 1 and {LEASE_SECONDS - 30}")
+    if args.max_seconds is None and args.drain:
+        args.max_seconds = DRAIN_SECONDS
+    if args.max_seconds is not None and args.max_seconds < args.job_deadline:
+        parser.error("--max-seconds must be at least --job-deadline")
     if args.queue_env_file and not args.queue_env_file.is_file():
         parser.error("The worker queue configuration file does not exist")
     if not 0.5 <= args.poll_interval <= 300:
@@ -168,7 +188,11 @@ def main(argv=None):
             PENDING_SQL,
         )
     attempts, failed = 0, False
+    started = time.monotonic()
     while not stopping:
+        elapsed = time.monotonic() - started
+        if args.max_seconds is not None and elapsed + args.job_deadline > args.max_seconds:
+            break
         if watch is not None and not watch.pending():
             wait(args.poll_interval, lambda: stopping)
             continue
@@ -176,7 +200,8 @@ def main(argv=None):
         if outcome == EXIT_IDLE:
             if args.drain:
                 break
-        else:
+        elif outcome != EXIT_YIELDED:
+            # A yielded turn saved a long job's progress; the time budget bounds those.
             attempts += 1
             if outcome != 0:
                 failed = True
@@ -188,7 +213,7 @@ def main(argv=None):
                 )
         if args.once or (args.drain and attempts >= args.max_jobs):
             break
-        if not stopping and outcome != 0:
+        if not stopping and outcome not in (0, EXIT_YIELDED):
             time.sleep(1)
     if watch is not None:
         watch.close()

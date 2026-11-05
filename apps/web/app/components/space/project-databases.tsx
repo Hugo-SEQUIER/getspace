@@ -2,7 +2,7 @@ import Link from "@web/lib/navigation";
 import { useRef, useState } from "react";
 import { message } from "../../../lib/client";
 import { createDatabaseSaveQueue } from "../../../lib/space/database-save-queue";
-import type { WorkspaceDatabase } from "../../../lib/space/databases";
+import { recordCount, type WorkspaceDatabase } from "../../../lib/space/databases";
 import { useFeedback } from "../notifications";
 import { saveRecovery } from "./database-save-recovery";
 import { useSpace } from "./provider";
@@ -72,7 +72,7 @@ export function ProjectDatabases({ base, projectId }: { base: string; projectId:
           </Link>
           {database.tasks && <span className="sp-tag">Task list</span>}
           <span className="sp-muted">
-            {database.records.length} {database.records.length === 1 ? "record" : "records"}
+            {recordCount(database)} {recordCount(database) === 1 ? "record" : "records"}
           </span>
           {data.canWrite && (
             <button

@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -22,12 +23,29 @@ import {
 import { normalizeMemories } from "../../../lib/space/memory-model";
 import { agentTokenRequest, type AgentToken } from "../../../lib/space/agent-tokens";
 import { resourceSaveCommand, type ResourceDraft } from "../../../lib/space/resource-model";
+import {
+  MAX_FILE_BYTES,
+  cleanFileName,
+  cleanFileType,
+  downloadFileParts,
+  downloadThumbnail,
+  fileDiscardPath,
+  fileParts,
+  forgetFiles,
+  rememberedFile,
+  rememberedThumbnail,
+  sha256Hex,
+  uploadFileParts,
+  type DocumentFile,
+  type FileRequest,
+} from "../../../lib/space/document-files";
+import type { MediaDetails, ThumbnailDraft } from "../../../lib/space/file-thumbnails";
 import type { Profile } from "../../../lib/space/profile";
 
 /** How this installation guards access: an access key, or nothing on a private network. */
 export type AccessMode = "key" | "private";
 import { statuses, type ResourceView } from "../../../lib/space/types";
-import { mergeSeen, seenRevisions } from "../../../lib/space/attention";
+import { mergeSeen, seenRevisions, seenTimes } from "../../../lib/space/attention";
 import { mergeTaskSummary, optimisticTask, settleLimited, taskColumnLabel, taskColumnsWithResources } from "../../../lib/space/task-model";
 import {
   invitationToken,
@@ -36,7 +54,10 @@ import {
   selectWorkspace,
 } from "../../../lib/space/teams";
 import {
+  databaseChange,
+  databaseSchema,
   isWorkspaceDatabase,
+  type DatabaseRecord,
   type WorkspaceDatabase,
 } from "../../../lib/space/databases";
 import type {
@@ -57,6 +78,26 @@ import type {
 
 // Keep initial requests small; the API supports larger explicit pages when needed.
 const MEMORY_PAGE_SIZE = 50;
+// The server caps one memory page at 200. A complete read and a search both ask for that
+// cap instead of one display page, so the vectors view and every query see every memory.
+const MEMORY_MAX_PAGE_SIZE = 200;
+// Files travel through the same API as everything else; this indirection keeps the file
+// paths in one place.
+const fileRequest: FileRequest = (path, method, body, signal) => api(path, method, body, signal);
+
+export type FileDraft = {
+  /** A new ID for each chosen file; retrying a save reuses it so staged parts are reused. */
+  id: string;
+  file: File;
+  bytes: Uint8Array;
+  title: string;
+  body: string;
+  project?: string;
+  folder?: string;
+  /** What the browser read about a picture or recording, and the thumbnail it made. */
+  media?: MediaDetails;
+  thumbnail?: ThumbnailDraft | null;
+};
 type ItemKind = "project" | "database" | "category" | "section" | "folder";
 type WorkspaceItem = (Project | WorkspaceDatabase | OrganizationItem | DocumentFolder) & { kind: ItemKind };
 type MemoryPage = { items: MemoryResponse[]; next_cursor: string | null; provider: Provider };
@@ -90,6 +131,8 @@ function useData() {
   const [resources, setResources] = useState<Resource[]>([]);
   // Which revision of each document or task the owner last opened.
   const [views, setViews] = useState<Record<string, number>>({});
+  // When the signed-in person last opened each document or task, for "Recently opened".
+  const [viewTimes, setViewTimes] = useState<Record<string, string>>({});
   const latestViews = useRef(views);
   latestViews.current = views;
   const [viewsReady, setViewsReady] = useState(false);
@@ -116,7 +159,15 @@ function useData() {
   const [agents, setAgents] = useState<AgentIdentity[]>([]);
   // Set once both agent lists loaded or failed, so the home page stops waiting for them.
   const [agentsReady, setAgentsReady] = useState(false);
+  // Listed databases carry their schema and record_count; the rows of each database are read
+  // when a page needs them and kept here by database until its revision moves on.
   const [databases, setDatabases] = useState<WorkspaceDatabase[]>([]);
+  const [databaseRecords, setDatabaseRecords] = useState<Record<string, { revision: number; records: DatabaseRecord[] }>>({});
+  const latestDatabases = useRef(databases);
+  latestDatabases.current = databases;
+  const latestRecords = useRef(databaseRecords);
+  latestRecords.current = databaseRecords;
+  const loadingRecords = useRef(new Set<string>());
   const [trashedItems, setTrashedItems] = useState<
     ((Project | WorkspaceDatabase) & { kind: "project" | "database" })[]
   >([]);
@@ -124,7 +175,7 @@ function useData() {
   const [cursors, setCursors] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [memoryLoading, setMemoryLoading] = useState(false);
-  const [memoryMoreLoading, setMemoryMoreLoading] = useState(false);
+  const [memoryAllLoading, setMemoryAllLoading] = useState(false);
   const [memoryLoaded, setMemoryLoaded] = useState(false);
   const [error, setError] = useState("");
   const [memoryError, setMemoryError] = useState("");
@@ -132,7 +183,7 @@ function useData() {
   const generation = useRef(0);
   const pending = useRef(new Map<string, string>());
   const memoryRequests = useRef(0);
-  const memoryMoreBusy = useRef(false);
+  const memoryAllBusy = useRef(false);
   const latestResources = useRef(resources);
   latestResources.current = resources;
   const memoryHasLoaded = useRef(memoryLoaded);
@@ -154,11 +205,81 @@ function useData() {
     }
   }, []);
 
+  // Parameters: a database as the Space lists or returns it.
+  // What it does: keeps the rows out of the listed copy; they live in the records cache.
+  // Output: the listed database, with an empty rows array until its records are merged in.
+  function listedDatabase(item: WorkspaceDatabase): WorkspaceDatabase {
+    const { records: _records, recordsLoaded: _loaded, ...listed } = item;
+    return { ...listed, records: [] };
+  }
+  // Parameters: a database the Space just returned with its rows.
+  // What it does: remembers its rows for its revision and refreshes its listed copy, at once in
+  // the refs the save path reads and in state.
+  // Output: nothing.
+  function rememberDatabase(item: WorkspaceDatabase) {
+    // A response that carries no rows (a trash or restore answer) says nothing about them; the
+    // page reads them when it opens the database.
+    if (Array.isArray(item.records)) {
+      const entry = { revision: item.revision ?? 0, records: item.records };
+      latestRecords.current = { ...latestRecords.current, [item.id]: entry };
+      setDatabaseRecords((old) => ({ ...old, [item.id]: entry }));
+    }
+    if (item.deleted) return;
+    const listed = listedDatabase(item);
+    const merge = (old: WorkspaceDatabase[]) => old.some((d) => d.id === item.id)
+      ? old.map((d) => d.id === item.id && (d.revision ?? 0) <= (item.revision ?? 0) ? listed : d)
+      : [...old, listed];
+    latestDatabases.current = merge(latestDatabases.current);
+    setDatabases(merge);
+  }
+  // Parameters: a listed database and the records cache.
+  // Output: the database with its rows when they were read at its revision; recordsLoaded says so.
+  function withRecords(item: WorkspaceDatabase, cache: typeof databaseRecords): WorkspaceDatabase {
+    const cached = cache[item.id];
+    return { ...item, records: cached?.records ?? [], recordsLoaded: !!cached && cached.revision === (item.revision ?? 0) };
+  }
+  const loadedDatabases = useMemo(
+    () => databases.map((item) => withRecords(item, databaseRecords)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [databases, databaseRecords],
+  );
+  // Parameters: a database ID.
+  // What it does: reads the database with its rows unless they are already known at its listed
+  // revision or being read; a failed read reports to the caller only.
+  // Output: nothing; the rows appear through the databases list.
+  const loadDatabaseRecords = useCallback(async (id: string) => {
+    if (!space) return;
+    const listed = latestDatabases.current.find((d) => d.id === id);
+    const cached = latestRecords.current[id];
+    if (listed && cached && cached.revision === (listed.revision ?? 0)) return;
+    if (loadingRecords.current.has(id)) return;
+    loadingRecords.current.add(id);
+    const current = generation.current;
+    try {
+      const item = await cachedApi<WorkspaceDatabase>(`spaces/${space.id}/items/${id}`);
+      if (current !== generation.current) return;
+      rememberDatabase(item);
+    } finally {
+      loadingRecords.current.delete(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [space]);
+  // Task databases feed Home and the Tasks board, so their rows load with the listing.
+  useEffect(() => {
+    if (!space) return;
+    for (const item of databases) {
+      if (!item.tasks || item.deleted) continue;
+      const cached = databaseRecords[item.id];
+      if (cached && cached.revision === (item.revision ?? 0)) continue;
+      void loadDatabaseRecords(item.id).catch(() => {});
+    }
+  }, [databases, databaseRecords, space, loadDatabaseRecords]);
+
   const applyItems = useCallback((kind: ItemKind, deleted: boolean, items: WorkspaceItem[]) => {
     if (kind === "folder") {
       if (!deleted) setFolders(items as DocumentFolder[]);
     } else if (kind === "project" && !deleted) setProjects(items as Project[]);
-    else if (kind === "database" && !deleted) setDatabases(items as WorkspaceDatabase[]);
+    else if (kind === "database" && !deleted) setDatabases((items as WorkspaceDatabase[]).map(listedDatabase));
     else if (kind === "category" || kind === "section")
       setOrganizationItems(old => [...old.filter(i => i.kind !== kind || !!i.deleted !== deleted), ...items as OrganizationItem[]]);
     else setTrashedItems(old => [...old.filter(i => i.kind !== kind), ...items as typeof old]);
@@ -295,6 +416,8 @@ function useData() {
     const reset = (event: Event) => {
       const { status, error } = (event as CustomEvent<{ status: number; error: string }>).detail;
       clearData();
+      // Downloaded files belong to the account that opened them.
+      forgetFiles();
       if (status !== 401 && error) { setAccountId(undefined); setError(error); }
     };
     window.addEventListener(ACCESS_RESET_EVENT, reset);
@@ -388,9 +511,11 @@ function useData() {
   const memoryPage = useCallback(
     async (
       spaceId: string,
-      search: { query?: string; after?: string | null } = {},
+      search: { query?: string; after?: string | null; limit?: number } = {},
     ) => {
-      const params = new URLSearchParams({ limit: String(MEMORY_PAGE_SIZE) });
+      const params = new URLSearchParams({
+        limit: String(search.limit ?? MEMORY_PAGE_SIZE),
+      });
       if (search.query) params.set("query", search.query);
       if (search.after) params.set("after", search.after);
       const result = await cachedApi<MemoryPage>(`spaces/${spaceId}/memories?${params}`);
@@ -502,31 +627,47 @@ function useData() {
     };
   }, [space, jobPollVersion]);
 
-  // Parameters: none. It continues from the loaded cursor.
-  // What it does: appends the next newest-first page and keeps the cursor that follows
-  //   it. A full reload started while this page was in flight owns the list instead.
+  // Parameters: none. It continues until the server has no older page.
+  // What it does: walks the newest-first pages and appends them, so both views hold every
+  //   memory and the list can page through all of them. A full reload started while a page
+  //   is in flight owns the list instead.
   // Output: nothing. Failures reach the view as memoryError.
-  const loadMoreMemories = useCallback(async () => {
-    if (!space || !memoryCursor || memoryMoreBusy.current) return;
+  const loadAllMemories = useCallback(async () => {
+    if (!space || !memoryCursor || memoryAllBusy.current) return;
     const current = memoryRequests.current;
-    memoryMoreBusy.current = true;
-    setMemoryMoreLoading(true);
+    memoryAllBusy.current = true;
+    setMemoryAllLoading(true);
     setMemoryError("");
     try {
-      const result = await memoryPage(space.id, { after: memoryCursor });
-      if (current !== memoryRequests.current) return;
-      const page = normalizeMemories(result.items, resources);
-      setMemories((old) => [
-        ...old,
-        ...page.filter((m) => !old.some((o) => o.id === m.id)),
-      ]);
-      setMemoryCursor(result.next_cursor);
-      setMemoryLoaded(true);
+      let cursor: string | null = memoryCursor;
+      const seen = new Set<string>();
+      while (cursor) {
+        seen.add(cursor);
+        const result = await memoryPage(space.id, {
+          after: cursor,
+          limit: MEMORY_MAX_PAGE_SIZE,
+        });
+        if (current !== memoryRequests.current) return;
+        const page = normalizeMemories(result.items, resources);
+        setMemories((old) => [
+          ...old,
+          ...page.filter((m) => !old.some((o) => o.id === m.id)),
+        ]);
+        const next = result.next_cursor;
+        cursor = next && !seen.has(next) ? next : null;
+        setMemoryCursor(cursor);
+        setMemoryLoaded(true);
+      }
     } catch (e) {
-      if (current === memoryRequests.current) setMemoryError(message(e));
+      if (current === memoryRequests.current) {
+        setMemoryError(message(e));
+        // Stop the view effect from retrying a failed walk; its Retry button reads the
+        // first page again and starts a fresh walk from there.
+        setMemoryCursor(null);
+      }
     } finally {
-      memoryMoreBusy.current = false;
-      setMemoryMoreLoading(false);
+      memoryAllBusy.current = false;
+      setMemoryAllLoading(false);
     }
   }, [space, memoryCursor, resources, memoryPage]);
 
@@ -537,7 +678,10 @@ function useData() {
   const searchMemories = useCallback(
     async (query: string) => {
       if (!space) return [];
-      const result = await memoryPage(space.id, { query });
+      const result = await memoryPage(space.id, {
+        query,
+        limit: MEMORY_MAX_PAGE_SIZE,
+      });
       return normalizeMemories(result.items, resources);
     },
     [space, resources, memoryPage],
@@ -582,6 +726,7 @@ function useData() {
     return watchApi<{ items: ResourceView[] }>(`spaces/${space.id}/views`, value => {
       if (current !== generation.current) return;
       setViews(seenRevisions(value.items));
+      setViewTimes(seenTimes(value.items));
       setViewsReady(true);
       setViewsSettled(true);
     }, () => {
@@ -597,6 +742,8 @@ function useData() {
     if (!pending.length) return;
     latestViews.current = mergeSeen(latestViews.current, pending);
     setViews(old => mergeSeen(old, pending));
+    const now = new Date().toISOString();
+    setViewTimes(old => ({ ...old, ...Object.fromEntries(pending.map(item => [item.id, now])) }));
     if (!space) return;
     try {
       await api(`spaces/${space.id}/views`, "POST", {
@@ -772,6 +919,85 @@ function useData() {
     setNotice("Saved successfully");
     return saved;
   }
+  // Parameters: the chosen file with its bytes, text, media details and thumbnail, and
+  // optional progress and cancellation.
+  // What it does: uploads the original in parts and the thumbnail as a one-part file of its
+  // own, then saves the document that keeps them.
+  // Output: the saved document, which carries the file's details.
+  async function saveFile(
+    draft: FileDraft,
+    { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {},
+  ) {
+    const target = writableSpace();
+    const bytes = draft.bytes.byteLength;
+    if (!bytes) throw new Error("This file is empty.");
+    if (bytes > MAX_FILE_BYTES) throw new Error("Choose a file up to 250 MB.");
+    const name = cleanFileName(draft.file.name), type = cleanFileType(draft.file.type, name);
+    const sha256 = await sha256Hex(draft.bytes);
+    const media = draft.media ?? {};
+    const thumbnail = draft.thumbnail ?? null;
+    const details: DocumentFile = {
+      id: draft.id, name, type, bytes, sha256, parts: fileParts(bytes),
+      ...(media.width && media.height ? { width: media.width, height: media.height } : {}),
+      ...(media.duration ? { duration: media.duration } : {}),
+      ...(thumbnail ? { thumbnail: { id: thumbnail.id, type: thumbnail.type, bytes: thumbnail.bytes, sha256: thumbnail.sha256, width: thumbnail.width, height: thumbnail.height, parts: 1 } } : {}),
+    };
+    let saved: Resource;
+    try {
+      await uploadFileParts(fileRequest, { spaceId: target.id, fileId: draft.id, data: draft.bytes, signal, onProgress });
+      signal?.throwIfAborted();
+      if (thumbnail) await uploadFileParts(fileRequest, { spaceId: target.id, fileId: thumbnail.id, data: thumbnail.data, signal });
+      signal?.throwIfAborted();
+      saved = await command<Resource>(`spaces/${target.id}/files`, {
+        file_id: draft.id, name, type, bytes, sha256, title: draft.title, body: draft.body,
+        project: draft.project || null, folder: draft.folder || null,
+        ...(details.width ? { width: details.width, height: details.height } : {}),
+        ...(details.duration ? { duration: details.duration } : {}),
+        ...(details.thumbnail ? { thumbnail: { id: details.thumbnail.id, type: details.thumbnail.type, bytes: details.thumbnail.bytes, sha256: details.thumbnail.sha256, width: details.thumbnail.width, height: details.thumbnail.height } } : {}),
+      });
+    } catch (error) {
+      // Staged parts count towards storage until the hourly sweep; free them now. Parts a
+      // document already committed are never touched, so an unclear failure is safe too.
+      void api(fileDiscardPath(target.id, draft.id), "DELETE").catch(() => {});
+      if (thumbnail) void api(fileDiscardPath(target.id, thumbnail.id), "DELETE").catch(() => {});
+      throw error;
+    }
+    setResources((old) => [saved, ...old.filter((r) => r.id !== saved.id)]);
+    setMemoryLoaded(false);
+    setNotice("File saved");
+    return saved;
+  }
+  // Parameters: a document that keeps a file, the revision being read, and optional progress
+  // and cancellation.
+  // What it does: downloads the file's parts and checks the whole file's SHA-256; files opened
+  // recently come from memory.
+  // Output: the original file as a Blob.
+  function readFile(
+    resource: Resource,
+    revision: number | undefined,
+    { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {},
+  ) {
+    const file = resource.file;
+    if (!file) return Promise.reject(new Error("This document has no original file."));
+    if (!space) return Promise.reject(new Error("Open a space first."));
+    const spaceId = space.id;
+    // A shared download must not be cancelled by the first viewer that closes.
+    return rememberedFile(`${spaceId}:${resource.id}:${file.id}`, () =>
+      downloadFileParts(fileRequest, { spaceId, resourceId: resource.id, file, revision, onProgress }),
+    ).then((blob) => { signal?.throwIfAborted(); return blob; });
+  }
+  // Parameters: a document whose file has a thumbnail, and optionally the revision being read.
+  // What it does: reads the thumbnail once and keeps it in this tab for the file grid.
+  // Output: the thumbnail as a Blob of its media type.
+  function readThumbnail(resource: Resource, revision?: number, signal?: AbortSignal) {
+    const thumbnail = resource.file?.thumbnail;
+    if (!thumbnail) return Promise.reject(new Error("This file has no thumbnail."));
+    if (!space) return Promise.reject(new Error("Open a space first."));
+    const spaceId = space.id;
+    return rememberedThumbnail(`${spaceId}:${resource.id}:${thumbnail.id}`, () =>
+      downloadThumbnail(fileRequest, { spaceId, resourceId: resource.id, thumbnail, revision }),
+    ).then((blob) => { signal?.throwIfAborted(); return blob; });
+  }
   async function deleteResource(resource: Resource) {
     await removeResource(resource);
     setNotice(resource.kind === "task" ? "Task deleted" : "Document deleted");
@@ -924,6 +1150,7 @@ function useData() {
     setTaskColumnsReady(false);
     setTaskColumnsError("");
     setViews({});
+    setViewTimes({});
     latestViews.current = {};
     setViewsReady(false);
     setViewsSettled(false);
@@ -933,8 +1160,8 @@ function useData() {
     setReadErrors({});
     setDismissedReadError("");
     setMemoryCursor(null);
-    memoryMoreBusy.current = false;
-    setMemoryMoreLoading(false);
+    memoryAllBusy.current = false;
+    setMemoryAllLoading(false);
     setMemoryError("");
     setError("");
     setLoading(false);
@@ -1063,13 +1290,15 @@ function useData() {
         ...old.filter((i) => i.id !== item.id),
         ...(!deleted ? [saved as Project] : []),
       ]);
-    else
-      setDatabases((old) => [
-        ...old.filter((i) => i.id !== item.id),
-        ...(!deleted ? [saved as WorkspaceDatabase] : []),
-      ]);
+    else if (deleted) setDatabases((old) => old.filter((i) => i.id !== item.id));
+    else rememberDatabase(saved as WorkspaceDatabase);
     setNotice(deleted ? "Moved to trash" : "Restored");
   }
+  // Parameters: the database to save, as the page holds it.
+  // What it does: creates a database with one save, and changes an existing one by sending only
+  // what differs from the saved copy: the schema when it changed, the rows that differ and the
+  // IDs that went away. The Space stores each row on its own, so a cell edit costs one row.
+  // Output: the saved database with its rows.
   async function saveDatabase(database: WorkspaceDatabase) {
     if (!space) throw new Error("Open a space first.");
     if (space.role === "viewer") throw new Error("You have view-only access to this Space.");
@@ -1077,41 +1306,45 @@ function useData() {
       throw new Error(
         "Check the database properties and record values before saving.",
       );
-    const {
-      id,
-      revision = 0,
-      name,
-      description,
-      fields,
-      records,
-      view,
-      groupBy,
-      tasks = null,
-      project_id = null,
-      section_id = null,
-    } = database;
-    const saved = await command<WorkspaceDatabase>(`spaces/${space.id}/items`, {
-      item_id: id,
-      expected_revision: revision,
-      kind: "database",
-      data: {
-        name, description, fields, records, view, groupBy,
-        ...(tasks ? { tasks } : {}),
-        // Agents place databases; a website edit must not clear that placement.
-        ...(project_id ? { project_id } : {}),
-        ...(section_id ? { section_id } : {}),
-      },
-    });
-    setDatabases((old) => [...old.filter((d) => d.id !== id), saved]);
-    return saved;
+    const listed = latestDatabases.current.find((d) => d.id === database.id);
+    const saved = listed && withRecords(listed, latestRecords.current);
+    if (!saved || !database.revision) {
+      const created = await command<WorkspaceDatabase>(`spaces/${space.id}/items`, {
+        item_id: database.id,
+        expected_revision: database.revision ?? 0,
+        kind: "database",
+        data: { ...databaseSchema(database), records: database.records },
+      });
+      rememberDatabase(created);
+      return { ...created, recordsLoaded: true };
+    }
+    if (!saved.recordsLoaded && JSON.stringify(database.records) !== JSON.stringify(saved.records))
+      throw new Error("The records of this database are still loading. Try again in a moment.");
+    const change = databaseChange(saved, database);
+    if (!change) return saved;
+    const result = await command<{ database: WorkspaceDatabase; replayed: boolean }>(
+      `spaces/${space.id}/databases/${database.id}/changes`,
+      change,
+    );
+    // The rows are known when this page held them, or when the change itself carried them.
+    // Otherwise the save only touched the schema (a project link, for example) and the answer
+    // holds no rows: remember the database without any, so opening it reads them.
+    if (saved.recordsLoaded || change.upsert.length || change.delete.length) {
+      const next = { ...result.database, records: database.records, recordsLoaded: true };
+      rememberDatabase(next);
+      return next;
+    }
+    const { records: _rows, ...withoutRows } = result.database;
+    rememberDatabase(withoutRows as WorkspaceDatabase);
+    return { ...withoutRows, records: [], recordsLoaded: false } as WorkspaceDatabase;
   }
   async function latestDatabase(id: string) {
     if (!space) throw new Error("Open a space first.");
     const latest = await api<WorkspaceDatabase>(`spaces/${space.id}/items/${id}`);
     if (!latest || latest.deleted || !isWorkspaceDatabase(latest))
       throw new Error("This database is no longer available. Reload the page.");
-    setDatabases((old) => [...old.filter((d) => d.id !== id), latest]);
-    return latest;
+    rememberDatabase(latest);
+    return { ...latest, recordsLoaded: true };
   }
   async function deleteDatabase(id: string) {
     const database = databases.find((d) => d.id === id);
@@ -1134,6 +1367,9 @@ function useData() {
     // A self-hosted Space has no plan: only a viewer role makes it read-only.
     canWrite: space?.role !== "viewer",
     deleteResource,
+    // Systems write through the same command IDs: an identical payload reuses one, so a
+    // retried submit lands once.
+    command,
     deleteTasks,
     switchWorkspace,
     agents,
@@ -1150,6 +1386,7 @@ function useData() {
     space,
     resources: resources.map(resource => optimisticTask(resource, pendingTaskStatuses)),
     views,
+    viewTimes,
     viewsReady,
     viewsSettled,
     watchViews,
@@ -1166,7 +1403,7 @@ function useData() {
     pendingTaskStatuses,
     projects,
     folders,
-    databases,
+    databases: loadedDatabases,
     memories,
     grants,
     provider,
@@ -1188,7 +1425,7 @@ function useData() {
     organizationError: (["project", "category"] as const).map(kind => readErrors[kind]).find(Boolean),
     retryOrganization: () => retryReads(["project", "category"]),
     memoryLoading,
-    memoryMoreLoading,
+    memoryAllLoading,
     memoryLoaded,
     memoryCursor,
     memoryError,
@@ -1203,11 +1440,14 @@ function useData() {
     loadMore,
     loadMemories,
     loadProvider,
-    loadMoreMemories,
+    loadAllMemories,
     searchMemories,
     readResource,
     loadSelectedMemory,
     saveResource,
+    saveFile,
+    readFile,
+    readThumbnail,
     changeMemory,
     buildMemory,
     memoryJobs,
@@ -1234,6 +1474,7 @@ function useData() {
     watchResource,
     saveDatabase,
     latestDatabase,
+    loadDatabaseRecords,
     deleteDatabase,
   };
 }

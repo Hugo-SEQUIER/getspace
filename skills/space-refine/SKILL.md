@@ -34,7 +34,7 @@ Build a capture with:
 - Remaining work, blockers, open questions and agreed next actions.
 - Candidate reusable facts or lessons, each with its origin and scope.
 
-Select claims that could change what a future agent does: explicit lasting preferences, project constraints, adopted decisions, and a demonstrated lesson with its conditions. Keep temporary status, one-off errors, unfinished ideas and next steps in the handoff. Include no credentials, excluded material, unnecessary personal details or unsupported inferences. Keep dates for facts that change, and separate the date of an event from the date of capture.
+Select claims that could change what a future agent does: explicit lasting preferences, project constraints, adopted decisions, and a demonstrated lesson with its conditions. Keep temporary status, one-off errors, unfinished ideas and next steps in the handoff. When the Space has systems (`list_systems`), propose a candidate lesson about recurring work as a lab entry of its system, with its evidence level and source (the `space-systems` skill), rather than as a memory claim; only a promoted verdict is recalled. Include no credentials, excluded material, unnecessary personal details or unsupported inferences. Keep dates for facts that change, and separate the date of an event from the date of capture.
 
 Worked examples of the distinction:
 
@@ -48,8 +48,8 @@ Before writing claims, search the relevant topics with `get_context` using `requ
 
 - Skip an equivalent supported claim that is already stored. Repeating a refinement must not create another copy.
 - Keep new evidence or changed circumstances distinct from a contradiction. A dated decision may remain valid as history.
-- Apply an explicit correction to the identified current claim only within the user's request or the established correction policy. Reread first, then use `change_memory` with its `resource_id`, `expected_revision`, `entry_id`, `action="edit"`, the replacement `value` and a fresh `command_id`.
-- `change_memory` retains the existing source reference. If a correction needs a new source, keep the attribution in the value or save a separately sourced replacement under the connected policy. Do not claim the old source was updated, and do not silently delete another claim to resolve uncertain provenance.
+- Apply an explicit correction to the identified current claim only within the user's request or the established correction policy. Reread first, then use `edit_memory_claim` with its `resource_id`, `expected_revision`, `entry_id`, the replacement `value` and a fresh `command_id`.
+- `edit_memory_claim` retains the existing source reference. If a correction needs a new source, keep the attribution in the value or save a separately sourced replacement under the connected policy. Do not claim the old source was updated, and do not silently delete another claim to resolve uncertain provenance.
 - Leave unresolved contradictions in the handoff and report them. Do not promote a guessed resolution into memory.
 
 ## Save the summary, then the claims

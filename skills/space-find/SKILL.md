@@ -22,7 +22,7 @@ Use this skill to locate records and to establish what a Space holds. It answers
 | A complete list of documents or tasks | `list_resources` |
 | Where something belongs, or an overview of the Space's containers and their rules | `get_space_map` |
 | A complete list of projects, databases, categories or sections | `list_workspace_items` |
-| Rows in a database, filtered or counted | `query_database` with `SELECT` |
+| Rows in a database, filtered or counted | `read_database` with `SELECT` |
 | The content of a record you already identified | `get_resource` or `get_workspace_item` |
 
 `search_workspace` matches a literal, case-insensitive substring. It does not rank by meaning, does not assess whether a match is relevant, and returns no citation. `get_context` does the opposite: it ranks and assesses evidence and cites revisions. Use search to locate, then read the record, and use recall when the user asked a question rather than a location.

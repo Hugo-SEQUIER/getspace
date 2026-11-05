@@ -7,7 +7,7 @@ from test_memory_jobs import queue as queue_fixture
 from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 
-from space import jobs, memory_classification, reclassify_jobs
+from space import job_worker, jobs, memory_classification, reclassify_jobs
 from space.memory import RememberClaims
 
 database = database_fixture
@@ -61,7 +61,7 @@ def test_next_write_queues_one_catch_up_that_reclassifies_only_limited_claims(
     remember(service, owner, space, "Another Atlas fact")
     assert len(reclassify_jobs_in(service, owner, space)) == 1
     first = jobs.claim(queue)
-    assert jobs.process(service, queue, first) is None
+    assert jobs.process(service, queue, first) is jobs.YIELDED
     [row] = reclassify_jobs_in(service, owner, space)
     assert row["status"] == "queued" and row["import_completed"] == 5
     assert jobs.process(service, queue, jobs.claim(queue)) == {}
@@ -73,6 +73,71 @@ def test_next_write_queues_one_catch_up_that_reclassifies_only_limited_claims(
         claim = current[memory["id"]]["claims"][0]
         assert claim["classification"]["project_ids"] == [project["id"]]
         assert claim["value"] == memory["memory"]["claims"][0]["value"]
+
+
+def unavailable_memories(service, owner, space, monkeypatch, count):
+    """Store memories the way a refused decision model leaves them: unassigned, unavailable."""
+    item(service, owner, space, "category", "Dev")
+    project = item(service, owner, space, "project", "Atlas")
+    models = service.memory_models = ClassifyingModels()
+    models.failure = True
+    monkeypatch.setattr(reclassify_jobs, "maybe_enqueue", lambda *args: None)
+    saved = [remember(service, owner, space, f"Atlas fact {n}") for n in range(count)]
+    monkeypatch.undo()
+    for memory in saved:
+        assert memory["memory"]["claims"][0]["classification"]["reason"] == "unavailable"
+    models.failure = False
+    return saved, project
+
+
+def test_each_decision_model_gets_one_catch_up_for_what_an_outage_left_unassigned(
+    commands, queue, monkeypatch
+):
+    service, owner, space, _ = commands
+    saved, project = unavailable_memories(service, owner, space, monkeypatch, 2)
+    remember(service, owner, space, "Queues the catch-up")
+    while (job := jobs.claim(queue)) is not None:
+        jobs.process(service, queue, job)
+    current = {m["id"]: m for m in service.list_memories(owner, space)["items"]}
+    for memory in saved:
+        classification = current[memory["id"]]["claims"][0]["classification"]
+        assert classification["reason"] == "matched"
+        assert classification["project_ids"] == [project["id"]]
+    remember(service, owner, space, "Only checks")
+    assert [r["status"] for r in reclassify_jobs_in(service, owner, space)] == ["ready"]
+    # Replacing the decision model, as when one is retired, earns one more catch-up...
+    service.memory_models.decision_fingerprint = "fixture-decision-v2"
+    remember(service, owner, space, "Queues another")
+    statuses = sorted(r["status"] for r in reclassify_jobs_in(service, owner, space))
+    assert statuses == ["queued", "ready"]
+    # ...but never a second one beside a catch-up that has not finished.
+    service.memory_models.decision_fingerprint = "fixture-decision-v3"
+    remember(service, owner, space, "Waits for it")
+    assert len(reclassify_jobs_in(service, owner, space)) == 2
+
+
+def test_one_drain_finishes_a_catch_up_longer_than_its_attempt_bound(commands, queue, monkeypatch):
+    service, owner, space, _ = commands
+    saved, project = unavailable_memories(service, owner, space, monkeypatch, 11)
+    remember(service, owner, space, "Queues a catch-up of three turns")
+
+    def attempt(*_):
+        """The child's claim and process, run here on the test's connections."""
+        job = jobs.claim(queue)
+        if job is None:
+            return job_worker.EXIT_IDLE
+        return job_worker.EXIT_YIELDED if jobs.process(service, queue, job) is jobs.YIELDED else 0
+
+    monkeypatch.setattr(job_worker, "supervise", attempt)
+    monkeypatch.setattr(job_worker.signal, "signal", lambda *_: None)
+    assert job_worker.main(["--drain", "--max-jobs", "2"]) == 0
+    [row] = reclassify_jobs_in(service, owner, space)
+    assert row["status"] == "ready" and row["import_completed"] == row["import_total"] == 12
+    current = {m["id"]: m for m in service.list_memories(owner, space)["items"]}
+    for memory in saved:
+        assert current[memory["id"]]["claims"][0]["classification"]["project_ids"] == [
+            project["id"]
+        ]
 
 
 def test_catch_up_needs_classification_and_never_fails_the_write(commands, monkeypatch):

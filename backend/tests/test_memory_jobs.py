@@ -91,12 +91,12 @@ def test_enqueued_job_outlives_session_expiry(commands, queue, monkeypatch):
     service, owner, space, _ = commands
     service.memory_models = Models()
     # Long enough to enqueue on a busy machine, then the session is made to expire.
-    short = Identity(owner.issuer, owner.subject, int(time.time()) + 5)
+    short = Identity(owner.issuer, owner.subject, int(time.time()) + 30)
     change = request()
     service.extract_memory(short, space, change)
     # Worker reconstructs a bounded execution identity from the durable receipt.
     now = time.time()
-    monkeypatch.setattr(time, "time", lambda: now + 6)
+    monkeypatch.setattr(time, "time", lambda: now + 60)
     with pytest.raises(Unauthenticated):
         short.check()
     job = jobs.claim(queue)

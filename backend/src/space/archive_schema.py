@@ -238,27 +238,32 @@ def validate_archive(raw):
             if not entry["current"]:
                 raise ValueError("Agent archives contain the current identity only")
         elif entity == "item":
-            workspace_items.SaveItem.model_validate(
-                {
-                    "command_id": id_,
-                    "item_id": id_,
-                    "expected_revision": revision - 1,
-                    "kind": value["kind"],
-                    "data": {
-                        key: item
-                        for key, item in value.items()
-                        if key
-                        not in {
-                            "id",
-                            "kind",
-                            "revision",
-                            "deleted",
-                            "updated_at",
-                            "author_agent",
-                        }
-                    },
+            data = {
+                key: item
+                for key, item in value.items()
+                if key
+                not in {
+                    "id",
+                    "kind",
+                    "revision",
+                    "deleted",
+                    "updated_at",
+                    "author_agent",
+                    "record_count",
                 }
-            )
+            }
+            if value["kind"] in {"system", "lab_entry"}:
+                workspace_items.item_model(value["kind"]).model_validate(data)
+            else:
+                workspace_items.SaveItem.model_validate(
+                    {
+                        "command_id": id_,
+                        "item_id": id_,
+                        "expected_revision": revision - 1,
+                        "kind": value["kind"],
+                        "data": data,
+                    }
+                )
             if type(value["deleted"]) is not bool:
                 raise ValueError("Invalid trash state")
             _agent(value.get("author_agent"))
@@ -335,6 +340,13 @@ def validate_archive(raw):
                 linked = groups.get(("item", _id(ref)))
                 if not linked or linked[-1]["value"]["kind"] != kind:
                     raise ValueError("Archive is missing a classification item")
+            if entity == "item" and value.get("system_id"):
+                linked = groups.get(("item", _id(value["system_id"])))
+                if not linked or linked[-1]["value"]["kind"] != "system":
+                    raise ValueError("Archive is missing a linked system")
+            if entity == "item" and value.get("playbook_id"):
+                if not groups.get(("resource", _id(value["playbook_id"]))):
+                    raise ValueError("Archive is missing a linked playbook")
             for claim in value.get("_memory", {}).get("claims", []):
                 for ref in (claim.get("routing") or {}).get("target_ids", []):
                     linked = groups.get(("item", _id(ref)))

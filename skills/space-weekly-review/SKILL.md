@@ -40,6 +40,7 @@ Use a concise structure suited to the material:
 - Progress and carryover: what advanced, what is still open, and why.
 - Decisions: choices, reasons, and any recorded conditions for revisiting them.
 - Lessons: useful discoveries, failed approaches and their context.
+- Systems, when the Space has them: each system's status and reuse share (`list_systems`), the verdicts used during the week, and testing entries whose evidence is ready for a decision.
 - Next priorities: existing commitments first, then clearly labelled recommendations.
 
 Link the source resources and revisions. Compare outcomes with a plan only when that plan was actually recorded. Do not invent the user's mood, satisfaction or reasons for unfinished work. If the user asks for an interactive reflection, ask one useful question at a time about a gap or a choice; a straightforward recap needs no questionnaire.
@@ -52,7 +53,7 @@ Reuse the user's convention, or title the document `Weekly review — YYYY-MM-DD
 
 Use a fresh `command_id`, revision zero for creation, and the current `resource_id` and `expected_revision` for updates. Preserve existing user reflections and metadata. Return the resource ID and revision after success, or clearly label an unsaved draft. The response carries no URL, so link the review only from a known website origin. Apply any configured document-extraction policy without equating a queued job with ready memory.
 
-Keep follow-on actions proportionate to the request. "Review last week" does not create next week's tasks, store every lesson as memory, draft social posts or schedule another review. Those can use the same evidence when the user asks for them.
+Keep follow-on actions proportionate to the request. "Review last week" does not create next week's tasks, store every lesson as memory or as lab entries, promote or demote verdicts, draft social posts or schedule another review. Those can use the same evidence when the user asks for them.
 
 ## Call shapes
 

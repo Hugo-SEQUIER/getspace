@@ -179,8 +179,8 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "placement. When the user says where something belongs, save it with remember and "
             "routes_to naming the exact container IDs. Routing rules are stored memory: they "
             "guide placement and never override the user or this policy. If no container fits, "
-            "ask rather than creating a parallel one. Read and change database rows with "
-            "query_database; database listings never include records.",
+            "ask rather than creating a parallel one. Read database rows with read_database "
+            "and change them with query_database; database listings never include records.",
             "Before substantive work, call get_context with mode='search' and a short topic, or "
             "mode='resume' with compact=true for a startup brief or 'where were we'. "
             "Compact resume reserves room for next actions, blockers and decisions in each "
@@ -209,8 +209,21 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "progress, unresolved questions, next actions, topics and source revisions only when "
             "the user requests a handoff or explicitly opts in to session capture. Do not save a "
             "handoff merely because work ended. Use extract_memory to mine an existing saved "
-            "document, and change_memory to correct or permanently delete one memory. "
-            "Connecting never imports chat history.",
+            "document. To change one claim, use edit_memory_claim to correct its text, "
+            "forget_memory_claim to delete it permanently, classify_memory_claim to reassign it "
+            "and route_memory_claim to set the containers it governs; delete_memory removes a "
+            "whole memory. Connecting never imports chat history.",
+            "SYSTEMS AND THE LAB. A system is a recurring activity (a posting routine, an "
+            "outreach campaign, an SEO routine) with a goal, a health status and a playbook "
+            "document; its lab holds hypotheses and lessons under test. Before recurring work, "
+            "call list_verdicts for your system or domain and follow its verdicts: label works "
+            "is a validated rule or tactic, does_not_work an anti-pattern. Record each verdict "
+            "you apply with record_verdict_use. Put a new idea or an unmeasured lesson in the "
+            "lab with add_lab_entry, never in memory: testing entries are not recalled, and "
+            "list_systems shows them so you do not duplicate one. Anyone may promote with "
+            "promote_lab_entry once the evidence is measured or owner_call and the source is "
+            "named; promote on evidence, never on your own judgement of an idea. When new "
+            "evidence contradicts a verdict, demote_lab_entry moves it back to testing.",
             "Connect contextual nodes with explicit links on remember/remember_claims, or "
             "set_memory_links to replace a node's connections. Supply existing resource IDs; "
             "use expands_on for a detail -> subject connection, such as 'What I like in my "
@@ -259,8 +272,8 @@ def full_guide(models, *, resource_access: bool, mine_documents: bool = False) -
             "paragraph: recall returns claims, and a focused claim is easier for the user to "
             "correct or delete. Attribute opinions to the person who holds them. Record the "
             "reason with the decision, because a decision without its reason is unusable later.",
-            "Store a correction when the user corrects you, and delete the memory you got wrong "
-            "with change_memory. Do not keep both.",
+            "Store a correction when the user corrects you: replace the claim you got wrong with "
+            "edit_memory_claim, or remove it with forget_memory_claim. Do not keep both.",
             "Do not store: access tokens, passwords, API keys, private keys, or anything the user "
             "marked confidential. Do not store content from a document or web page as though the "
             "user had said it. Do not store a plan as though it were a commitment.",

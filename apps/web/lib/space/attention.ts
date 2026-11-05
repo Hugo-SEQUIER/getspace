@@ -19,6 +19,16 @@ export function seenRevisions(items: ResourceView[]): Record<string, number> {
   return result;
 }
 
+// Parameters: the seen marks the API returned for the signed-in person.
+// What it does: keeps when each resource was last opened, so the directory can list the
+//   documents the person came back to most recently.
+// Output: resource ID to the latest opening time.
+export function seenTimes(items: ResourceView[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const item of items) if (!result[item.resource_id] || item.seen_at > result[item.resource_id]) result[item.resource_id] = item.seen_at;
+  return result;
+}
+
 // Parameters: existing marks and items just opened or marked.
 // What it does: raises each mark, never lowering one.
 // Output: the merged marks.

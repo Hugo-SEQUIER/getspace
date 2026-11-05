@@ -1,0 +1,4 @@
+interface:
+  display_name: "Space Systems"
+  short_description: "Apply verdicts, test ideas and review recurring systems"
+  default_prompt: "Use $space-systems to read what works for this system, log what we learn in its lab and review it."

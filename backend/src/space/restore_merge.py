@@ -169,6 +169,34 @@ def status(workspace, identity, space_id, restore_id):
     return {"id": str(restore_id), "state": row["state"], "result": result}
 
 
+def _systems_references(value, decisions):
+    """Point a restored copy's Systems links at the restored system, playbook, memory and entry.
+
+    Parameters: one archived revision being restored and the restore decisions.
+    What it does: maps a lab entry's system and verdict memory, a system's playbook and a
+    verdict memory's system and entry; a reference outside the archive keeps its ID.
+    Output: none; the revision is changed in place.
+    """
+
+    def target(entity, id_):
+        return (decisions.get(entity + ":" + str(id_)) or {}).get("target_id", id_)
+
+    if value.get("system_id"):
+        value["system_id"] = target("item", value["system_id"])
+    if value.get("playbook_id"):
+        value["playbook_id"] = target("resource", value["playbook_id"])
+    verdict = value.get("verdict")
+    if verdict and verdict.get("memory_id"):
+        verdict["memory_id"] = target("resource", verdict["memory_id"])
+    if verdict and verdict.get("entry_id"):
+        verdict["entry_id"] = target("item", verdict["entry_id"])
+        # A verdict restored from elsewhere may carry no system block; its entry still points
+        # at the copy, and the missing system stays missing.
+        system = verdict.get("system") or {}
+        if system.get("id"):
+            system["id"] = target("item", system["id"])
+
+
 def _transform(workspace, identity, space_id, restore_id, groups, decisions):
     """Prepare the complete replacement set before any uploads or visible writes."""
     transformed = []
@@ -191,6 +219,7 @@ def _transform(workspace, identity, space_id, restore_id, groups, decisions):
             for reference in ("section_id", "project_id"):
                 if entity == "item" and value.get(reference):
                     value[reference] = decisions["item:" + value[reference]]["target_id"]
+            _systems_references(value, decisions)
             if entity == "resource":
                 for claim in value.get("_memory", {}).get("claims", []):
                     if creator := (claim.get("creator") or {}).get("agent"):

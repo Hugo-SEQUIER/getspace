@@ -44,11 +44,23 @@ In the installation's PostgreSQL database. Revisions hold the claim text as read
 
 **Proof:** `backend/migrations/versions/0003_memory_brain.sql`, `backend/src/space/security/payloads.py`.
 
+### How is a database stored, and what bounds it?
+
+Each record is its own row with its own history: `space.database_records` holds one head per record and `space.database_record_revisions` one version per write, keyed by the database revision that wrote it. The item revision holds the schema and metadata. A write stores only the rows it changed, so storage grows with what changed rather than with the size of the table, and a read at an earlier revision takes each record's last version at or before it. A database holds up to 10,000 records; a record has a name of up to 200 characters, notes of up to 20,000 and values of up to 2,000 characters in up to 30 fields. Databases written before 22 October 2026 keep their records inside their item payloads until their next write moves them.
+
+**Proof:** `backend/migrations/versions/0042_database_records.sql`, `backend/src/space/database_records.py`, `backend/tests/test_workspace_items.py` (`test_database_rows_are_stored_one_per_record_and_an_edit_costs_one_row`).
+
 ### Is anything encrypted at rest?
 
 No. Space stores content as readable JSON in PostgreSQL, and the claim index adds embeddings, hashes and identifiers beside it. Ranking needs the vectors in SQL; the text stays in the revision. Anyone who can read the database, its disk or a backup can read every document and memory, so protect the server accordingly.
 
 **Proof:** `docs/PRIVACY.md`, `backend/src/space/security/payloads.py`.
+
+### Can a document keep a PDF, a Word file, a presentation, a picture or a video?
+
+Yes. Upload keeps the original file, of any type up to 250 MB, as parts of at most 1 MiB, and the document's body holds the text the browser read from it. Search, recall and agents read that text and see the file's name, type and size, a picture's or video's pixel size and a recording's length; a picture or video has no text, so its title is what describes it. The file itself is viewed and downloaded on the website, which shows a thumbnail the browser made at upload for pictures, videos and PDFs, stored as one more part of at most 64 KiB. Its parts are ordinary stored rows, counted at about the file's own size, and the cleanup sweep removes parts no document committed within an hour.
+
+**Proof:** `backend/src/space/document_files.py`, `backend/migrations/versions/0041_document_files.sql`.
 
 ### Can a database export reveal what was written?
 
@@ -58,7 +70,7 @@ Yes, all of it. A backup made by `scripts/backup.sh` is a complete `pg_dump` of 
 
 ### How much can one Space remember?
 
-Recall is bounded per call, not by the size of the Space, so nothing caps the corpus. One lexical search selects at most 256 candidate resources from the keyed term index and ranks 32 bodies, with up to 10 additional body reads for final metadata-only matches; vector recall ranks every claim of the Space exactly and loads the selected memories, and the brain browser reads memory in pages of at most 200 and searches the database for a query. A Space larger than any of those bounds is searched, not refused. The old 512-resource recall limit and the 12,288-claim ceiling (512 x 24) it produced were removed on 14 September 2026, when candidate selection moved into SQL. There is still no compaction or expiry.
+Recall is bounded per call, not by the size of the Space, so nothing caps the corpus. One lexical search selects at most 256 candidate resources from the keyed term index and ranks 32 bodies, with up to 10 additional body reads for final metadata-only matches; vector recall ranks every claim of the Space exactly and loads the selected memories, and the brain browser reads memory in pages of at most 200 and searches the database for a query. The browser walks those pages until it holds every memory, and the list view then shows 50 rows at a time. A Space larger than any of those bounds is searched, not refused. The old 512-resource recall limit and the 12,288-claim ceiling (512 x 24) it produced were removed on 14 September 2026, when candidate selection moved into SQL. There is still no compaction or expiry.
 
 **Proof:** `backend/src/space/memory.py` (`MAX_LEXICAL_CANDIDATES`, `MAX_LEXICAL_BODIES`, `MAX_MEMORY_LIST`), `backend/src/space/workspace.py` `_candidates`, `memory_pipeline.py` (`MAX_CLAIMS`).
 

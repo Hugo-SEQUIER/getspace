@@ -29,15 +29,16 @@ def current_items(workspace, identity, space_id):
     with workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id)
         rows = connection.execute(
-            workspace_items.ROW
-            + "WHERE NOT i.deleted AND v.revision=i.current_revision ORDER BY i.id LIMIT %s",
+            workspace_items.ROW + "WHERE NOT i.deleted AND v.revision=i.current_revision "
+            "AND i.kind NOT IN ('system','lab_entry') ORDER BY i.id LIMIT %s",
             (MAX_ITEMS + 1,),
         ).fetchall()
         key_rows = workspace_items.item_keys(workspace, connection, scope, rows[:MAX_ITEMS])
+        counts = workspace_items.record_counts(connection, rows[:MAX_ITEMS])
     if not rows:
         return [], False
     items = workspace_items.decode(workspace, identity, space_id, scope, rows[:MAX_ITEMS], key_rows)
-    return [workspace_items.without_records(item) for item in items], len(rows) > MAX_ITEMS
+    return [workspace_items.without_records(item, counts) for item in items], len(rows) > MAX_ITEMS
 
 
 def container(item, rules):

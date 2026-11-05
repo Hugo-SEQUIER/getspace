@@ -13,6 +13,7 @@ from space import (
     api_keys,
     database_sql,
     device_auth,
+    document_files,
     memora_jobs,
     oauth_server,
     overview,
@@ -23,6 +24,7 @@ from space import (
     restore_merge,
     restore_staging,
     space_map,
+    systems,
     tasks,
     teams,
     webhooks,
@@ -182,6 +184,47 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     def save(space_id: UUID, body: SaveResource, session=write):
         return workspace.save(session[0], space_id, body)
 
+    # A document's original file: the website uploads it in parts, with a thumbnail of a
+    # picture, video or PDF as a one-part file of its own, then commits the document that
+    # holds them, and reads them back part by part. Agents read the file's text from the body.
+    @router.post("/spaces/{space_id}/files/{file_id}/parts/{part}")
+    def upload_file_part(
+        space_id: UUID, file_id: UUID, part: int, body: document_files.Part, session=auth
+    ):
+        return document_files.upload_part(workspace, session[0], space_id, file_id, part, body)
+
+    @router.post("/spaces/{space_id}/files")
+    def commit_file(space_id: UUID, body: document_files.Commit, session=auth):
+        return document_files.commit(workspace, session[0], space_id, body)
+
+    @router.delete("/spaces/{space_id}/files/{file_id}")
+    def discard_file(space_id: UUID, file_id: UUID, session=auth):
+        return document_files.discard(workspace, session[0], space_id, file_id)
+
+    # Declared before the part route: a path segment of "thumbnail" is not a part number.
+    @router.get("/spaces/{space_id}/resources/{resource_id}/file/thumbnail")
+    def file_thumbnail(
+        space_id: UUID,
+        resource_id: UUID,
+        revision: Annotated[int | None, Query(ge=1)] = None,
+        session=auth,
+    ):
+        return document_files.read_part(
+            workspace, session[0], space_id, resource_id, 0, revision, thumbnail=True
+        )
+
+    @router.get("/spaces/{space_id}/resources/{resource_id}/file/{part}")
+    def file_part(
+        space_id: UUID,
+        resource_id: UUID,
+        part: int,
+        revision: Annotated[int | None, Query(ge=1)] = None,
+        session=auth,
+    ):
+        return document_files.read_part(
+            workspace, session[0], space_id, resource_id, part, revision
+        )
+
     @public.get(
         "/spaces/{space_id}/tasks/columns",
         tags=["Documents and tasks"],
@@ -330,6 +373,47 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     )
     def query_database(space_id: UUID, database_id: UUID, body: database_sql.Query, session=read):
         return database_sql.execute(workspace, session[0], space_id, database_id, body)
+
+    # The website's database writes: a schema change, some rows, or both, as one revision.
+    # Agents change rows with SQL through the query route and schemas through /items.
+    @router.post("/spaces/{space_id}/databases/{database_id}/changes")
+    def change_database(
+        space_id: UUID, database_id: UUID, body: workspace_items.DatabaseChange, session=auth
+    ):
+        return workspace_items.change_database(workspace, session[0], space_id, database_id, body)
+
+    # The Systems area: systems, their lab entries and the promotion of verdicts.
+    @router.get("/spaces/{space_id}/systems")
+    def systems_area(space_id: UUID, session=auth):
+        return systems.overview(workspace, session[0], space_id)
+
+    @router.post("/spaces/{space_id}/systems")
+    def save_system(space_id: UUID, body: systems.SaveSystem, session=auth):
+        return systems.save_system(workspace, session[0], space_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries")
+    def save_lab_entry(space_id: UUID, body: systems.SaveLabEntry, session=auth):
+        return systems.save_entry(workspace, session[0], space_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/promote")
+    def promote_lab_entry(space_id: UUID, entry_id: UUID, body: systems.Promote, session=auth):
+        return systems.promote(workspace, session[0], space_id, entry_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/demote")
+    def demote_lab_entry(space_id: UUID, entry_id: UUID, body: systems.Demote, session=auth):
+        return systems.demote(workspace, session[0], space_id, entry_id, body)
+
+    @router.post("/spaces/{space_id}/systems/entries/{entry_id}/uses")
+    def record_verdict_use(space_id: UUID, entry_id: UUID, body: systems.RecordUse, session=auth):
+        return systems.record_use(workspace, session[0], space_id, entry_id, body)
+
+    @router.get("/spaces/{space_id}/systems/activity")
+    def lab_activity(space_id: UUID, system_id: UUID | None = None, session=auth):
+        return systems.activity(workspace, session[0], space_id, system_id)
+
+    @router.get("/spaces/{space_id}/systems/entries/{entry_id}/history")
+    def lab_entry_history(space_id: UUID, entry_id: UUID, session=auth):
+        return systems.history(workspace, session[0], space_id, entry_id)
 
     @router.post("/spaces/{space_id}/items/{item_id}/visibility")
     def item_visibility(
