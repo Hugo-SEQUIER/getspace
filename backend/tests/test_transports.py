@@ -170,6 +170,18 @@ def test_every_tool_lists_what_the_connector_directories_require():
             assert "type" in schema or "anyOf" in schema, (tool.name, name)
 
 
+def test_saving_a_workspace_item_is_destructive():
+    """OpenAI's scan flags a tool that can delete data without destructiveHint: a save with
+    records replaces a whole table and deletes the rows the list omits."""
+    workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
+    tools = {
+        tool.name: tool
+        for tool in create_mcp(Settings(environment="test"), workspace)._tool_manager.list_tools()
+    }
+    hints = tools["save_workspace_item"].annotations
+    assert hints.destructiveHint is True and hints.readOnlyHint is False
+
+
 def test_database_reads_and_changes_are_separate_tools():
     """The directories reject one tool that both reads and changes data."""
     workspace = Workspace(None, None, None, "http://127.0.0.1:8000/mcp/")
