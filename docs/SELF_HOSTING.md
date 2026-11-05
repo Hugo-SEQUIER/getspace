@@ -162,7 +162,9 @@ The script refuses to run if files of the checkout were changed locally, since s
 scripts/backup.sh
 ```
 
-This writes `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation: every document, task, database, memory, agent connection and setting. There is nothing else to back up besides `.env`. Copy both somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /opt/space && scripts/backup.sh` takes a nightly backup; prune old files yourself.
+This writes two files for the same moment: `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation (every document, task, database, memory, agent connection and setting), and `backups/space-<UTC time>.files.tar.gz`, the uploaded files of the documents that keep one, from the `files-data` volume at `/var/lib/space/files`. A backup is the pair: the dump alone brings back documents whose files are not there. Copy both, plus `.env`, somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /opt/space && scripts/backup.sh` takes a nightly backup; prune old files yourself.
+
+Uploaded files live outside PostgreSQL, in the `files-data` volume. The database keeps their path, their sizes and a digest, so a Space with large files grows that volume rather than the database and its dumps. Watch the disk: `docker system df -v` shows the volume's size, and `du -sh /var/lib/space/files` inside the `api` container gives the same number.
 
 ### Restoring
 
@@ -170,7 +172,18 @@ This writes `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole i
 scripts/restore.sh backups/space-20261009T030000Z.dump
 ```
 
-This stops the website, the API and the workers, replaces the database contents with the backup, upgrades it to the current version if it is older, and starts everything again. The database logins keep the passwords from the current `.env`, so you can restore a backup onto a fresh installation with new secrets.
+This stops the website, the API and the workers, replaces the database contents with the backup, empties the `files-data` volume and unpacks the archive that came with it, upgrades the database to the current version if it is older, and starts everything again. It refuses a backup whose file archive is missing rather than restoring half of an installation. The database logins keep the passwords from the current `.env`, so you can restore a backup onto a fresh installation with new secrets.
+
+### Moving uploaded files out of the database
+
+An installation upgraded from v0.5.0 keeps the files it received in the database, because that release stored them there. The upgrade runs the move for you; to run it yourself, or to check one that was interrupted:
+
+```sh
+docker compose run --rm migrate python -m space.files.move --dry-run
+docker compose run --rm migrate python -m space.files.move
+```
+
+It copies each part to the file folder, checks it against the digest the database keeps, and only then empties the database's copy. Running it twice is safe. `python -m space.files.reconcile` lists file objects no row names and, more seriously, rows whose file is gone; it exits with status 1 in that case and `--delete-orphans` removes the unreferenced objects.
 
 ### Changing the access key
 

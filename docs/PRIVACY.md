@@ -7,7 +7,7 @@ A self-hosted installation keeps its data on the machine that runs it, under the
 Almost everything lives in the PostgreSQL database, in the `db-data` Docker volume:
 
 - **Content.** Documents, tasks, projects, folders, sections, categories, databases and their records, handoffs and memories, each with every revision.
-- **Original files.** A document that keeps its uploaded file stores it in parts of at most 1 MiB. Files are parsed and previewed in the browser, never on the server: Word and PowerPoint previews render in a frame that runs no scripts and loads nothing from the network, and SVG files are only downloaded.
+- **Original files.** A document that keeps its uploaded file stores it in parts of at most 1 MiB, in a folder on the server's own disk beside the database volume, named by a path the database holds. The bytes are not encrypted: anyone who can read the server's disk or its backups can read them, as with every document and memory here. Files are parsed and previewed in the browser, never on the server: Word and PowerPoint previews render in a frame that runs no scripts and loads nothing from the network, and SVG files are only downloaded.
 - **The memory index.** For each current memory claim: its embedding, SHA-256 hashes of the claim text and of its cue labels, its type, declared importance, embedding model, source reference and identifiers.
 - **Search fingerprints.** Keyed fingerprints of every word in each current revision, used to find candidates for recall.
 - **Agents and access.** Agent identities (a name and a harness), agent connections and whether they may write, SHA-256 digests of agent tokens and API keys, API key names and prefixes, and webhook subscriptions with their receiver URLs and signing secrets.
@@ -69,4 +69,4 @@ The containers log request outcomes and fixed error categories, never document c
 
 ## Backups
 
-`scripts/backup.sh` writes a complete, unencrypted copy of the database: content, history, the memory index, token digests, webhook signing secrets and settings. Restoring a backup brings back everything it contained, including items deleted after it was taken. Deleted data therefore survives in older backups until you delete those files. Keep backups and `.env` as private as the server, and copy them somewhere off the machine.
+`scripts/backup.sh` writes a complete, unencrypted copy of the database (content, history, the memory index, token digests, webhook signing secrets and settings) and an archive of the uploaded files it does not hold. Restoring a backup brings back everything it contained, including items deleted after it was taken. Deleted data therefore survives in older backups until you delete those files. Keep backups and `.env` as private as the server, and copy them somewhere off the machine.

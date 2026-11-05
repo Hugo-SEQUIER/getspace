@@ -3,10 +3,11 @@
 #   scripts/upgrade.sh
 #   scripts/upgrade.sh v0.4.0
 #   scripts/upgrade.sh --build     # build the images here instead of downloading them
-# It downloads the release's images, backs up the database, switches this folder to the
-# release and restarts Space. If the download fails, nothing changes. Database migrations
-# run on start and only move forward, so it refuses to go back to an older release; restore
-# a backup taken with that release instead.
+# It downloads the release's images, backs up the database and the file folder, switches this
+# folder to the release, moves any file bytes still in the database onto the folder and
+# restarts Space. If the download fails, nothing changes. Database migrations run on start
+# and only move forward, so it refuses to go back to an older release; restore a backup taken
+# with that release instead.
 set -euo pipefail
 
 # Everything runs inside main, which bash reads completely before running it: switching
@@ -16,7 +17,7 @@ main() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --build) build=1 ;;
-      -h | --help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+      -h | --help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
       -*) fail "Unknown option: $1" ;;
       *) target="$1" ;;
     esac
@@ -59,13 +60,24 @@ main() {
     SPACE_VERSION="$target" docker compose pull --quiet ||
       fail "Could not download the images of $target; nothing was changed. Try again later, or build them here with: scripts/upgrade.sh --build $target"
   fi
+  # The dump and the file folder, both needed to restore this version.
   scripts/backup.sh
   git -c advice.detachedHead=false checkout --quiet "$target"
   set_version "$target"
   if [ "$build" -eq 1 ]; then
-    docker compose up -d --wait --remove-orphans --build
-  else
-    docker compose up -d --wait --remove-orphans
+    docker compose build
+  fi
+  # The folder holding uploaded file bytes is a volume outside this checkout, so switching
+  # releases leaves it alone; preparing it again costs a second and repairs an old owner.
+  scripts/files-dir.sh
+  # Apply the new migrations, then write the file parts an older release kept in the
+  # database into that folder, so no part is left behind in PostgreSQL.
+  docker compose run --rm migrate
+  local moved=0
+  docker compose run --rm migrate python -m space.files.move || moved=$?
+  docker compose up -d --wait --remove-orphans
+  if [ "$moved" -ne 0 ]; then
+    fail "Space is now on $target and running, but some file parts could not be moved out of the database. Run docker compose run --rm migrate python -m space.files.move again to see which, and read the message it printed."
   fi
   echo "Space is now on $target."
 }

@@ -22,6 +22,14 @@ x-database: &database
   SPACE_DATABASE_WORKER_PROCESSES: "1"
   SPACE_DATABASE_WEBHOOK_PROCESSES: "1"
 
+# Uploaded file bytes are files in a folder, not rows, so every process that can write a
+# part or run a command mounts the same named volume at the same path.
+x-files: &files
+  SPACE_FILE_DIR: /var/lib/space/files
+
+x-file-volume: &file-volume
+  - files-data:/var/lib/space/files
+
 x-runtime: &runtime
   SPACE_ENVIRONMENT: production
   SPACE_ACCESS_MODE: ${SPACE_ACCESS_MODE:-key}
@@ -70,8 +78,9 @@ services:
   migrate:
     <<: *backend-image
     command: ["python", "-m", "space.install"]
+    volumes: *file-volume
     environment:
-      <<: *database
+      <<: [*database, *files]
       SPACE_MIGRATION_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/space
       SPACE_JOB_DATABASE_URL: postgresql://space_worker:${SPACE_WORKER_DB_PASSWORD:?run scripts/setup.sh first}@db:5432/space
       SPACE_WEBHOOK_DATABASE_URL: postgresql://space_webhook:${SPACE_WEBHOOK_DB_PASSWORD:?run scripts/setup.sh first}@db:5432/space
@@ -85,8 +94,9 @@ services:
   api:
     <<: *backend-image
     restart: unless-stopped
+    volumes: *file-volume
     environment:
-      <<: [*database, *runtime]
+      <<: [*database, *runtime, *files]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -107,8 +117,9 @@ services:
     <<: *backend-image
     command: ["python", "-m", "space.job_worker"]
     restart: unless-stopped
+    volumes: *file-volume
     environment:
-      <<: [*database, *runtime]
+      <<: [*database, *runtime, *files]
       SPACE_JOB_DATABASE_URL: postgresql://space_worker:${SPACE_WORKER_DB_PASSWORD}@db:5432/space
     depends_on:
       migrate:
@@ -120,8 +131,9 @@ services:
     <<: *backend-image
     command: ["python", "-m", "space.webhook_worker", "--loop"]
     restart: unless-stopped
+    volumes: *file-volume
     environment:
-      <<: [*database, *runtime]
+      <<: [*database, *runtime, *files]
       SPACE_WEBHOOK_DATABASE_URL: postgresql://space_webhook:${SPACE_WEBHOOK_DB_PASSWORD}@db:5432/space
     depends_on:
       migrate:
@@ -167,5 +179,6 @@ services:
 
 volumes:
   db-data:
+  files-data:
   caddy-data:
   caddy-config:

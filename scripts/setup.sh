@@ -174,6 +174,12 @@ SPACE_MEMORY_EMBEDDING_DIMENSIONS=1536
 ENV
 
 echo "Wrote $output (readable by you only)."
+# The file folder is a volume the backend writes to as an unprivileged user. Prepare it now,
+# when it is not there yet, so the first upload works; `docker compose up -d` prepares it too.
+if [ "$output" = ".env" ] && [ -z "${SPACE_SETUP_QUIET:-}" ] && command -v docker >/dev/null 2>&1; then
+  scripts/files-dir.sh ||
+    echo "Could not prepare the file folder yet; scripts/files-dir.sh does it before Space starts." >&2
+fi
 # scripts/install.sh starts Space itself and prints its own summary.
 if [ -n "${SPACE_SETUP_QUIET:-}" ]; then
   exit 0

@@ -11,6 +11,13 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 COPY migrations ./migrations
 RUN uv sync --frozen --no-dev && useradd --uid 10001 --create-home space
+# Uploaded file bytes live in this folder, mounted from the files-data volume. A new named
+# volume takes this directory's owner and mode, so the unprivileged process can write to it
+# without the stack ever running as root.
+RUN mkdir -p /var/lib/space/files \
+    && touch /var/lib/space/files/.keep \
+    && chown -R space:space /var/lib/space/files \
+    && chmod 700 /var/lib/space/files
 ENV PATH="/app/.venv/bin:$PATH"
 USER space
 EXPOSE 8000
