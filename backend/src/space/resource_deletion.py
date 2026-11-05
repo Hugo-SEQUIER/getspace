@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from space import content_changes
+from space import content_changes, document_files
 
 
 def delete_resource(workspace, identity, space_id, resource_id, expected_revision):
@@ -53,6 +53,8 @@ def delete_resource(workspace, identity, space_id, resource_id, expected_revisio
             "ON CONFLICT DO NOTHING",
             (cleanup_id, cleanup_id, resource_id),
         )
+        # A document's original file goes with it; its parts hold the stored bytes.
+        document_files.detach(connection, resource_id)
         connection.execute(
             "DELETE FROM space.events WHERE command_id IN "
             "(SELECT id FROM space.commands WHERE resource_id=%s)",

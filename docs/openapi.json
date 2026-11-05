@@ -6314,6 +6314,53 @@
         ],
         "title": "Deleted"
       },
+      "DocumentFile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The original file name."
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The file's media type, such as application/pdf."
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Bytes",
+            "description": "The file's size in bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "The SHA-256 digest of the file, in hexadecimal."
+          },
+          "parts": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Parts",
+            "description": "How many parts of up to 1 MiB store the file."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "bytes",
+          "sha256",
+          "parts"
+        ],
+        "title": "DocumentFile"
+      },
       "Error": {
         "properties": {
           "error": {
@@ -7286,6 +7333,17 @@
           "recall": {
             "$ref": "#/components/schemas/Recall"
           },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentFile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+          },
           "body": {
             "type": "string",
             "title": "Body"
@@ -7420,6 +7478,17 @@
           },
           "recall": {
             "$ref": "#/components/schemas/Recall"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentFile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           },
           "stale": {
             "type": "boolean",
@@ -8531,6 +8600,17 @@
           "recall": {
             "$ref": "#/components/schemas/Recall"
           },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentFile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+          },
           "body": {
             "type": "string",
             "title": "Body",
@@ -8704,6 +8784,17 @@
           },
           "recall": {
             "$ref": "#/components/schemas/Recall"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentFile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           }
         },
         "additionalProperties": false,

@@ -39,7 +39,7 @@ Two tables grow with every write, and two more with activity. Nothing prunes the
 
 | Command | What it removes |
 |---|---|
-| `python -m space.retention` | Command and event rows older than 180 days (`--days` changes the window), then Overview activity older than 90 days, then the recall vectors of deleted memory claims older than one day, which exports in progress may still read. It works in committed batches of 10,000 rows (`--batch-size`) until nothing is left, and prints the counts. |
+| `python -m space.retention` | Command and event rows older than 180 days (`--days` changes the window), then Overview activity older than 90 days, then the recall vectors of deleted memory claims older than one day, which exports in progress may still read, then the parts of files an upload staged more than an hour ago and no document committed. It works in committed batches of 10,000 rows (`--batch-size`) until nothing is left, and prints the counts. |
 | `python -m space.webhook_retention` | Delivered or failed webhook deliveries older than 30 days with their attempts, events no delivery still references, command receipts older than 30 days, and subscriptions removed more than 30 days ago. Each run removes at most one batch of 1,000 rows per table (`--batch-size`, up to 10,000); run it again while it reports removals. |
 
 A command row is what makes a retry safe: within the window, repeating a command ID returns the original result. After its row is pruned, a retry of that command is applied again. Imports of Memora exports rely on the same rows to skip records they already imported.
@@ -69,7 +69,7 @@ SET storage_limit_bytes = 1073741824, item_limit = 20000, model_request_limit = 
 WHERE space_id = '<space-uuid>';
 ```
 
-Storage counts every retained revision. Each outbound model request counts before it is sent, including requests that then fail. At a limit, writes that add content or call a model fail with 429 and nothing partial is saved; reading, export, deletion and forgetting a memory still work. Restore a limit to "none" with the column's maximum value: 9223372036854775807 for storage, 2147483647 for items and model requests.
+Storage counts every retained revision, including the parts of a document's original file whether staged or committed. A file's parts must be committed within 50 minutes of their upload; the retention command removes staged parts an hour after their upload. Each outbound model request counts before it is sent, including requests that then fail. At a limit, writes that add content or call a model fail with 429 and nothing partial is saved; reading, export, deletion and forgetting a memory still work. Restore a limit to "none" with the column's maximum value: 9223372036854775807 for storage, 2147483647 for items and model requests.
 
 ## After restoring a backup
 

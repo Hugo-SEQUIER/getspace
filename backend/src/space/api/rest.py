@@ -13,6 +13,7 @@ from space import (
     api_keys,
     database_sql,
     device_auth,
+    document_files,
     memora_jobs,
     oauth_server,
     overview,
@@ -181,6 +182,34 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     )
     def save(space_id: UUID, body: SaveResource, session=write):
         return workspace.save(session[0], space_id, body)
+
+    # A document's original file: the website uploads it in parts, then commits the document
+    # that holds it, and reads it back part by part. Agents read its text from the body.
+    @router.post("/spaces/{space_id}/files/{file_id}/parts/{part}")
+    def upload_file_part(
+        space_id: UUID, file_id: UUID, part: int, body: document_files.Part, session=auth
+    ):
+        return document_files.upload_part(workspace, session[0], space_id, file_id, part, body)
+
+    @router.post("/spaces/{space_id}/files")
+    def commit_file(space_id: UUID, body: document_files.Commit, session=auth):
+        return document_files.commit(workspace, session[0], space_id, body)
+
+    @router.delete("/spaces/{space_id}/files/{file_id}")
+    def discard_file(space_id: UUID, file_id: UUID, session=auth):
+        return document_files.discard(workspace, session[0], space_id, file_id)
+
+    @router.get("/spaces/{space_id}/resources/{resource_id}/file/{part}")
+    def file_part(
+        space_id: UUID,
+        resource_id: UUID,
+        part: int,
+        revision: Annotated[int | None, Query(ge=1)] = None,
+        session=auth,
+    ):
+        return document_files.read_part(
+            workspace, session[0], space_id, resource_id, part, revision
+        )
 
     @public.get(
         "/spaces/{space_id}/tasks/columns",

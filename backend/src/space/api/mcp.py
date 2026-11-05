@@ -461,7 +461,13 @@ def create_mcp(
             revision: int | None = None,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Read a document or task, optionally at an immutable historical revision."""
+            """Read a document or task, optionally at an immutable historical revision.
+
+            A document with a `file` field keeps an original file the person uploaded on the
+            website, such as a PDF, Word document or presentation. Its body holds the text
+            extracted from that file; the file itself is viewed and downloaded on the
+            website and cannot be read through this tool.
+            """
             return await command(
                 workspace.get_resource, space_id, resource_id, revision, agent_id=agent_id
             )
@@ -534,8 +540,10 @@ def create_mcp(
             documents and are independent of projects. New folder assignments must name
             an active folder in this Space; unchanged archived references may remain.
             A project must name an existing project in this Space. Kind cannot change.
-            Tasks cannot carry recall.category="handoff". Generated memory is never
-            edited here: use remember, remember_claims, extract_memory or edit_memory_claim.
+            Tasks cannot carry recall.category="handoff". Updating a document that keeps
+            an original file keeps the file; only the website uploads one. Generated
+            memory is never edited here: use remember, remember_claims, extract_memory or
+            edit_memory_claim.
             Prefer a status from task_columns; a new status value is saved as a column
             labelled from it (add_task_column picks the label), and set_task_status moves
             a task without resending its body. Set status

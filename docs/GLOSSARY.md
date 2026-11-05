@@ -45,6 +45,8 @@ How to read this page:
 | Command | One client operation with one `command_id`, for example one `extract_memory` call. | `Workspace._save`, `jobs.enqueue` |
 | Command ID / idempotent replay | Repeating a `command_id` with the same payload returns the originally committed revision and spends no model call. The same ID with a different payload raises 409 `This command ID was already used for another operation.` The queue applies the same rule to a job ID and says `This job ID was already used for another request or grant`. | `Workspace._previous`, `jobs.enqueue` |
 | Command fingerprint | An HMAC of the request under the Space key. A reused command ID is compared by fingerprint, so a different payload cannot replay an old result. | `Workspace._save`, `Workspace._memory_retry` |
+| Original file | A file a person uploaded on the website that a document keeps, up to 250 MiB, such as a PDF, a Word document or a presentation. The document's `file` field gives its name, media type, size, SHA-256 digest and part count, and its body holds the text the browser extracted from it. Edits keep the file; it cannot be replaced or removed. | `backend/src/space/document_files.py`, `Workspace.save_file` |
+| File part | Up to 1 MiB of an original file, stored in its own `space.file_parts` row with a digest bound to the file ID and part number. A part is staged when it arrives and attached in the transaction that creates its document. | `space.file_parts` in `backend/migrations/versions/0041_document_files.sql` |
 
 ## Memory anatomy
 
@@ -130,6 +132,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Claim IDs, memory IDs, revisions, entry indices, timestamps | Claim text (`value`) and the memory title |
 | `embedding` vector and `embedding_model` name | Cue labels, before hashing |
 | `text_hash` and `cue_hashes` | The memory record's `entries` text |
+| File part IDs, sizes and digests | Original file bytes, file names and media types |
 | Claim type and declared importance | Creator, classification and links |
 
 [Data and privacy](PRIVACY.md) lists what is stored and who can read it.

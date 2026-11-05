@@ -701,6 +701,8 @@ class Workspace:
             "folder": metadata.get("folder"),
             "priority": metadata.get("priority"),
             "recall": metadata.get("recall", RecallMetadata().model_dump(mode="json")),
+            # A document that keeps its original file; see document_files.
+            **({"file": metadata["file"]} if metadata.get("file") else {}),
         }
 
     def list_resources(
@@ -894,6 +896,11 @@ class Workspace:
     def save(self, identity, space_id: UUID, request: SaveResource):
         return self._save(identity, space_id, request)
 
+    @key_operation
+    def save_file(self, identity, space_id: UUID, request: SaveResource, file: dict):
+        """Create a document holding an uploaded file; see document_files.commit."""
+        return self._save(identity, space_id, request, file=file)
+
     def _save(
         self,
         identity,
@@ -906,19 +913,23 @@ class Workspace:
         new_id=None,
         index=None,
         quota_deletion=False,
+        file=None,
     ):
+        if file is not None and request.resource_id:
+            raise CommandError("A file can only be added to a new document", 400)
         scope, key, previous = self._write_context(identity, space_id, request.command_id)
+        command = request.model_dump(
+            mode="json",
+            exclude=({"recall"} if request.recall is None else set())
+            | ({"project", "folder", "priority"} - request.model_fields_set),
+        )
+        if file is not None:
+            command["file"] = file
         fingerprint = fingerprint or hmac.digest(
             key.key.material,
             b"space.command.v1\0"
             + ((identity.agent_id + "\0").encode() if identity.agent_id else b"")
-            + encode(
-                request.model_dump(
-                    mode="json",
-                    exclude=({"recall"} if request.recall is None else set())
-                    | ({"project", "folder", "priority"} - request.model_fields_set),
-                )
-            ),
+            + encode(command),
             "sha256",
         )
         previous = self._validate_previous(identity, scope, previous, fingerprint)
@@ -949,6 +960,8 @@ class Workspace:
                 project = UUID(old["project"]) if old.get("project") else None
             if "priority" not in request.model_fields_set:
                 priority = old.get("priority")
+            # Edits keep the original file; only document_files.commit adds one.
+            file = old.get("file")
             if old["recall"]["category"] == "memory" and memory is None:
                 raise CommandError(
                     "Change a memory's claims with edit_memory_claim or forget_memory_claim, "
@@ -975,6 +988,8 @@ class Workspace:
             # website, so its writes count as unseen until they open them.
             "author_api_key": identity.api_key.id if identity.api_key else None,
         }
+        if file:
+            content["file"] = file
         if memory is not None:
             if request.expected_revision == 0:
                 memory_creator.capture(memory, content["author_agent"])
@@ -1006,6 +1021,7 @@ class Workspace:
                 "project": content["project"],
                 "folder": content["folder"],
                 "priority": content["priority"],
+                **({"file": file} if file else {}),
             },
         )
         # Searchable fingerprints of the same text, so recall can select this resource with
@@ -1102,6 +1118,10 @@ class Workspace:
                             memory_kind,
                         ),
                     )
+                    if file:
+                        from space import document_files
+
+                        document_files.attach(connection, resource_id, file)
                 saved_revision = connection.execute(
                     "INSERT INTO space.resource_revisions(organization_id,"
                     "space_id,resource_id,revision,key_id,encrypted_metadata,"

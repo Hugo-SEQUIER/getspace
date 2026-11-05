@@ -312,6 +312,7 @@ def test_activity_retention_is_independent_of_command_retention(commands):
             "commands": 0,
             "activity_events": 1,
             "retired_claim_vectors": 0,
+            "staged_file_parts": 0,
         }
     assert overview.snapshot(service, owner, space)["summary"]["document_writes"] == 1
 

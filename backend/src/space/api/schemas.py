@@ -71,6 +71,15 @@ class TaskColumn(Closed):
 # Documents and tasks
 
 
+class DocumentFile(Closed):
+    id: UUID
+    name: str = Field(description="The original file name.")
+    type: str = Field(description="The file's media type, such as application/pdf.")
+    bytes: int = Field(ge=1, description="The file's size in bytes.")
+    sha256: str = Field(description="The SHA-256 digest of the file, in hexadecimal.")
+    parts: int = Field(ge=1, description="How many parts of up to 1 MiB store the file.")
+
+
 class ResourceSummary(Closed):
     id: UUID
     kind: Literal["document", "task"]
@@ -89,6 +98,12 @@ class ResourceSummary(Closed):
     folder: UUID | None
     priority: Literal["High", "Medium", "Low"] | None
     recall: Recall
+    file: DocumentFile | None = Field(
+        default=None,
+        description="Present on a document that keeps an original file uploaded on the website, "
+        "such as a PDF or a presentation. The body holds the text extracted from it; the file "
+        "itself is viewed and downloaded on the website.",
+    )
 
 
 class ExplicitLink(Closed):

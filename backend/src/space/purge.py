@@ -138,6 +138,11 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "WHERE organization_id=%s AND space_id=%s",
     ),
     (
+        "file_parts",
+        "DELETE FROM space.file_parts WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) AS rows FROM space.file_parts WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
         "resource_revisions",
         "DELETE FROM space.resource_revisions WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) AS rows FROM space.resource_revisions "
