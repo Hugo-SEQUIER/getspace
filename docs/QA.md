@@ -44,6 +44,12 @@ In the installation's PostgreSQL database. Revisions hold the claim text as read
 
 **Proof:** `backend/migrations/versions/0003_memory_brain.sql`, `backend/src/space/security/payloads.py`.
 
+### How is a database stored, and what bounds it?
+
+Each record is its own row with its own history: `space.database_records` holds one head per record and `space.database_record_revisions` one version per write, keyed by the database revision that wrote it. The item revision holds the schema and metadata. A write stores only the rows it changed, so storage grows with what changed rather than with the size of the table, and a read at an earlier revision takes each record's last version at or before it. A database holds up to 10,000 records; a record has a name of up to 200 characters, notes of up to 20,000 and values of up to 2,000 characters in up to 30 fields. Databases written before 22 October 2026 keep their records inside their item payloads until their next write moves them.
+
+**Proof:** `backend/migrations/versions/0042_database_records.sql`, `backend/src/space/database_records.py`, `backend/tests/test_workspace_items.py` (`test_database_rows_are_stored_one_per_record_and_an_edit_costs_one_row`).
+
 ### Is anything encrypted at rest?
 
 No. Space stores content as readable JSON in PostgreSQL, and the claim index adds embeddings, hashes and identifiers beside it. Ranking needs the vectors in SQL; the text stays in the revision. Anyone who can read the database, its disk or a backup can read every document and memory, so protect the server accordingly.

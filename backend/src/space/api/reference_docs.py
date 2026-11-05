@@ -142,18 +142,24 @@ OPERATIONS = {
     ("get", "/v1/spaces/{space_id}/items"): Operation(
         s.ItemPage,
         "Sections, projects, folders, categories or databases of one `kind`. Pass "
-        "`deleted=true` to list deleted ones.",
+        "`deleted=true` to list deleted ones. A database is listed with its `fields` and "
+        "`record_count`, never its `records`: read one item for them, or query it.",
         (*READ, 422),
     ),
     ("post", "/v1/spaces/{space_id}/items"): Operation(
         s.WorkspaceItem,
         "Creates an item with a new `item_id` and `expected_revision: 0`, or replaces its "
-        "`data` at the current revision. `data` depends on `kind`; databases carry `fields` "
-        "and `records`.",
+        "`data` at the current revision. `data` depends on `kind`. Databases carry `fields` "
+        "and optionally `records`: with `records`, the list is the whole table and only the "
+        "rows that differ are stored, each as its own revision; without it, the stored "
+        "records stay as they are.",
         WRITE,
     ),
     ("get", "/v1/spaces/{space_id}/items/{item_id}"): Operation(
-        s.WorkspaceItem, "One item. Pass `revision` to read an earlier revision.", (*READ, 422)
+        s.WorkspaceItem,
+        "One item. Pass `revision` to read an earlier revision. A database carries its "
+        "`records` as they were at that revision.",
+        (*READ, 422),
     ),
     ("post", "/v1/spaces/{space_id}/databases/{database_id}/query"): Operation(
         s.QueryResult,

@@ -255,6 +255,7 @@ def validate_archive(raw):
                             "deleted",
                             "updated_at",
                             "author_agent",
+                            "record_count",
                         }
                     },
                 }

@@ -41,11 +41,11 @@ Pause stops new event admission for that subscription and new network attempts. 
 
 ### Commit-only notifications
 
-Ordinary browser REST saves, `save_workspace_item` MCP writes and final active database heads published by archive restore share the same outbox producer. Each snapshot compares records by stable record ID with its locked predecessor. Only record additions, deletions or actual `name`, `notes`, `createdAt` or field-value differences create events. Row order, database/view/schema metadata alone and `updatedAt`-only edits do not report unchanged rows. Missing and null field values are equivalent. Database archive/restore visibility toggles do not submit unchanged records for review.
+Ordinary browser row changes, snapshot saves over REST, `save_workspace_item` and `query_database` MCP writes and final active database heads published by archive restore share the same outbox producer. Each write compares the rows it touches, by stable record ID, with their stored versions at the revision being replaced. Only record additions, deletions or actual `name`, `notes`, `createdAt` or field-value differences create events. Row order, database/view/schema metadata alone and `updatedAt`-only edits do not report unchanged rows. Missing and null field values are equivalent. Database archive/restore visibility toggles do not submit unchanged records for review.
 
 Event and delivery inserts commit atomically with the database revision. Failed validation, revision conflicts, rolled-back writes and retries of an already committed command create no additional events. An enabled subscription is required for event production; creating a subscription does not report older changes. A full outbox rejects the save rather than silently losing notifications.
 
-Events have one UUID per changed record and committed database revision. The same event ID is shared across matching subscriptions, while each delivery has its own stable ID. `previous_revision` and `revision` refer to database snapshots, not per-record counters. An archive merge reports only the final changed row, not every imported historical revision.
+Events have one UUID per changed record and committed database revision. The same event ID is shared across matching subscriptions, while each delivery has its own stable ID. `previous_revision` and `revision` refer to database revisions, not per-record counters. An archive merge reports only the final changed row, not every imported historical revision.
 
 The v1 payload shape is:
 

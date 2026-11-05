@@ -313,7 +313,7 @@ def create_mcp(
             """
             return await command(
                 lambda actor: workspace_items.listing(
-                    workspace, actor, space_id, kind, after, deleted, records=False
+                    workspace, actor, space_id, kind, after, deleted
                 ),
                 agent_id=agent_id,
             )
@@ -324,10 +324,14 @@ def create_mcp(
         ) -> dict[str, Any]:
             """Parameters: Space, item ID and optional historical revision.
             What it does: reads a project, folder, database, category or section.
+            A database comes with its schema and record_count, never its records: read
+            rows with read_database and change them with query_database.
             Output: the item and its revision.
             """
             return await command(
-                lambda actor: workspace_items.get(workspace, actor, space_id, item_id, revision),
+                lambda actor: workspace_items.get(
+                    workspace, actor, space_id, item_id, revision, records=False
+                ),
                 agent_id=agent_id,
             )
 
@@ -347,17 +351,24 @@ def create_mcp(
             project places it in the Space map and never moves its documents.
             New section or project assignments must name an active item in this Space.
             Categories and sections use name and description; use user-defined labels.
-            Databases use name, description, fields, records, view, groupBy and optional
-            project_id, section_id and tasks. tasks marks the rows as tasks: status is a
-            select field ID, done lists the options that close a row, and planned is a
-            date field ID for the day a row is planned for. Change records with
-            query_database.
-            Read the current item first and preserve field/record IDs. Limits are
-            30 fields, 1,000 records and 900 KiB per snapshot. Create at revision zero.
-            Output: the saved item and its new revision.
+            Databases use name, description, fields, view, groupBy and optional
+            project_id, section_id, tasks and records. tasks marks the rows as tasks:
+            status is a select field ID, done lists the options that close a row, and
+            planned is a date field ID for the day a row is planned for. Leave records
+            out to change the schema and keep every stored row; change rows with
+            query_database. Pass records only to replace the whole table, such as a
+            bulk import: rows it omits are deleted, and only rows that differ are
+            stored, each as its own revision.
+            Read the current item first and preserve field IDs. Limits are 30 fields,
+            10,000 records per database and 2,000 characters per value. Create at
+            revision zero.
+            Output: the saved item, with its record_count for a database, and its new
+            revision.
             """
             return await command(
-                lambda actor: workspace_items.save(workspace, actor, space_id, change),
+                lambda actor: workspace_items.save(
+                    workspace, actor, space_id, change, records=False
+                ),
                 agent_id=agent_id,
             )
 
@@ -402,8 +413,9 @@ def create_mcp(
             (quote names with spaces). Send INSERT, UPDATE or DELETE as sql with params
             bound to ? placeholders, or a statements batch of up to 20 that succeed or fail
             together; a SELECT in a batch sees the earlier changes. command_id and the
-            current expected_revision are required; the whole change is validated and
-            saved as one revision. A request without INSERT, UPDATE or DELETE is refused;
+            current expected_revision are required; the change is validated as a whole
+            and saved as one revision that stores only the rows it changed. A request
+            without INSERT, UPDATE or DELETE is refused;
             read rows with read_database. Omit id on INSERT to have one assigned; id,
             created_at and updated_at cannot be updated. Checkbox columns hold 0 or 1.
             include_schema returns the column map.

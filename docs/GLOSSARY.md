@@ -159,6 +159,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Memories per list, and per recall load | 200 listed. Recall loads `max(32, its selected order)`, so the load bound never truncates the ranked or cue-expanded order; the shipped guide states an effective bound of 40 at the default multiplier. | `MAX_MEMORY_LIST`, `MAX_MEMORY_LOAD`, `Workspace.context` |
 | Recall request | query at most 500 characters, limit 1 to 10 (default 5), `max_chars` 2000 to 20000 (default 12000) | `RecallRequest` |
 | Evidence assessment | 50 records of at most 2000 characters | `relevance.MAX_EVIDENCE`, `MAX_EVIDENCE_CHARS` |
+| Database records | 10,000 per database; a record has a name of at most 200 characters, notes of at most 20,000 and values of at most 2,000 characters in at most 30 fields; each record is stored as its own revision | `workspace_items.MAX_DATABASE_RECORDS`, `DatabaseRecord`, `database_records.py` |
 | Recall lane | 12 active, 128 waiting, 5-second queue deadline | `Workspace.__init__` |
 | Memory write lane | 2 active, 32 waiting, 5-second queue deadline | `Workspace.__init__` |
 | Job queue per Space | 100 unfinished jobs | `jobs.MAX_PENDING_PER_SPACE` |

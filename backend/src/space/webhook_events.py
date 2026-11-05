@@ -1,6 +1,6 @@
-"""Parameters: a successful database snapshot command and its owning transaction.
-What it does: compares stable record IDs and writes versioned delivery intents.
-Output: an atomic outbox visible only when the record revision commits.
+"""Parameters: the row changes of one database write and its owning transaction.
+What it does: turns each changed record into packed, versioned delivery intents.
+Output: an atomic outbox visible only when the database revision commits.
 """
 
 from contextlib import contextmanager
@@ -30,45 +30,48 @@ def watch_queued_deliveries():
         _queued.reset(token)
 
 
-def record_changes(before, after):
-    """Parameters: old and new database data.
-    What it does: ignores row order and updatedAt-only changes; compares actual values.
-    Output: changed records with property/field IDs and private before/after inputs.
+def row_change(record_id, previous, current):
+    """Parameters: one record's ID and its versions before and after a write, None when absent.
+    What it does: compares actual values; an updatedAt-only change is no change.
+    Output: the event fields describing the change, or None when nothing changed.
     """
-    old = {record["id"]: record for record in before.get("records", [])}
-    new = {record["id"]: record for record in after.get("records", [])}
-    for record_id in sorted(old.keys() | new.keys()):
-        previous, current = old.get(record_id), new.get(record_id)
-        old_values = previous.get("values", {}) if previous else {}
-        new_values = current.get("values", {}) if current else {}
-        fields = sorted(
-            field
-            for field in old_values.keys() | new_values.keys()
-            if old_values.get(field) != new_values.get(field)
-        )
-        properties = [
-            field
-            for field in ("name", "notes", "createdAt")
-            if (previous or {}).get(field) != (current or {}).get(field)
-        ]
-        if previous is not None and current is not None and not fields and not properties:
-            continue
-        if previous is None:
-            operation = "created"
-        elif current is None:
-            operation = "deleted"
-        else:
-            operation = "updated"
-        yield (
-            {
-                "record_id": record_id,
-                "operation": operation,
-                "changed_fields": fields,
-                "changed_properties": properties,
-            },
-            previous,
-            current,
-        )
+    old_values = previous.get("values", {}) if previous else {}
+    new_values = current.get("values", {}) if current else {}
+    fields = sorted(
+        field
+        for field in old_values.keys() | new_values.keys()
+        if old_values.get(field) != new_values.get(field)
+    )
+    properties = [
+        field
+        for field in ("name", "notes", "createdAt")
+        if (previous or {}).get(field) != (current or {}).get(field)
+    ]
+    if previous is not None and current is not None and not fields and not properties:
+        return None
+    if previous is None:
+        operation = "created"
+    elif current is None:
+        operation = "deleted"
+    else:
+        operation = "updated"
+    return {
+        "record_id": record_id,
+        "operation": operation,
+        "changed_fields": fields,
+        "changed_properties": properties,
+    }
+
+
+def snapshot_changes(before, after):
+    """Parameters: two whole tables as record lists, such as a database before and after a
+    restore.
+    What it does: pairs each record ID with its version in each, ignoring row order.
+    Output: (record ID, before, after) for every ID in either table, in ID order.
+    """
+    old = {record["id"]: record for record in before}
+    new = {record["id"]: record for record in after}
+    return [(id_, old.get(id_), new.get(id_)) for id_ in sorted(old.keys() | new.keys())]
 
 
 def projection(event, transition, before, after, fields):
@@ -89,10 +92,14 @@ def projection(event, transition, before, after, fields):
     return {**event, "transition": {"field_id": field_id, "before": old_value, "after": new_value}}
 
 
-def enqueue(workspace, connection, scope, key, database_id, revision, data):
-    """Parameters: scoped snapshot transaction, database ID and intended new revision.
-    What it does: reads the locked predecessor and inserts row events and matching deliveries.
-    Output: no network work; rollback discards the outbox with a failed snapshot.
+def enqueue(
+    workspace, connection, scope, key, database_id, previous_revision, revision, changes, fields
+):
+    """Parameters: the writing transaction, the database, the revision being replaced, the one
+    being written, the row changes as (record ID, before, after) and the schema's fields.
+    What it does: inserts row events and matching deliveries for every record whose content
+    changed.
+    Output: no network work; rollback discards the outbox with a failed write.
     """
     from space.workspace import CommandError
 
@@ -101,15 +108,6 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
     ).fetchall()
     if not subscribers:
         return
-    row = connection.execute(
-        "SELECT i.current_revision,i.deleted,v.key_id,v.encrypted_payload "
-        "FROM space.workspace_items i JOIN space.workspace_item_revisions v ON "
-        "(v.organization_id,v.space_id,v.item_id,v.revision)="
-        "(i.organization_id,i.space_id,i.id,i.current_revision) WHERE i.id=%s",
-        (database_id,),
-    ).fetchone()
-    previous_revision = row["current_revision"] if row else 0
-    before = {}
     keys = {key.key.key_id: key}
 
     def scoped_key(key_id):
@@ -122,15 +120,6 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
             )
         return keys[key_reference]
 
-    if row and not row["deleted"]:
-        before = workspace._unpack(
-            scoped_key(row["key_id"]),
-            scope,
-            database_id,
-            previous_revision,
-            "workspace_item",
-            row["encrypted_payload"],
-        )["data"]
     filters = [
         (
             sub["id"],
@@ -146,10 +135,13 @@ def enqueue(workspace, connection, scope, key, database_id, revision, data):
         )
         for sub in subscribers
     ]
-    fields = {field["id"]: field for field in data.get("fields", [])}
+    fields = {field["id"]: field for field in fields}
     occurred_at = datetime.now(UTC).isoformat()
     intents = []
-    for diff, old_record, new_record in record_changes(before, data):
+    for record_id, old_record, new_record in changes:
+        diff = row_change(record_id, old_record, new_record)
+        if diff is None:
+            continue
         event = {
             "version": 1,
             "id": str(uuid4()),

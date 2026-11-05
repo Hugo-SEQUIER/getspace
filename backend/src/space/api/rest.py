@@ -360,6 +360,14 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     def query_database(space_id: UUID, database_id: UUID, body: database_sql.Query, session=read):
         return database_sql.execute(workspace, session[0], space_id, database_id, body)
 
+    # The website's database writes: a schema change, some rows, or both, as one revision.
+    # Agents change rows with SQL through the query route and schemas through /items.
+    @router.post("/spaces/{space_id}/databases/{database_id}/changes")
+    def change_database(
+        space_id: UUID, database_id: UUID, body: workspace_items.DatabaseChange, session=auth
+    ):
+        return workspace_items.change_database(workspace, session[0], space_id, database_id, body)
+
     @router.post("/spaces/{space_id}/items/{item_id}/visibility")
     def item_visibility(
         space_id: UUID, item_id: UUID, body: workspace_items.ChangeVisibility, session=auth

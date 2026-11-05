@@ -156,6 +156,7 @@ def test_writes_need_a_command_and_never_change_unrelated_rows(commands):
         ("UPDATE records SET Active=2", "expects 0 or 1"),
         ("UPDATE records SET Value='lots'", "expects a number"),
         ("UPDATE records SET name=NULL", "NOT NULL"),
+        ("UPDATE records SET name=''", "at least 1 character"),
     ],
 )
 def test_invalid_writes_are_rejected_whole(commands, sql, match):
@@ -318,12 +319,14 @@ def test_requests_and_listings_are_bounded(commands):
     ):
         with pytest.raises(ValidationError):
             Query(**invalid)
-    listed = workspace_items.listing(service, owner, space, "database", records=False)
+    listed = workspace_items.listing(service, owner, space, "database")
     [item] = listed["items"]
     assert "records" not in item and item["record_count"] == 3
     assert item["fields"] == db["fields"]
-    full = workspace_items.listing(service, owner, space, "database")
-    assert len(full["items"][0]["records"]) == 3
+    full = workspace_items.get(service, owner, space, UUID(db["id"]))
+    assert len(full["records"]) == 3 and full["record_count"] == 3
+    brief = workspace_items.get(service, owner, space, UUID(db["id"]), records=False)
+    assert "records" not in brief and brief["record_count"] == 3
 
 
 def test_sql_writes_reach_the_webhook_outbox_once_per_changed_record(commands, monkeypatch):

@@ -49,6 +49,8 @@ Chat requests to an OpenAI-compatible endpoint ask the provider not to store the
 
 **Caddy** obtains its HTTPS certificate from a public certificate authority such as Let's Encrypt, which learns your domain name.
 
+Inside the database, `space.database_records` and `space.database_record_revisions` hold one row per database record, with its own history. The operator of a self-hosted Space reads them like any other stored row: the record ID the writer chose, the database revision each version was written at, a deleted flag, the row's insertion position, and a payload holding the record's name, notes and values. A database export therefore contains how many records a database has, when each was written or deleted, and what they say.
+
 Agents connected to Space receive whatever they read through MCP. What an agent and its model provider keep is outside Space's control.
 
 ## Logs

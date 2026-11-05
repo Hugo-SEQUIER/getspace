@@ -315,7 +315,7 @@ Skill updates ship separately from the backend:
 - Large catalogs move from no classification at all to one embedding per changed item plus the usual one classification request per claim. Item embeddings are cached per item revision.
 - All of these count against the existing per-session limits and the Space's model request counter, and the served provider disclosure mentions them.
 - Telemetry records duration and item counts only, never names, descriptions or rule text.
-- Cost risk: record counts and field lists require reading each database snapshot (up to 900 KiB). Measure on a Space with 50 databases at the 1,000-record limit. If it is too slow, store `record_count` and the field summary in the item revision's metadata at save time.
+- Record counts and field lists come from the rows themselves since 22 October 2026: the map counts a database's records with one query (`database_records.counts`), and the item payload it reads holds only the schema.
 - Rules are read per memory revision, at most 5 per container and 10 global, so cost scales with the number of containers shown, not with the size of memory.
 
 ## Context map

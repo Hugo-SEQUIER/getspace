@@ -11,6 +11,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from space import database_records
 from space.memory import Input, document_text
 from space.workspace import CommandError
 from space.workspace_items import ROW
@@ -112,6 +113,13 @@ def _page(workspace, identity, space_id, after, size, expected=None):
             else []
         )
         items = connection.execute(ITEMS, _pinned(item_rows)).fetchall() if item_rows else []
+        # Database rows are read with their item; the snapshot recheck below refuses a page
+        # that a write landed in, so the current rows are the ones the listed revision holds.
+        database_rows = {
+            row["id"]: database_records.current_rows(connection, row["id"])
+            for row in items
+            if row["kind"] == "database"
+        }
         key_rows = workspace._key_rows([*resources, *items])
     keys = {
         key_id: workspace._unwrap_key(scope["organization_id"], scope["space_id"], row)
@@ -149,13 +157,20 @@ def _page(workspace, identity, space_id, after, size, expected=None):
         )["data"]
         text = data.get("description", "")
         if row["kind"] == "database":
+            records = (
+                data["records"]
+                if data.get("records") is not None
+                else database_records.decode(
+                    workspace, scope, row["id"], database_rows[row["id"]], data["fields"]
+                )
+            )
             text += "\n" + "\n".join(
                 " ".join(
                     str(value)
                     for value in [record["name"], record["notes"], *record["values"].values()]
                     if value is not None
                 )
-                for record in data["records"]
+                for record in records
             )
             text += "\n" + " ".join(field["name"] for field in data["fields"])
         entries[row["id"]] = [

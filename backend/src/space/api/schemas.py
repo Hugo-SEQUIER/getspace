@@ -435,7 +435,13 @@ class WorkspaceItem(Closed):
     project_id: UUID | None = Field(default=None, description="Folders and databases.")
     status: str | None = Field(default=None, description="Projects: a task column value.")
     fields: list[DatabaseField] | None = Field(default=None, description="Databases.")
-    records: list[DatabaseRecord] | None = Field(default=None, description="Databases.")
+    records: list[DatabaseRecord] | None = Field(
+        default=None,
+        description="Databases, when one item is read; listings carry record_count instead.",
+    )
+    record_count: int | None = Field(
+        default=None, description="Databases: how many records the database holds."
+    )
     view: str | None = Field(default=None, description="Databases: table or board.")
     groupBy: str | None = Field(default=None, description="Databases: the board's field.")
     tasks: TaskTracking | None = Field(

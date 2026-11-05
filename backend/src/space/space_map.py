@@ -34,10 +34,11 @@ def current_items(workspace, identity, space_id):
             (MAX_ITEMS + 1,),
         ).fetchall()
         key_rows = workspace_items.item_keys(workspace, connection, scope, rows[:MAX_ITEMS])
+        counts = workspace_items.record_counts(connection, rows[:MAX_ITEMS])
     if not rows:
         return [], False
     items = workspace_items.decode(workspace, identity, space_id, scope, rows[:MAX_ITEMS], key_rows)
-    return [workspace_items.without_records(item) for item in items], len(rows) > MAX_ITEMS
+    return [workspace_items.without_records(item, counts) for item in items], len(rows) > MAX_ITEMS
 
 
 def container(item, rules):
