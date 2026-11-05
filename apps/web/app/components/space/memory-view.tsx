@@ -69,6 +69,12 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
   useEffect(() => {
     return data.watchMemories();
   }, [data.watchMemories]);
+  // The vectors view draws the whole Space, so the pages behind it must be complete.
+  // The list view keeps its own page and asks for older memory only when wanted.
+  useEffect(() => {
+    if (view !== "vectors" || !data.memoryCursor) return;
+    void data.loadAllMemories();
+  }, [view, data.memoryCursor, data.loadAllMemories]);
   useEffect(() => {
     if (data.memoryLoaded && id && !data.memories.some(m => m.id === id)) {
       void data.loadSelectedMemory(id.split(":")[0]).catch(e => setError(message(e)));
@@ -465,14 +471,13 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
               </div>
               {memoryListPage.items.map(memoryRow)}
               <ListPageControls {...memoryListPage} />
-            </div>
-          )}
-              {/* A page holds what the server sent. Older memory is one page away, and the
-                  server only offers a cursor when no search is running. */}
+              {/* The list reads one page at a time, and the server only offers a cursor
+                  when no search is running. The vectors view loads every page instead. */}
               {data.memoryCursor && !query.trim() && (
                 <div className="sp-memory-more">
-                  <p className="sp-muted">Filters apply to loaded memories. Load older memory to include more.</p>
+                  <p className="sp-muted">Category and project filters apply to loaded memories. Search covers every memory.</p>
                   <button
+                    type="button"
                     onClick={() => void data.loadMoreMemories()}
                     disabled={data.memoryMoreLoading}
                   >
@@ -480,6 +485,8 @@ export function MemoryView({ base, id }: { base: string; id?: string }) {
                   </button>
                 </div>
               )}
+            </div>
+          )}
 
           <div className="sp-network-caption">
             <strong>{visible.length.toLocaleString()} memories</strong>

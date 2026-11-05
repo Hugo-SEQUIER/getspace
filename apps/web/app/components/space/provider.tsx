@@ -78,6 +78,9 @@ import type {
 
 // Keep initial requests small; the API supports larger explicit pages when needed.
 const MEMORY_PAGE_SIZE = 50;
+// The server caps one memory page at 200. A complete read and a search both ask for that
+// cap instead of one display page, so the vectors view and every query see every memory.
+const MEMORY_MAX_PAGE_SIZE = 200;
 // Files saved in the sample workspace stay in this tab's memory; only their documents are
 // written to browser storage, so a reload keeps the page and loses the bytes.
 const fileRequest: FileRequest = (path, method, body, signal) => api(path, method, body, signal);
@@ -508,9 +511,11 @@ function useData() {
   const memoryPage = useCallback(
     async (
       spaceId: string,
-      search: { query?: string; after?: string | null } = {},
+      search: { query?: string; after?: string | null; limit?: number } = {},
     ) => {
-      const params = new URLSearchParams({ limit: String(MEMORY_PAGE_SIZE) });
+      const params = new URLSearchParams({
+        limit: String(search.limit ?? MEMORY_PAGE_SIZE),
+      });
       if (search.query) params.set("query", search.query);
       if (search.after) params.set("after", search.after);
       const result = await cachedApi<MemoryPage>(`spaces/${spaceId}/memories?${params}`);
@@ -650,6 +655,44 @@ function useData() {
     }
   }, [space, memoryCursor, resources, memoryPage]);
 
+  // Parameters: none. It continues until the server has no older page.
+  // What it does: walks the newest-first pages and appends them, so the graph can show
+  //   every memory. A full reload started while a page is in flight owns the list instead.
+  // Output: nothing. Failures reach the view as memoryError.
+  const loadAllMemories = useCallback(async () => {
+    if (!space || !memoryCursor || memoryMoreBusy.current) return;
+    const current = memoryRequests.current;
+    memoryMoreBusy.current = true;
+    setMemoryMoreLoading(true);
+    setMemoryError("");
+    try {
+      let cursor: string | null = memoryCursor;
+      const seen = new Set<string>();
+      while (cursor) {
+        seen.add(cursor);
+        const result = await memoryPage(space.id, {
+          after: cursor,
+          limit: MEMORY_MAX_PAGE_SIZE,
+        });
+        if (current !== memoryRequests.current) return;
+        const page = normalizeMemories(result.items, resources);
+        setMemories((old) => [
+          ...old,
+          ...page.filter((m) => !old.some((o) => o.id === m.id)),
+        ]);
+        const next = result.next_cursor;
+        cursor = next && !seen.has(next) ? next : null;
+        setMemoryCursor(cursor);
+        setMemoryLoaded(true);
+      }
+    } catch (e) {
+      if (current === memoryRequests.current) setMemoryError(message(e));
+    } finally {
+      memoryMoreBusy.current = false;
+      setMemoryMoreLoading(false);
+    }
+  }, [space, memoryCursor, resources, memoryPage]);
+
   // Parameters: the search text. It must not be reduced to the pages already loaded.
   // What it does: asks the server to match every memory in the Space. The caller
   //   debounces the term and drops responses that a newer term has replaced.
@@ -657,7 +700,10 @@ function useData() {
   const searchMemories = useCallback(
     async (query: string) => {
       if (!space) return [];
-      const result = await memoryPage(space.id, { query });
+      const result = await memoryPage(space.id, {
+        query,
+        limit: MEMORY_MAX_PAGE_SIZE,
+      });
       return normalizeMemories(result.items, resources);
     },
     [space, resources, memoryPage],
@@ -1406,6 +1452,7 @@ function useData() {
     loadMemories,
     loadProvider,
     loadMoreMemories,
+    loadAllMemories,
     searchMemories,
     readResource,
     loadSelectedMemory,
