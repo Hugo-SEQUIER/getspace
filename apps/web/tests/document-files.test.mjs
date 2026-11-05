@@ -15,19 +15,28 @@ import {
   cleanFileName,
   cleanFileType,
   downloadFileParts,
+  THUMBNAIL_BYTES,
+  THUMBNAIL_SIDE,
+  downloadThumbnail,
   eachPart,
+  fileDetails,
   fileKind,
   fileLabel,
   fileParts,
   filePartPath,
   fileReadPath,
   fileDiscardPath,
+  fileThumbnailPath,
+  fitThumbnail,
+  formatDuration,
   formatFileSize,
+  mediaDetail,
   partRange,
   previewMode,
   sha256Hex,
   slideOrder,
   slideText,
+  thumbnailKinds,
   uploadFileParts,
 } from "../lib/space/document-files.ts";
 
@@ -211,6 +220,47 @@ test("a download joins the parts in order and refuses bytes that do not match th
   assert.deepEqual(new Uint8Array(await blob.arrayBuffer()), data);
   await assert.rejects(
     downloadFileParts(async () => ({ data: bytesToBase64(new Uint8Array(3)) }), { spaceId: "s", resourceId: "r", file: { ...file, parts: 1, bytes: 3 } }),
+    /did not arrive intact/,
+  );
+});
+
+test("thumbnails fit 480 pixels without growing, and pictures, videos and PDFs get one", () => {
+  assert.equal(THUMBNAIL_BYTES, 65_536);
+  assert.equal(THUMBNAIL_SIDE, 480);
+  assert.deepEqual(fitThumbnail(4000, 3000), { width: 480, height: 360 });
+  assert.deepEqual(fitThumbnail(1080, 1920), { width: 270, height: 480 });
+  assert.deepEqual(fitThumbnail(64, 48), { width: 64, height: 48 });
+  assert.deepEqual(fitThumbnail(10_000, 1), { width: 480, height: 1 });
+  assert.deepEqual(fitThumbnail(0, 0), { width: 1, height: 1 });
+  assert.deepEqual(thumbnailKinds, ["image", "video", "pdf"]);
+  assert.equal(fileThumbnailPath("s", "r"), "spaces/s/resources/r/file/thumbnail");
+  assert.equal(fileThumbnailPath("s", "r", 4), "spaces/s/resources/r/file/thumbnail?revision=4");
+});
+
+test("file details add a picture's size or a recording's length to the type and size", () => {
+  assert.equal(formatDuration(0.4), "0:00");
+  assert.equal(formatDuration(154.5), "2:35");
+  assert.equal(formatDuration(3725), "1:02:05");
+  assert.equal(mediaDetail({ width: 1920, height: 1080 }), "1920×1080");
+  assert.equal(mediaDetail({ duration: 61 }), "1:01");
+  assert.equal(mediaDetail({ width: 64, height: 48, duration: 2.4 }), "64×48 · 0:02");
+  assert.equal(mediaDetail({}), "");
+  assert.equal(fileDetails({ name: "garden.png", type: "image/png", bytes: 2_516_582, width: 3000, height: 2000 }), "PNG · 2.4 MB · 3000×2000");
+  assert.equal(fileDetails({ name: "talk.mp4", type: "video/mp4", bytes: 900, duration: 154.5 }), "MP4 · 900 B · 2:35");
+  assert.equal(fileDetails({ name: "plan.pdf", type: "application/pdf", bytes: 900 }), "PDF · 900 B");
+});
+
+test("a thumbnail download checks its size and hash and reports the backend's type", async () => {
+  const data = new Uint8Array(3000).map((_, index) => (index * 13) & 0xff);
+  const thumbnail = { id: "t", type: "image/webp", bytes: data.length, sha256: await sha256Hex(data), width: 480, height: 320, parts: 1 };
+  const paths = [];
+  const request = async (path) => { paths.push(path); return { data: bytesToBase64(data), type: "image/webp" }; };
+  const blob = await downloadThumbnail(request, { spaceId: "s", resourceId: "r", thumbnail, revision: 2 });
+  assert.equal(blob.type, "image/webp");
+  assert.deepEqual(new Uint8Array(await blob.arrayBuffer()), data);
+  assert.deepEqual(paths, ["spaces/s/resources/r/file/thumbnail?revision=2"]);
+  await assert.rejects(
+    downloadThumbnail(async () => ({ data: bytesToBase64(new Uint8Array(5)), type: "image/webp" }), { spaceId: "s", resourceId: "r", thumbnail }),
     /did not arrive intact/,
   );
 });

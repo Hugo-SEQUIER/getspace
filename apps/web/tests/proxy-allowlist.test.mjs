@@ -65,7 +65,7 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["POST", `${space}/files/${UUID}/parts/0`], ["POST", `${space}/files/${UUID}/parts/249`], ["POST", `${space}/files`],
     ["DELETE", `${space}/files/${UUID}`],
     ["GET", `${space}/resources/${UUID}/file/0`], ["GET", `${space}/resources/${UUID}/file/3?revision=2`],
-
+    ["GET", `${space}/resources/${UUID}/file/thumbnail`], ["GET", `${space}/resources/${UUID}/file/thumbnail?revision=2`],
   ]) assert.ok(proxyAllowed(proxyPath(path), method), `${method} ${path}`);
   for (const [method, path] of [
     ["POST", `${space}/read-version`], ["GET", `${space}/unknown`], ["GET", "admin"],
@@ -74,6 +74,6 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["POST", "oauth/token"], ["POST", "oauth/register"], ["GET", "oauth/authorize"],
     ["POST", `${space}/files/${UUID}`], ["GET", `${space}/files/${UUID}`],
     ["POST", `${space}/files/${UUID}/parts/x`], ["GET", `${space}/resources/${UUID}/file`],
-
+    ["GET", `${space}/resources/${UUID}/file/thumbnails`], ["GET", `${space}/resources/${UUID}/file/thumbnail/0`],
   ]) assert.ok(!proxyAllowed(proxyPath(path), method), `${method} ${path} must be refused`);
 });

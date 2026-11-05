@@ -26,7 +26,11 @@ export type Task = {
   author_agent?: { id: string; name: string; harness: string; revision: number } | null;
   updated_at: string;
 };
-export type DocumentFile = { id: string; name: string; type: string; bytes: number; sha256: string; parts: number };
+export type FileThumbnail = { id: string; type: string; bytes: number; sha256: string; width: number; height: number; parts: number };
+export type DocumentFile = {
+  id: string; name: string; type: string; bytes: number; sha256: string; parts: number;
+  width?: number; height?: number; duration?: number; thumbnail?: FileThumbnail;
+};
 export type Document = Omit<Task, 'kind'> & { kind: 'document'; folder?: string; file?: DocumentFile };
 /** The fixture backend's part size, the same as the real one. */
 export const FILE_PART_BYTES = 1_048_576;
@@ -244,7 +248,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     const fileDiscard = /\/files\/([^/]+)$/.exec(path);
     if (fileDiscard && method === 'DELETE') {
       state.fileDiscards.push(fileDiscard[1]);
-      const committed = state.documents.some(item => item.file?.id === fileDiscard[1]);
+      const committed = state.documents.some(item => item.file?.id === fileDiscard[1] || item.file?.thumbnail?.id === fileDiscard[1]);
       const parts = committed ? [] : state.fileParts.get(fileDiscard[1]) ?? [];
       if (!committed) state.fileParts.delete(fileDiscard[1]);
       return send({ discarded: parts.filter(Boolean).length });
@@ -262,16 +266,42 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       const whole = Buffer.concat(parts);
       if (whole.length !== body.bytes || createHash('sha256').update(whole).digest('hex') !== body.sha256)
         return send({ error: 'The uploaded parts do not match this file. Upload it again.' }, 409);
+      // A thumbnail is one staged part under its own ID, checked like the file's parts; it
+      // must fit the backend's 64 KiB cap and be WebP or JPEG.
+      let thumbnail: FileThumbnail | undefined;
+      if (body.thumbnail) {
+        const small = (state.fileParts.get(body.thumbnail.id) ?? []).map(part => part && Buffer.from(part, 'base64'));
+        if (small.length !== 1 || !small[0] || small[0].length !== body.thumbnail.bytes
+          || createHash('sha256').update(small[0]).digest('hex') !== body.thumbnail.sha256)
+          return send({ error: 'The thumbnail upload is incomplete. Upload the file again.' }, 409);
+        if (body.thumbnail.bytes > 65_536 || !['image/webp', 'image/jpeg'].includes(body.thumbnail.type)
+          || body.thumbnail.id === body.file_id)
+          return send({ error: 'Invalid thumbnail.' }, 422);
+        thumbnail = { ...body.thumbnail, parts: 1 };
+      }
       const saved: Document = {
         id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(state.fileDocuments.size + 1).padStart(12, '0')}`,
         kind: 'document', title: body.title, body: body.body, status: 'todo', revision: 1, author: 'you',
         updated_at: '2026-10-22T09:00:00Z',
         ...(body.project ? { project: body.project } : {}), ...(body.folder ? { folder: body.folder } : {}),
-        file: { id: body.file_id, name: body.name, type: body.type.toLowerCase(), bytes: body.bytes, sha256: body.sha256, parts: count },
+        file: {
+          id: body.file_id, name: body.name, type: body.type.toLowerCase(), bytes: body.bytes, sha256: body.sha256, parts: count,
+          ...(body.width ? { width: body.width, height: body.height } : {}),
+          ...(body.duration ? { duration: body.duration } : {}),
+          ...(thumbnail ? { thumbnail } : {}),
+        },
       };
       state.fileDocuments.set(body.command_id, saved);
       state.documents = [...state.documents, saved];
       return send(saved);
+    }
+    const thumbnailRead = /\/resources\/([^/]+)\/file\/thumbnail$/.exec(path);
+    if (thumbnailRead && method === 'GET') {
+      const document = state.documents.find(item => item.id === thumbnailRead[1]);
+      state.fileReads.push(`${thumbnailRead[1]}/thumbnail`);
+      const thumbnail = document?.file?.thumbnail;
+      const data = thumbnail && state.fileParts.get(thumbnail.id)?.[0];
+      return data ? send({ data, type: thumbnail.type }) : send({ error: 'This file has no thumbnail.' }, 404);
     }
     const fileRead = /\/resources\/([^/]+)\/file\/(\d+)$/.exec(path);
     if (fileRead && method === 'GET') {
@@ -307,10 +337,11 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (state.failDelete.delete(id) || (task && task.revision !== expected))
         return send({ error: 'This resource changed. Reload before deleting.' }, 409);
       state.tasks = state.tasks.filter(item => item.id !== id);
-      // Deleting a document that keeps a file removes the file too.
+      // Deleting a document that keeps a file removes the file and its thumbnail too.
       const file = state.documents.find(item => item.id === id)?.file;
       if (file) {
         state.fileParts.delete(file.id);
+        if (file.thumbnail) state.fileParts.delete(file.thumbnail.id);
         state.documents = state.documents.filter(item => item.id !== id);
       }
       return send({ deleted: true });

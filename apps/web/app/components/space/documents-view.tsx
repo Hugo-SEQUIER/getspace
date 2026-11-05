@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { message } from "../../../lib/client";
 import { useFeedback } from "../notifications";
 import { documentBlocks, documentText } from "../../../lib/space/document-content";
-import { fileLabel } from "../../../lib/space/document-files";
+import { fileDetails, fileKind, fileLabel } from "../../../lib/space/document-files";
 import {
   categoryColors,
   statuses,
@@ -23,6 +23,12 @@ import { DocumentIconButton } from "./sidebar-navigation";
 import { DocumentTree } from "./document-tree";
 import { DocumentDragProvider } from "./document-drag";
 import { DocumentRecentCard, DocumentTableRow } from "./document-list-items";
+import { FileGrid } from "./file-grid";
+
+/** Whether a drag over the library carries files from outside the page, not a document card. */
+function carriesFiles(transfer: DataTransfer | null) {
+  return !!transfer && Array.from(transfer.types ?? []).includes("Files");
+}
 
 function DocumentRail({
   panel,
@@ -85,6 +91,8 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [importing, setImporting] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
+  const [dropping, setDropping] = useState(false);
   const [selected, setSelected] = useState<Resource | null>(null);
   const [current, setCurrent] = useState<Resource | null>(null);
   const [error, setError] = useState("");
@@ -120,14 +128,16 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 3);
   const handoffs = matchingDocuments.filter((r) => r.recall?.category === "handoff");
+  const files = matchingDocuments.filter((r) => !!r.file);
   const items = matchingDocuments
-    .filter((r) => tab !== "handoffs" || r.recall?.category === "handoff")
+    .filter((r) => tab === "handoffs" ? r.recall?.category === "handoff" : tab === "files" ? !!r.file : true)
     .sort((a, b) =>
       sort === "name"
         ? a.title.localeCompare(b.title)
         : b.updated_at.localeCompare(a.updated_at),
     );
-  const filtered = !!query || !!projectFilter || !!folderFilter || !!sectionFilter || tab !== "all";
+  const narrowed = !!query || !!projectFilter || !!folderFilter || !!sectionFilter;
+  const filtered = narrowed || tab !== "all";
   const locationName = folderFilter
     ? folderFilter === "unfiled" ? "Unfiled" : folders.find((folder) => folder.id === folderFilter)?.name
     : sectionFilter
@@ -324,7 +334,39 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         </div>
         <div className="sp-doc-main">
       {!id ? (
-        <div className="sp-doc-library">
+        <div
+          className="sp-doc-library"
+          onDragEnter={(event) => {
+            if (!data.canWrite || !carriesFiles(event.dataTransfer)) return;
+            event.preventDefault();
+            setDropping(true);
+          }}
+          onDragOver={(event) => {
+            if (!data.canWrite || !carriesFiles(event.dataTransfer)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            if (!dropping) setDropping(true);
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+          }}
+          onDrop={(event) => {
+            if (!carriesFiles(event.dataTransfer)) return;
+            event.preventDefault();
+            setDropping(false);
+            const dropped = [...event.dataTransfer.files];
+            if (!data.canWrite || !dropped.length) return;
+            setDroppedFiles(dropped);
+            setImporting(true);
+          }}
+        >
+          {dropping && (
+            <div className="sp-doc-drop-overlay" aria-hidden="true">
+              <Icon name="upload" size={28} />
+              <strong>Drop to upload</strong>
+              <span>Pictures, videos, PDFs and any other file, saved in {locationName ?? "Documents"}</span>
+            </div>
+          )}
           <header className="sp-doc-library-heading">
             <div>
               <h1>{locationName ?? "Documents"}</h1>
@@ -336,7 +378,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
               </button>
               <button
                 className="sp-doc-upload"
-                aria-label="Upload document"
+                aria-label="Upload files"
                 disabled={!data.canWrite}
                 onClick={() => setImporting(true)}
               >
@@ -383,6 +425,12 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                   All documents<span>{matchingDocuments.length}</span>
                 </button>
                 <button
+                  aria-pressed={tab === "files"}
+                  onClick={() => setTab("files")}
+                >
+                  Files<span>{files.length}</span>
+                </button>
+                <button
                   aria-pressed={tab === "handoffs"}
                   onClick={() => setTab("handoffs")}
                 >
@@ -424,7 +472,24 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                 </select>
               </div>
             </div>
-            {items.length ? (
+            {tab === "files" ? (
+              items.length ? (
+                <FileGrid documents={items} base={base} />
+              ) : (
+                <Empty icon="image" title={narrowed ? "No files found" : "No files yet"}>
+                  <p>
+                    {narrowed
+                      ? "Try another name or broaden your filters."
+                      : "Drop pictures, videos, PDFs and any other file here, or use Upload. Each is kept as it is, with a preview."}
+                  </p>
+                  {narrowed ? (
+                    <button onClick={clearFilters}>Clear filters</button>
+                  ) : (
+                    <button disabled={!data.canWrite} onClick={() => setImporting(true)}>Upload files</button>
+                  )}
+                </Empty>
+              )
+            ) : items.length ? (
               <div className="sp-table-wrap">
                 <table className="sp-table sp-doc-table">
                   <thead>
@@ -468,7 +533,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
             )}
             <div className="sp-doc-library-footer">
               <span>
-                {items.length} {items.length === 1 ? "document" : "documents"}
+                {items.length} {tab === "files" ? (items.length === 1 ? "file" : "files") : items.length === 1 ? "document" : "documents"}
                 {data.cursors.document ? " loaded" : ""}
               </span>
               {filtered && (
@@ -540,7 +605,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                       {selected.recall?.category === "handoff"
                         ? "Session handoff"
                         : selected.file
-                          ? `${fileLabel(selected.file)} file`
+                          ? { image: "Picture", video: "Video", audio: "Recording" }[fileKind(selected.file) as string] ?? `${fileLabel(selected.file)} file`
                           : "Document"}
                     </span>
                     {project && (
@@ -978,10 +1043,14 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         <ImportDocumentDialog
           initialProject={projectFilter === "unfiled" ? "" : projectFilter}
           initialFolder={folders.some(folder => folder.id === folderFilter) ? folderFilter : ""}
-          close={() => setImporting(false)}
-          created={(saved) => {
+          initialFiles={droppedFiles}
+          close={() => { setImporting(false); setDroppedFiles([]); }}
+          created={(saved, options) => {
             setImporting(false);
-            router.push(`${base}/documents/${saved.id}`);
+            setDroppedFiles([]);
+            // One reviewed file opens; a batch lands in the Files tab together.
+            if (!options?.batch && saved.length === 1) router.push(`${base}/documents/${saved[0].id}`);
+            else setTab("files");
           }}
         />
       )}

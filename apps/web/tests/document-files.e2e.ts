@@ -3,7 +3,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect } from 'e2e';
-import { docx, pdfFixture, pptx } from './import-fixtures.mjs';
+import { docx, pdfFixture, pngFixture, pptx, webm } from './import-fixtures.mjs';
 import { FILE_PART_BYTES, test } from './support/space-api.ts';
 
 async function fixture(name: string, bytes: Buffer) {
@@ -17,8 +17,8 @@ async function fixture(name: string, bytes: Buffer) {
 test('a PDF keeps its original file with a page preview, download and list hint', async ({ app, screen, browser, space }) => {
   const pdf = pdfFixture('Quarterly plan for the launch.');
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  const dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('Quarterly plan.pdf', pdf));
   await expect(dialog.getByRole('radio', /Keep the original file/)).toBeChecked();
   await expect(dialog.getByText(/Agents and search can read 5 words/)).toBeVisible();
@@ -56,8 +56,8 @@ test('a PDF keeps its original file with a page preview, download and list hint'
 test('a multi-part file uploads in parts and downloads intact', async ({ app, screen, browser, space }) => {
   const bytes = randomBytes(FILE_PART_BYTES * 2 + 4321);
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  const dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('archive.zip', bytes));
   await expect(dialog.getByText('Agents and search see this file’s title, not its contents.')).toBeVisible();
   await expect(dialog.getByRole('radio', /Convert to an editable page/)).toHaveCount(0);
@@ -82,8 +82,8 @@ test('a multi-part file uploads in parts and downloads intact', async ({ app, sc
 // PDF and Word files can still become editable pages, the earlier import behaviour.
 test('a PDF can still be converted to an editable page', async ({ app, screen, space }) => {
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  const dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('notes.pdf', pdfFixture()));
   await dialog.getByRole('radio', /Convert to an editable page/).check();
   await expect(dialog.getByLabel('Imported content')).toHaveValue(/Acquisition notes from PDF\./);
@@ -98,8 +98,8 @@ test('a PDF can still be converted to an editable page', async ({ app, screen, s
 // may not run scripts; slides are read in the presentation's order, not file order.
 test('Word and PowerPoint files preview in a script-free frame', async ({ app, screen, browser, space }) => {
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  let dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  let dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('plan.pptx', pptx));
   await expect(dialog.getByText('Agents and search can read 11 words from this file.')).toBeVisible();
   await dialog.getByRole('button', 'Save file').tap();
@@ -110,8 +110,8 @@ test('Word and PowerPoint files preview in a script-free frame', async ({ app, s
   expect((space.fileCommands[0] as { body: string }).body).toBe('Slide 1\nFirst slide: launch plan\n\nSlide 2\nSecond slide: budget');
 
   await screen.getByRole('link', 'Documents').first().tap();
-  await screen.getByRole('button', 'Upload document').tap();
-  dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('notes.docx', docx));
   await expect(dialog.getByRole('radio', /Keep the original file/)).toBeChecked();
   await dialog.getByRole('button', 'Save file').tap();
@@ -126,8 +126,8 @@ test('Word and PowerPoint files preview in a script-free frame', async ({ app, s
 test('a failed upload discards the parts it already sent', async ({ app, screen, space }) => {
   space.failFilePart = 1;
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  const dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('backup.zip', randomBytes(FILE_PART_BYTES * 2 + 5)));
   await dialog.getByRole('button', 'Save file').tap();
   await expect(screen.getByText('This Space has reached its storage limit.')).toBeVisible();
@@ -142,8 +142,8 @@ test('a large file loads its preview only when asked', { timeout: 300_000 }, asy
   const csv = Buffer.from(`label,value\n${rows}\n`);
   expect(csv.length).toBeGreaterThan(25 * FILE_PART_BYTES);
   await app.open('/app/documents');
-  await screen.getByRole('button', 'Upload document').tap();
-  const dialog = screen.getByRole('dialog', 'Import a document');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('ledger.csv', csv));
   await dialog.getByRole('button', 'Save file').tap();
   // Twenty-six parts of base64 through the mocked proxy take a while on a busy machine.
@@ -157,4 +157,163 @@ test('a large file loads its preview only when asked', { timeout: 300_000 }, asy
   await original.getByRole('button', 'Load preview').tap();
   await expect.poll(() => space.fileReads.length, { timeout: 30_000 }).toBe(Math.ceil(csv.length / FILE_PART_BYTES));
   await expect(original.getByText(/^label,value/)).toBeVisible();
+});
+
+// A picture is kept as the original file, with the thumbnail and size the browser read from
+// it; the Files tab shows the thumbnail, read once through its own route.
+test('a picture is kept as the original with a thumbnail and shows in Files', async ({ app, screen, browser, space }) => {
+  const png = pngFixture(640, 480);
+  await app.open('/app/documents');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('Garden.png', png));
+  await expect(dialog.getByRole('radio', /Keep the original file/)).toBeChecked();
+  await expect(dialog.getByRole('radio', /Convert to an editable page/)).toBeEnabled();
+  await expect(dialog.getByText(/^PNG · [\d.]+ KB · 640×480$/)).toBeVisible();
+  await expect(dialog.getByLabel('Document title')).toHaveValue('Garden');
+  await dialog.getByRole('button', 'Save file').tap();
+
+  await expect(screen.getByRole('heading', 'Garden', { level: 1 })).toBeVisible();
+  await expect(screen.getByText('Picture')).toBeVisible();
+  const original = screen.getByRole('region', 'Original file');
+  await expect(original.getByText(/^PNG · [\d.]+ KB · 640×480$/)).toBeVisible();
+  await expect(original.getByRole('img', 'Garden')).toBeVisible();
+  const [saved] = space.fileCommands as Record<string, unknown>[];
+  expect(saved.width).toBe(640);
+  expect(saved.height).toBe(480);
+  const thumbnail = saved.thumbnail as { id: string; type: string; bytes: number; sha256: string; width: number; height: number };
+  expect(['image/webp', 'image/jpeg']).toContain(thumbnail.type);
+  expect(thumbnail.width).toBe(480);
+  expect(thumbnail.height).toBe(360);
+  expect(thumbnail.bytes).toBeLessThanOrEqual(65_536);
+  const small = Buffer.from(space.fileParts.get(thumbnail.id)![0], 'base64');
+  expect(small.length).toBe(thumbnail.bytes);
+  expect(createHash('sha256').update(small).digest('hex')).toBe(thumbnail.sha256);
+  // The original is untouched: one part holding the PNG itself, never an embedded copy.
+  expect(Buffer.from(space.fileParts.get(saved.file_id as string)![0], 'base64').equals(png)).toBe(true);
+  expect(space.resourceCommands).toEqual([]);
+
+  await screen.getByRole('link', 'Documents').first().tap();
+  await screen.getByRole('button', /^Files/).tap();
+  const tile = screen.getByRole('list', 'Files').getByRole('link', /Garden/);
+  await expect(tile.getByText(/^PNG · [\d.]+ KB · 640×480/)).toBeVisible();
+  await expect.poll(() => space.fileReads.filter(read => read.endsWith('/thumbnail')).length).toBe(1);
+  await expect.poll(() => browser.evaluate(() => {
+    const image = document.querySelector<HTMLImageElement>('.sp-file-tile img');
+    return image ? image.naturalWidth : 0;
+  })).toBe(480);
+  await expect(screen.getByText('1 file')).toBeVisible();
+});
+
+// A video keeps its original bytes, a frame as its thumbnail and its length; agents see its title.
+test('a video is kept with a frame thumbnail and its duration', async ({ app, screen, space }) => {
+  await app.open('/app/documents');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('Launch clip.webm', webm));
+  await expect(dialog.getByText('WEBM · 821 B · 64×48 · 0:02')).toBeVisible();
+  await expect(dialog.getByText('Agents and search see this file’s title, not its contents.')).toBeVisible();
+  await expect(dialog.getByRole('radio', /Convert to an editable page/)).toHaveCount(0);
+  await dialog.getByRole('button', 'Save file').tap();
+  await expect(screen.getByRole('heading', 'Launch clip', { level: 1 })).toBeVisible();
+  await expect(screen.getByText('Video')).toBeVisible();
+  const [saved] = space.fileCommands as Record<string, unknown>[];
+  expect(saved.duration).toBeCloseTo(2.4, 1);
+  expect(saved.width).toBe(64);
+  expect(saved.height).toBe(48);
+  const thumbnail = saved.thumbnail as Record<string, unknown>;
+  expect(thumbnail.width).toBe(64);
+  expect(thumbnail.height).toBe(48);
+  expect(saved.body).toBe('');
+  await expect(screen.getByRole('region', 'Original file').getByText('WEBM · 821 B · 64×48 · 0:02')).toBeVisible();
+});
+
+// Several files chosen together are saved one after another under their own names, without
+// a review step, and the library opens on Files with all of them.
+test('several files upload at once and land in Files', async ({ app, screen, browser, space }) => {
+  await app.open('/app/documents');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await dialog.getByLabel('Choose a file to import').setInputFiles([
+    await fixture('Quarterly plan.pdf', pdfFixture('Quarterly plan for the launch.')),
+    await fixture('Garden.png', pngFixture(320, 240)),
+    await fixture('archive.zip', randomBytes(2048)),
+  ]);
+  const list = dialog.getByRole('list', 'Files to save');
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await expect(dialog.getByLabel('Document title')).toHaveCount(0);
+  await dialog.getByRole('button', 'Save 3 files').tap();
+
+  await expect(screen.getByRole('button', /^Files/)).toHaveAttribute('aria-pressed', 'true');
+  await expect(browser).toHaveURL(/\/app\/documents$/);
+  const grid = screen.getByRole('list', 'Files');
+  await expect(grid.getByRole('listitem')).toHaveCount(3);
+  await expect(grid.getByRole('link', /Quarterly plan/)).toBeVisible();
+  await expect(grid.getByRole('link', /Garden/)).toBeVisible();
+  await expect(grid.getByRole('link', /archive/)).toBeVisible();
+  const commands = space.fileCommands as Record<string, unknown>[];
+  expect(commands.map(command => command.title)).toEqual(['Quarterly plan', 'Garden', 'archive']);
+  expect(commands[0].body).toBe('Quarterly plan for the launch.');
+  // The PDF's first page and the picture have thumbnails; the archive has none.
+  expect(commands.map(command => !!command.thumbnail)).toEqual([true, true, false]);
+  expect(space.resourceCommands).toEqual([]);
+});
+
+// A file that fails in a batch is reported in its row while the others still save; the
+// dialog then offers to retry it.
+test('a failed file in a batch is reported while the others save', async ({ app, screen, space }) => {
+  space.failFilePart = 1;
+  await app.open('/app/documents');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await dialog.getByLabel('Choose a file to import').setInputFiles([
+    await fixture('notes.txt', Buffer.from('plain notes')),
+    await fixture('backup.zip', randomBytes(FILE_PART_BYTES * 2 + 5)),
+  ]);
+  await dialog.getByRole('button', 'Save 2 files').tap();
+  await expect(dialog.getByRole('status', 'notes.txt: Saved')).toBeVisible();
+  await expect(dialog.getByRole('status', 'backup.zip: Failed')).toBeVisible();
+  await expect(dialog.getByText(/This Space has reached its storage limit\./)).toBeVisible();
+  await expect(dialog.getByRole('button', 'Retry the failed file')).toBeEnabled();
+  expect(space.fileCommands).toHaveLength(1);
+  await expect.poll(() => space.fileDiscards.length).toBe(1);
+  await dialog.getByRole('button', 'Done').tap();
+  await expect(screen.getByRole('button', /^Files/)).toHaveAttribute('aria-pressed', 'true');
+  await expect(screen.getByRole('list', 'Files').getByRole('link', /notes/)).toBeVisible();
+});
+
+// Files dragged from the desktop onto the library open the upload dialog with them.
+test('files dropped on the library open the upload dialog', async ({ app, screen, browser, space }) => {
+  await app.open('/app/documents');
+  await expect(screen.getByRole('button', 'Upload files')).toBeVisible();
+  await browser.evaluate((encoded: string) => {
+    const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], 'Dropped plan.pdf', { type: 'application/pdf' }));
+    const library = document.querySelector('.sp-doc-library')!;
+    library.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    library.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    return true;
+  }, pdfFixture('Dropped onto the library.').toString('base64'));
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await expect(dialog.getByText('Dropped plan.pdf')).toBeVisible();
+  await expect(dialog.getByLabel('Document title')).toHaveValue('Dropped plan');
+  await dialog.getByRole('button', 'Save file').tap();
+  await expect(screen.getByRole('heading', 'Dropped plan', { level: 1 })).toBeVisible();
+  expect((space.fileCommands[0] as { body: string }).body).toBe('Dropped onto the library.');
+});
+
+// Pictures up to 10 MB can still become an image page, the earlier behaviour, as a choice.
+test('a picture can still be converted to an image page', async ({ app, screen, space }) => {
+  await app.open('/app/documents');
+  await screen.getByRole('button', 'Upload files').tap();
+  const dialog = screen.getByRole('dialog', 'Upload files');
+  await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('Garden.png', pngFixture(320, 240)));
+  await dialog.getByRole('radio', /Convert to an editable page/).check();
+  await expect(dialog.getByLabel('Image description')).toHaveValue('Garden');
+  await dialog.getByRole('button', 'Import document').tap();
+  await expect(screen.getByRole('heading', 'Garden', { level: 1 })).toBeVisible();
+  expect(space.fileCommands).toEqual([]);
+  expect(space.resourceCommands).toHaveLength(1);
+  expect((space.resourceCommands[0] as { body: string }).body).toMatch(/^!\[Garden\]\(data:image\/webp;base64,/);
 });

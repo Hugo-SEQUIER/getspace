@@ -13,6 +13,21 @@ export const MAX_FILE_TEXT_BYTES = 900_000;
 export const AUTO_PREVIEW_BYTES = 26_214_400;
 /** Word, PowerPoint, Excel and picture previews hold the whole file in memory several times. */
 export const HEAVY_PREVIEW_BYTES = 52_428_800;
+/** A thumbnail is one small part, the backend's cap. */
+export const THUMBNAIL_BYTES = 65_536;
+/** The longest side of a thumbnail: sharp in a grid tile at 2x, small enough to fit the cap. */
+export const THUMBNAIL_SIDE = 480;
+
+/** The small picture of a picture, video or PDF made at upload and shown in the file grid. */
+export type FileThumbnail = {
+  id: string;
+  type: "image/webp" | "image/jpeg";
+  bytes: number;
+  sha256: string;
+  width: number;
+  height: number;
+  parts: number;
+};
 
 export type DocumentFile = {
   id: string;
@@ -21,6 +36,12 @@ export type DocumentFile = {
   bytes: number;
   sha256: string;
   parts: number;
+  /** A picture's or video's pixel size, when the browser read it at upload. */
+  width?: number;
+  height?: number;
+  /** A video's or recording's length in seconds, when the browser read it at upload. */
+  duration?: number;
+  thumbnail?: FileThumbnail;
 };
 
 export type FileKind = "pdf" | "word" | "slides" | "sheet" | "image" | "text" | "audio" | "video" | "other";
@@ -166,6 +187,39 @@ export function fileSummary(file: { name: string; type: string; bytes: number })
   return `${fileLabel(file)} · ${formatFileSize(file.bytes)}`;
 }
 
+/** A length in seconds as m:ss, or h:mm:ss from an hour. */
+export function formatDuration(seconds: number) {
+  const whole = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(whole / 3600), minutes = Math.floor((whole % 3600) / 60), rest = whole % 60;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return hours ? `${hours}:${pad(minutes)}:${pad(rest)}` : `${minutes}:${pad(rest)}`;
+}
+
+/** What the browser read about a picture or recording: "1920×1080", "2:34" or both, else "". */
+export function mediaDetail(file: { width?: number; height?: number; duration?: number }) {
+  return [
+    file.width && file.height ? `${file.width}×${file.height}` : "",
+    file.duration ? formatDuration(file.duration) : "",
+  ].filter(Boolean).join(" · ");
+}
+
+/** Type, size and, when known, dimensions and duration: "PNG · 2.4 MB · 1920×1080". */
+export function fileDetails(file: { name: string; type: string; bytes: number; width?: number; height?: number; duration?: number }) {
+  return [fileSummary(file), mediaDetail(file)].filter(Boolean).join(" · ");
+}
+
+/** The kinds a thumbnail is made for: pictures, video frames and the first PDF page. */
+export const thumbnailKinds: FileKind[] = ["image", "video", "pdf"];
+
+// Parameters: a picture's size and the longest side a thumbnail may have.
+// What it does: scales the picture down to fit, never up, keeping its aspect ratio and at
+// least one pixel on each side.
+// Output: the thumbnail's width and height.
+export function fitThumbnail(width: number, height: number, side = THUMBNAIL_SIDE) {
+  const scale = Math.min(1, side / Math.max(width, height, 1));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
 const encoder = new TextEncoder();
 const encodedSize = (text: string) => encoder.encode(JSON.stringify(text)).length;
 
@@ -294,6 +348,9 @@ export const fileDiscardPath = (spaceId: string, fileId: string) => `spaces/${sp
 export const fileReadPath = (spaceId: string, resourceId: string, part: number, revision?: number) =>
   `spaces/${spaceId}/resources/${resourceId}/file/${part}${revision ? `?revision=${revision}` : ""}`;
 
+export const fileThumbnailPath = (spaceId: string, resourceId: string, revision?: number) =>
+  `spaces/${spaceId}/resources/${resourceId}/file/thumbnail${revision ? `?revision=${revision}` : ""}`;
+
 /** A lost connection, an overloaded or restarting backend, or a gateway timeout is worth another try. */
 function retryable(error: unknown) {
   if (!(error instanceof Error) || error.name === "AbortError") return false;
@@ -379,6 +436,36 @@ export async function uploadFileParts(
   });
 }
 
+// Parameters: the request function, the Space, the document and its thumbnail details.
+// What it does: reads the one-part thumbnail and checks its size and SHA-256 like a file.
+// Output: the thumbnail as a Blob of its media type.
+export async function downloadThumbnail(
+  request: FileRequest,
+  { spaceId, resourceId, thumbnail, revision, signal }: {
+    spaceId: string;
+    resourceId: string;
+    thumbnail: FileThumbnail;
+    revision?: number;
+    signal?: AbortSignal;
+  },
+) {
+  const controller = new AbortController();
+  const stop = () => controller.abort(signal?.reason);
+  signal?.addEventListener("abort", stop, { once: true });
+  try {
+    const value = await withRetry(
+      () => request<{ data: string; type: string }>(fileThumbnailPath(spaceId, resourceId, revision), "GET", undefined, controller.signal),
+      controller.signal,
+    );
+    const bytes = base64ToBytes(value.data);
+    if (bytes.byteLength !== thumbnail.bytes || (await sha256Hex(bytes)) !== thumbnail.sha256)
+      throw new Error("This thumbnail did not arrive intact.");
+    return new Blob([bytes as BlobPart], { type: thumbnail.type });
+  } finally {
+    signal?.removeEventListener("abort", stop);
+  }
+}
+
 export async function downloadFileParts(
   request: FileRequest,
   { spaceId, resourceId, file, revision, signal, onProgress }: {
@@ -408,22 +495,34 @@ export async function downloadFileParts(
 }
 
 // Recently opened files, so returning to a document or switching revisions does not download
-// the same bytes again. Bounded to a few files; never persisted.
+// the same bytes again. Bounded to a few files; never persisted. Thumbnails are small, so the
+// grid keeps many more of them.
 const recentFiles = new Map<string, Promise<Blob>>();
+const recentThumbnails = new Map<string, Promise<Blob>>();
 const RECENT_FILES = 3;
+const RECENT_THUMBNAILS = 400;
 
-export function rememberedFile(key: string, load: () => Promise<Blob>) {
-  let value = recentFiles.get(key);
-  if (value) recentFiles.delete(key);
+function remembered(store: Map<string, Promise<Blob>>, limit: number, key: string, load: () => Promise<Blob>) {
+  let value = store.get(key);
+  if (value) store.delete(key);
   else {
     value = load();
-    value.catch(() => { if (recentFiles.get(key) === value) recentFiles.delete(key); });
+    value.catch(() => { if (store.get(key) === value) store.delete(key); });
   }
-  recentFiles.set(key, value);
-  while (recentFiles.size > RECENT_FILES) recentFiles.delete(recentFiles.keys().next().value!);
+  store.set(key, value);
+  while (store.size > limit) store.delete(store.keys().next().value!);
   return value;
+}
+
+export function rememberedFile(key: string, load: () => Promise<Blob>) {
+  return remembered(recentFiles, RECENT_FILES, key, load);
+}
+
+export function rememberedThumbnail(key: string, load: () => Promise<Blob>) {
+  return remembered(recentThumbnails, RECENT_THUMBNAILS, key, load);
 }
 
 export function forgetFiles() {
   recentFiles.clear();
+  recentThumbnails.clear();
 }

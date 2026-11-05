@@ -2,7 +2,7 @@
 import Link from "@web/lib/navigation";
 import type { Resource } from "../../../lib/space/types";
 import { documentText } from "../../../lib/space/document-content";
-import { fileSummary } from "../../../lib/space/document-files";
+import { fileDetails } from "../../../lib/space/document-files";
 import { useDocumentDraggable } from "./document-drag";
 import { PageIcon } from "./sidebar-preferences";
 import { Avatar, authorName, relativeDate } from "./ui";
@@ -55,7 +55,7 @@ export function DocumentTableRow({ document, base, folderName }: {
             <span>
               {document.title}
               {isHandoff && <small>Session handoff</small>}
-              {document.file && <small>{fileSummary(document.file)}</small>}
+              {document.file && <small>{fileDetails(document.file)}</small>}
             </span>
           </Link>
         </div>
@@ -82,7 +82,7 @@ export function DocumentRecentCard({ document, base }: { document: Resource; bas
           </span>
         </div>
         <h3>{document.title}</h3>
-        <p>{document.file ? `${fileSummary(document.file)} · Original file` : excerpt || "Open the latest saved version."}</p>
+        <p>{document.file ? `${fileDetails(document.file)} · Original file` : excerpt || "Open the latest saved version."}</p>
         <div className="sp-doc-card-footer">
           <span><Avatar name={author} harness={document.author_agent?.harness} kind={document.author === "agent" ? "agent" : "person"} small />{author}</span>
           <span>{relativeDate(document.updated_at)} · v{document.revision}</span>

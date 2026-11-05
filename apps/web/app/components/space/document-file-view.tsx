@@ -3,7 +3,7 @@ import "../../document-files.css";
 import dynamic from "@web/lib/lazy";
 import { useEffect, useState } from "react";
 import { message } from "../../../lib/client";
-import { fileKind, fileLabel, fileSummary, formatFileSize, previewMode } from "../../../lib/space/document-files";
+import { fileDetails, fileKind, fileLabel, formatFileSize, previewMode } from "../../../lib/space/document-files";
 import type { Resource } from "../../../lib/space/types";
 import { useSpace } from "./provider";
 import { Icon } from "./ui-icon";
@@ -106,7 +106,7 @@ export function DocumentFileView({ resource, revision }: { resource: Resource; r
   }
 
   const openable = blob && (kind === "pdf" || kind === "image");
-  const detail = [fileSummary(file), pages ? `${pages} ${kind === "slides" ? (pages === 1 ? "slide" : "slides") : pages === 1 ? "page" : "pages"}` : ""]
+  const detail = [fileDetails(file), pages ? `${pages} ${kind === "slides" ? (pages === 1 ? "slide" : "slides") : pages === 1 ? "page" : "pages"}` : ""]
     .filter(Boolean).join(" · ");
   return (
     <section className="sp-file-view" aria-label="Original file">

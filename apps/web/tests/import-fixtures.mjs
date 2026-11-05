@@ -1,3 +1,4 @@
+import { deflateSync } from "node:zlib";
 import { zipSync, strToU8 } from "fflate";
 const zip = (files) =>
   Buffer.from(
@@ -69,3 +70,55 @@ export const pptx = zip({
   "ppt/slides/slide1.xml": slide("Second slide: budget"),
   "ppt/slides/slide2.xml": slide("First slide: launch plan"),
 });
+
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function pngChunk(type, data) {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, crc]);
+}
+// A real PNG of the given size: a green-to-apricot gradient, so a thumbnail made from it has
+// something to show and compresses to a few kilobytes.
+export function pngFixture(width = 640, height = 480) {
+  const rows = [];
+  for (let y = 0; y < height; y++) {
+    const row = Buffer.alloc(1 + width * 3);
+    for (let x = 0; x < width; x++) {
+      const t = x / Math.max(1, width - 1), u = y / Math.max(1, height - 1);
+      row[1 + x * 3] = Math.round(66 + (217 - 66) * t);
+      row[2 + x * 3] = Math.round(100 + (130 - 100) * u);
+      row[3 + x * 3] = Math.round(76 + (90 - 76) * t);
+    }
+    rows.push(row);
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8; // bit depth
+  header[9] = 2; // RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(Buffer.concat(rows))),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+// A 2.4 second, 64×48 VP8 WebM clip of one colour, made with ffmpeg; Chromium decodes it
+// without proprietary codecs, so a video thumbnail and its duration can be checked.
+export const webm = Buffer.from(
+  "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAMFEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHYTbuMU6uEElTDZ1OsggElTbuMU6uEHFO7a1OsggLv7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsirXsYMPQkBNgI1MYXZmNjIuMTIuMTAwV0GNTGF2ZjYyLjEyLjEwMESJiECiwAAAAAAAFlSua8iuAQAAAAAAAD/XgQFzxYh1j5GKKBqm7pyBACK1nIN1bmSIgQCGhVZfVlA4g4EBI+ODhAvrwgDgkLCBQLqBMJqBAlWwhFW5gQESVMNn/HNzoGPAgGfImkWjh0VOQ09ERVJEh41MYXZmNjIuMTIuMTAwc3PWY8CLY8WIdY+Riigapu5nyKFFo4dFTkNPREVSRIeUTGF2YzYyLjI4LjEwMCBsaWJ2cHhnyKFFo4hEVVJBVElPTkSHkzAwOjAwOjAyLjQwMDAwMDAwMAAfQ7Z1QUPngQCjt4EAAIAQAwCdASpAADAAAEcIhYWIhYSIAgICdaoCBuY8wgpjZ4WA/vvwb8NqrK2/+LQ60OtDOkCjloEAyADRAQABEBAAGAAYWC/0AAiMAACjloEBkADRAQABEBAAGAAYWC/0AAiMAACjloECWADRAQABEBAAGAAYWC/0AAiMAACjloEDIADRAQABEBAAGAAYWC/0AAiMAACjloED6ADRAQABEBAAGAAYWC/0AAiMAACjloEEsADRAQABEBAAGAAYWC/0AAiMAACjlYEFeACxAQABEBAUYABhYL/QACIwAKOWgQZAANEBAAEQEAAYABhYL/QACIwAAKOWgQcIANEBAAEQEAAYABhYL/QACIwAAKOWgQfQANEBAAEQEAAYABhYL/QACIwAAKOWgQiYANEBAAEQEAAYABhYL/QACIwAABxTu2uRu4+zgQC3iveBAfGCAabwgQM=",
+  "base64",
+);

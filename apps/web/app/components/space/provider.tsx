@@ -28,14 +28,18 @@ import {
   cleanFileName,
   cleanFileType,
   downloadFileParts,
+  downloadThumbnail,
   fileDiscardPath,
   fileParts,
   forgetFiles,
   rememberedFile,
+  rememberedThumbnail,
   sha256Hex,
   uploadFileParts,
+  type DocumentFile,
   type FileRequest,
 } from "../../../lib/space/document-files";
+import type { MediaDetails, ThumbnailDraft } from "../../../lib/space/file-thumbnails";
 import type { Profile } from "../../../lib/space/profile";
 
 /** How this installation guards access: an access key, or nothing on a private network. */
@@ -87,6 +91,9 @@ export type FileDraft = {
   body: string;
   project?: string;
   folder?: string;
+  /** What the browser read about a picture or recording, and the thumbnail it made. */
+  media?: MediaDetails;
+  thumbnail?: ThumbnailDraft | null;
 };
 type ItemKind = "project" | "database" | "category" | "section" | "folder";
 type WorkspaceItem = (Project | WorkspaceDatabase | OrganizationItem | DocumentFolder) & { kind: ItemKind };
@@ -883,8 +890,10 @@ function useData() {
     setNotice("Saved successfully");
     return saved;
   }
-  // Parameters: the chosen file with its bytes and text, and optional progress and cancellation.
-  // What it does: uploads the original in parts, then saves the document that keeps it.
+  // Parameters: the chosen file with its bytes, text, media details and thumbnail, and
+  // optional progress and cancellation.
+  // What it does: uploads the original in parts and the thumbnail as a one-part file of its
+  // own, then saves the document that keeps them.
   // Output: the saved document, which carries the file's details.
   async function saveFile(
     draft: FileDraft,
@@ -896,18 +905,32 @@ function useData() {
     if (bytes > MAX_FILE_BYTES) throw new Error("Choose a file up to 250 MB.");
     const name = cleanFileName(draft.file.name), type = cleanFileType(draft.file.type, name);
     const sha256 = await sha256Hex(draft.bytes);
+    const media = draft.media ?? {};
+    const thumbnail = draft.thumbnail ?? null;
+    const details: DocumentFile = {
+      id: draft.id, name, type, bytes, sha256, parts: fileParts(bytes),
+      ...(media.width && media.height ? { width: media.width, height: media.height } : {}),
+      ...(media.duration ? { duration: media.duration } : {}),
+      ...(thumbnail ? { thumbnail: { id: thumbnail.id, type: thumbnail.type, bytes: thumbnail.bytes, sha256: thumbnail.sha256, width: thumbnail.width, height: thumbnail.height, parts: 1 } } : {}),
+    };
     let saved: Resource;
     try {
       await uploadFileParts(fileRequest, { spaceId: target.id, fileId: draft.id, data: draft.bytes, signal, onProgress });
       signal?.throwIfAborted();
+      if (thumbnail) await uploadFileParts(fileRequest, { spaceId: target.id, fileId: thumbnail.id, data: thumbnail.data, signal });
+      signal?.throwIfAborted();
       saved = await command<Resource>(`spaces/${target.id}/files`, {
         file_id: draft.id, name, type, bytes, sha256, title: draft.title, body: draft.body,
         project: draft.project || null, folder: draft.folder || null,
+        ...(details.width ? { width: details.width, height: details.height } : {}),
+        ...(details.duration ? { duration: details.duration } : {}),
+        ...(details.thumbnail ? { thumbnail: { id: details.thumbnail.id, type: details.thumbnail.type, bytes: details.thumbnail.bytes, sha256: details.thumbnail.sha256, width: details.thumbnail.width, height: details.thumbnail.height } } : {}),
       });
     } catch (error) {
       // Staged parts count towards storage until the hourly sweep; free them now. Parts a
       // document already committed are never touched, so an unclear failure is safe too.
       void api(fileDiscardPath(target.id, draft.id), "DELETE").catch(() => {});
+      if (thumbnail) void api(fileDiscardPath(target.id, thumbnail.id), "DELETE").catch(() => {});
       throw error;
     }
     setResources((old) => [saved, ...old.filter((r) => r.id !== saved.id)]);
@@ -932,6 +955,18 @@ function useData() {
     // A shared download must not be cancelled by the first viewer that closes.
     return rememberedFile(`${spaceId}:${resource.id}:${file.id}`, () =>
       downloadFileParts(fileRequest, { spaceId, resourceId: resource.id, file, revision, onProgress }),
+    ).then((blob) => { signal?.throwIfAborted(); return blob; });
+  }
+  // Parameters: a document whose file has a thumbnail, and optionally the revision being read.
+  // What it does: reads the thumbnail once and keeps it in this tab for the file grid.
+  // Output: the thumbnail as a Blob of its media type.
+  function readThumbnail(resource: Resource, revision?: number, signal?: AbortSignal) {
+    const thumbnail = resource.file?.thumbnail;
+    if (!thumbnail) return Promise.reject(new Error("This file has no thumbnail."));
+    if (!space) return Promise.reject(new Error("Open a space first."));
+    const spaceId = space.id;
+    return rememberedThumbnail(`${spaceId}:${resource.id}:${thumbnail.id}`, () =>
+      downloadThumbnail(fileRequest, { spaceId, resourceId: resource.id, thumbnail, revision }),
     ).then((blob) => { signal?.throwIfAborted(); return blob; });
   }
   async function deleteResource(resource: Resource) {
@@ -1370,6 +1405,7 @@ function useData() {
     saveResource,
     saveFile,
     readFile,
+    readThumbnail,
     changeMemory,
     buildMemory,
     memoryJobs,
