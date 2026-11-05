@@ -592,3 +592,53 @@ def test_a_refused_decision_is_logged_once_an_hour_per_status(caplog, monkeypatc
     ]
     for leaked in ("my private diary entry", "test-secret-key"):
         assert leaked not in caplog.text
+
+
+def test_a_refused_temperature_is_retried_once_without_it(monkeypatch):
+    """gpt-5 and the o-series take only the default temperature.
+
+    A deployment that leaves the effort unset sends the caller's value, so the provider
+    answers 400. The retry keeps the same request and drops that one field; a refusal for
+    any other reason is not retried.
+    """
+    bodies = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        bodies.append(body)
+        if "temperature" in body:
+            return httpx.Response(
+                400, json={"error": {"message": "Unsupported value: 'temperature'"}}
+            )
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"text":"ok"}'}}]})
+
+    provider = models(monkeypatch, handler)
+    value = provider.session(lambda: None).invoke(
+        "Synthetic evidence", response_format=Output, temperature=0
+    )
+    assert value.text == "ok"
+    assert len(bodies) == 2
+    assert bodies[0]["temperature"] == 0 and "temperature" not in bodies[1]
+    assert bodies[0]["model"] == bodies[1]["model"]
+    assert bodies[1]["max_completion_tokens"] == 6000
+
+
+def test_a_refusal_for_another_reason_raises_after_the_one_retry(monkeypatch):
+    """The retry is bounded: one more attempt without temperature, then the error.
+
+    A 400 rejects the request, so an extra attempt cannot duplicate work; keep the
+    upstream body out of the error, as the provider wrapper promises.
+    """
+    calls = []
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return httpx.Response(400, json={"error": {"message": "Unsupported parameter: 'store'"}})
+
+    provider = models(monkeypatch, handler)
+    with pytest.raises(ModelError):
+        provider.session(lambda: None).invoke(
+            "Synthetic evidence", response_format=Output, temperature=0
+        )
+    assert len(calls) == 2
+    assert "temperature" in calls[0] and "temperature" not in calls[1]
