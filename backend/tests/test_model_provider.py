@@ -599,7 +599,7 @@ def test_a_refused_temperature_is_retried_once_without_it(monkeypatch):
 
     A deployment that leaves the effort unset sends the caller's value, so the provider
     answers 400. The retry keeps the same request and drops that one field; a refusal for
-    any other reason is not retried.
+    any other reason also gets the one retry, then raises.
     """
     bodies = []
 
@@ -618,16 +618,15 @@ def test_a_refused_temperature_is_retried_once_without_it(monkeypatch):
     )
     assert value.text == "ok"
     assert len(bodies) == 2
-    assert bodies[0]["temperature"] == 0 and "temperature" not in bodies[1]
-    assert bodies[0]["model"] == bodies[1]["model"]
-    assert bodies[1]["max_completion_tokens"] == 6000
+    assert bodies[0]["temperature"] == 0
+    assert bodies[1] == {k: v for k, v in bodies[0].items() if k != "temperature"}
 
 
 def test_a_refusal_for_another_reason_raises_after_the_one_retry(monkeypatch):
     """The retry is bounded: one more attempt without temperature, then the error.
 
-    A 400 rejects the request, so an extra attempt cannot duplicate work; keep the
-    upstream body out of the error, as the provider wrapper promises.
+    A 400 rejects the request, so an extra attempt cannot duplicate work; the upstream
+    body stays out of the error, as the provider wrapper promises.
     """
     calls = []
 
@@ -636,9 +635,10 @@ def test_a_refusal_for_another_reason_raises_after_the_one_retry(monkeypatch):
         return httpx.Response(400, json={"error": {"message": "Unsupported parameter: 'store'"}})
 
     provider = models(monkeypatch, handler)
-    with pytest.raises(ModelError):
+    with pytest.raises(ModelError) as refusal:
         provider.session(lambda: None).invoke(
             "Synthetic evidence", response_format=Output, temperature=0
         )
     assert len(calls) == 2
     assert "temperature" in calls[0] and "temperature" not in calls[1]
+    assert "store" not in str(refusal.value)
