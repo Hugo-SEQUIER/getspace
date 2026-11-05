@@ -37,7 +37,12 @@ export type WorkspaceDatabase = {
   name: string;
   description: string;
   fields: DatabaseField[];
+  /** The rows, once loaded; a listed database starts with none and its record_count. */
   records: DatabaseRecord[];
+  /** How many rows the Space holds; listings carry it instead of the rows. */
+  record_count?: number;
+  /** False until the rows were read from the Space; the preview always has them. */
+  recordsLoaded?: boolean;
   view: "table" | "board";
   groupBy: string | null;
   tasks?: TaskTracking | null;
@@ -61,6 +66,57 @@ export function optionColor(field: DatabaseField, value: FieldValue): string {
   return configured && optionColors.includes(configured)
     ? configured
     : optionColors[Math.max(0, field.options?.indexOf(label) ?? 0) % optionColors.length];
+}
+
+/** How many rows a database holds, from its loaded rows or the count the listing gave. */
+export function recordCount(database: WorkspaceDatabase): number {
+  return database.recordsLoaded === false ? database.record_count ?? database.records.length : database.records.length;
+}
+
+/** The schema and metadata a save sends, without the rows. */
+export function databaseSchema(database: WorkspaceDatabase) {
+  const { name, description, fields, view, groupBy, tasks = null, project_id = null, section_id = null } = database;
+  return {
+    name, description, fields, view, groupBy,
+    ...(tasks ? { tasks } : {}),
+    // Agents place databases; a website edit must not clear that placement.
+    ...(project_id ? { project_id } : {}),
+    ...(section_id ? { section_id } : {}),
+  };
+}
+
+function sameRecordContent(a: DatabaseRecord, b: DatabaseRecord): boolean {
+  if (a.name !== b.name || a.notes !== b.notes || a.updatedAt !== b.updatedAt || (a.createdAt ?? null) !== (b.createdAt ?? null)) return false;
+  const keys = new Set([...Object.keys(a.values), ...Object.keys(b.values)]);
+  for (const key of keys) if ((a.values[key] ?? null) !== (b.values[key] ?? null)) return false;
+  return true;
+}
+
+export type DatabaseChange = {
+  expected_revision: number;
+  data?: ReturnType<typeof databaseSchema>;
+  upsert: DatabaseRecord[];
+  delete: string[];
+};
+
+/**
+ * Parameters: the saved database (rows loaded) and the version to save.
+ * What it does: works out what one save must send: the schema when it changed, the rows that
+ * differ and the IDs that went away. Only differing rows travel and are stored.
+ * Output: the change, or null when nothing differs.
+ */
+export function databaseChange(saved: WorkspaceDatabase, next: WorkspaceDatabase): DatabaseChange | null {
+  const before = JSON.stringify(databaseSchema(saved)), after = JSON.stringify(databaseSchema(next));
+  const schema = before === after ? undefined : databaseSchema(next);
+  const previous = new Map(saved.records.map((record) => [record.id, record]));
+  const upsert = next.records.filter((record) => {
+    const stored = previous.get(record.id);
+    return !stored || !sameRecordContent(stored, record);
+  });
+  const kept = new Set(next.records.map((record) => record.id));
+  const remove = saved.records.filter((record) => !kept.has(record.id)).map((record) => record.id);
+  if (!schema && !upsert.length && !remove.length) return null;
+  return { expected_revision: saved.revision ?? 0, ...(schema ? { data: schema } : {}), upsert, delete: remove };
 }
 
 export type DatabaseTemplate = "blank" | "clients" | "tasks";

@@ -27,6 +27,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | Search: titles answer before the index, body matches after one index read, type tabs, the palette reuses the index | `workspace` | `search` | |
 | Projects: create, rename, task filter, linked databases | `projects` | `project-databases` | Trash and sections: not yet |
 | Databases: create, records, reload, record panel | `databases` | `database-record-panel` | Properties, board view and import are not covered |
+| Databases: rows load on open, an edit saves one row | | `database-rows` | Against the fake API: the listing shows `record_count` and no rows, opening a database reads it once, a cell edit sends one `upsert` and no `data`, a view change sends the schema alone, a deletion sends the row's ID |
 | Databases: row selection | | `database-row-selection` | The checkbox cell selects a record; while any record is selected, a click on a row selects or clears it instead of editing or opening it, while the keyboard and the row menu keep their actions |
 | Databases: set a select value on selected rows | | `database-bulk-option` | The selection bar's menu lists only select properties; choosing an option or the empty choice saves every selected record at once and leaves unselected and unchanged records' edit times alone |
 | Databases: an edited row keeps its place | | `database-row-order` | Saving a cell no longer moves the row to the top under Last edited |

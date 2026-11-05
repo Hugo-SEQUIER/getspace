@@ -95,6 +95,10 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     /** The revision of each resource the signed-in person last opened. */
     views: [] as SeenMark[],
     memoryJobs: [] as { id: string; status: string; attempts: number; error_code: string | null; result: null }[],
+    /** Bodies of every database change command, in order. */
+    databaseCommands: [] as Record<string, unknown>[],
+    /** Database detail reads, by database ID: a listing never carries rows. */
+    databaseReads: [] as string[],
     webhooks: [] as WebhookRow[],
     /** Bodies of every subscription create or change command, in order. */
     webhookCommands: [] as Record<string, unknown>[],
@@ -324,7 +328,11 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       const key = (['projects', 'databases'] as const).find(name => state[name].some(entry => entry.id === item[1]));
       const current = key && state[key].find(entry => entry.id === item[1]);
       if (!key || !current) return send({ error: 'Workspace item not found' }, 404);
-      if (method === 'GET' && !item[2]) return send(current);
+      if (method === 'GET' && !item[2]) {
+        // Only this read returns the rows of a database; a listing carries a count.
+        if (key === 'databases') state.databaseReads.push(item[1]);
+        return send(current);
+      }
       if (method !== 'POST' || !item[2]) { state.unexpected.push(`${method} ${path}`); return send({ error: 'Unexpected item request' }, 500); }
       if (current.revision !== body.expected_revision) return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
       const saved = { ...current, deleted: body.deleted, revision: current.revision + 1 };
@@ -337,14 +345,43 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (!key) { state.unexpected.push(`${method} ${path} ${body.kind}`); return send({ error: 'Unexpected item kind' }, 500); }
       const current = state[key].find(entry => entry.id === body.item_id);
       if ((current?.revision ?? 0) !== body.expected_revision) return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
-      const saved: Item = { ...body.data, id: body.item_id, kind: body.kind, revision: body.expected_revision + 1, deleted: false, updated_at: '2026-09-23T00:00:00Z', author_agent: null };
+      // A database save that omits records keeps the stored rows, as the Space does.
+      const { records: sentRecords, ...data } = (body.data ?? {}) as { records?: DatabaseRow['records'] } & Record<string, unknown>;
+      const saved: Item = {
+        ...data, id: body.item_id, kind: body.kind, revision: body.expected_revision + 1, deleted: false,
+        updated_at: '2026-09-23T00:00:00Z', author_agent: null,
+        ...(body.kind === 'database' ? { records: sentRecords ?? recordsOf(current ?? { id: '', kind: 'database', revision: 0 }) } : {}),
+      };
       state[key] = current ? state[key].map(entry => entry.id === saved.id ? saved : entry) : [...state[key], saved];
       return send(saved);
     }
     if (path.endsWith('/items')) {
       const key = listOf(url.searchParams.get('kind'));
       const deleted = url.searchParams.get('deleted') === 'true';
-      return send({ items: key ? state[key].filter(entry => !!entry.deleted === deleted) : [], next_cursor: null });
+      const listed = key ? state[key].filter(entry => !!entry.deleted === deleted) : [];
+      // A database listing carries the schema and a record count, never the rows.
+      return send({ items: key === 'databases' ? listed.map(listedDatabase) : listed, next_cursor: null });
+    }
+    const change = /\/databases\/([^/]+)\/changes$/.exec(path);
+    if (change && method === 'POST') {
+      state.databaseCommands.push(body);
+      expect(body.command_id).toBeTruthy();
+      const database = state.databases.find(entry => entry.id === change[1]);
+      if (!database || database.revision !== body.expected_revision)
+        return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
+      const rows = recordsOf(database);
+      const upsert = (body.upsert ?? []) as DatabaseRow['records'];
+      const removed = new Set<string>(body.delete ?? []);
+      const records = [
+        ...rows.filter(record => !removed.has(record.id)).map(record => upsert.find(row => row.id === record.id) ?? record),
+        ...upsert.filter(row => !rows.some(record => record.id === row.id)),
+      ];
+      const saved: Item = { ...database, ...(body.data ?? {}), revision: database.revision + 1, records };
+      state.databases = state.databases.map(entry => entry.id === saved.id ? saved : entry);
+      const counts = { inserted: upsert.filter(row => !rows.some(record => record.id === row.id)).length,
+        updated: upsert.filter(row => rows.some(record => record.id === row.id)).length, deleted: removed.size };
+      // A replay answers with no rows; the fixture never replays a command.
+      return send({ database: listedDatabase(saved), changes: counts, replayed: false, records: upsert, deleted: [...removed] });
     }
     if (path.endsWith('/webhooks')) {
       if (method === 'POST') {
@@ -451,8 +488,26 @@ export type WebhookRow = {
 
 export const databaseId = '66666666-6666-4666-8666-666666666666';
 
+export type DatabaseRow = {
+  id: string; kind: 'database'; name: string; description: string; revision: number; deleted: boolean;
+  fields: { id: string; name: string; type: string; options?: string[] }[];
+  records: { id: string; name: string; notes: string; values: Record<string, unknown>; createdAt?: string | null; updatedAt: string }[];
+  view: 'table' | 'board'; groupBy: string | null; tasks?: { status: string; done: string[]; planned: string } | null;
+};
+
+/** The rows a stored item holds; an item saved without records keeps the rows it had. */
+function recordsOf(item: Item): DatabaseRow['records'] {
+  return (item as { records?: DatabaseRow['records'] }).records ?? [];
+}
+
+/** A database as the Space lists it: the schema and a record count, never the rows. */
+export function listedDatabase(item: Item): Item {
+  const { records: _records, ...listed } = item as Item & { records?: DatabaseRow['records'] };
+  return { ...listed, record_count: recordsOf(item).length };
+}
+
 /** A pipeline database with one select field, so a webhook can filter on Stage → Review. */
-export function sampleDatabase() {
+export function sampleDatabase(): DatabaseRow {
   return {
     id: databaseId, kind: 'database', name: 'Pipeline', description: '', revision: 1, deleted: false,
     fields: [

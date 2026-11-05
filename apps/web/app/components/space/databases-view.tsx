@@ -16,6 +16,7 @@ import {
   applyDatabaseField,
   applyRecordChanges,
   validateRecord,
+  recordCount,
   type DatabaseField,
   type DatabaseRecord,
   type DatabaseTemplate,
@@ -385,7 +386,7 @@ function DatabaseSettings({
               if (
                 await confirm({
                   title: "Move database to trash?",
-                  message: `Move “${database.name}” and its ${database.records.length} records to trash? You can restore them later.`,
+                  message: `Move “${database.name}” and its ${recordCount(database)} records to trash? You can restore them later.`,
                   confirmLabel: "Move to trash",
                 })
               ) {
@@ -427,7 +428,6 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
   const [recordExpanded, setRecordExpanded] = useState(false);
   const beforeCloseRecord = useRef<(() => Promise<boolean>) | null>(null);
   const confirm = useConfirm();
-  const canWrite = data.canWrite;
   const [initialValues, setInitialValues] = useState<
     Record<string, FieldValue>
   >({});
@@ -438,6 +438,21 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
     [filterValue, setFilterValue] = useState("");
   const savedDatabase = data.databases.find((d) => d.id === id);
   const databaseKey = JSON.stringify([data.space?.id, id]);
+  // The listing carries the schema and a count; the rows arrive with the first open and again
+  // when another writer moved the database to a new revision.
+  const recordsLoading = !!savedDatabase && savedDatabase.recordsLoaded === false;
+  const [recordsError, setRecordsError] = useState("");
+  useEffect(() => {
+    if (!id || !savedDatabase || savedDatabase.recordsLoaded !== false) return;
+    let cancelled = false;
+    setRecordsError("");
+    data.loadDatabaseRecords(id).catch((e) => { if (!cancelled) setRecordsError(message(e)); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, savedDatabase?.id, savedDatabase?.revision, savedDatabase?.recordsLoaded]);
+  // Rows and properties are edited against the loaded rows; a write before they arrive would
+  // work from an empty table.
+  const canWrite = data.canWrite && !recordsLoading;
   const [pendingChanges, setPendingChanges] = useState<{
     token: number;
     key: string;
@@ -483,11 +498,12 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [copyingRows, setCopyingRows] = useState(false);
   useFeedback({
-    error: saveError,
+    error: saveError || recordsError,
     notice: rowFeedback,
     clearNotice: () => setRowFeedback(""),
     loading: saving ? creating ? "Creating database…" : "Saving database changes…"
-      : refreshing ? "Loading latest database…" : copyingRows ? "Copying records…" : "",
+      : refreshing ? "Loading latest database…" : recordsLoading && !recordsError ? "Loading records…"
+      : copyingRows ? "Copying records…" : "",
   });
   const saveQueue = useRef(createDatabaseSaveQueue(saveRecovery));
   const pendingSaves = useRef(0);
@@ -725,7 +741,7 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
                   ))}
                 </div>
                 <div className="sp-db-card-footer">
-                  <span>{db.records.length} records</span>
+                  <span>{recordCount(db)} records</span>
                   <span>{db.fields.length + 1} properties</span>
                 </div>
               </Link>
@@ -940,7 +956,7 @@ export function DatabasesView({ base, id }: { base: string; id?: string }) {
           )}
           <div className="sp-db-status">
             <span>
-              {records.length} of {database.records.length} records
+              {recordsLoading ? "Loading records…" : `${records.length} of ${database.records.length} records`}
               <span> · </span>
               {database.fields.length + 1} properties
             </span>
