@@ -99,6 +99,6 @@ Copy backups off the server: a backup on the same disk is not a backup.
 
 ## License
 
-Space is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use, modify and self-host it for any purpose. If you run a modified version for other people over a network, you must offer them its source code. The vendored Memora runtime keeps its MIT license; see [NOTICE](NOTICE) and [THIRD-PARTY.md](THIRD-PARTY.md).
+Space is free software under the [MIT License](LICENSE). You may use, change, share and self-host it for any purpose, including commercially, as long as the copyright and permission notice stays with copies or substantial portions of the software. The vendored Memora runtime keeps its own MIT license; see [NOTICE](NOTICE) and [THIRD-PARTY.md](THIRD-PARTY.md).
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and accept the [Contributor License Agreement](CLA.md) before your first pull request.

@@ -2,7 +2,7 @@
 
 License inventory for the Space repository, regenerated on 9 October 2026.
 
-Space itself is free software under the GNU Affero General Public License, version 3. See [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for the copyright statement. This file records the licenses of the components that Space ships or depends on directly.
+Space itself is free software under the MIT License. See [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for the copyright statement. This file records the licenses of the components that Space ships or depends on directly.
 
 Transitive dependencies are not listed; each package remains under its own license. A distribution should regenerate this inventory, for example with `pip-licenses` for the backend and `license-checker` for the website.
 
@@ -12,7 +12,7 @@ Transitive dependencies are not listed; each package remains under its own licen
 |---|---|---|---|
 | Memora text inference runtime | pinned commit `dec3f8f2444eace7004fc084abe1be9f3d88270e` | MIT | Text retained in `backend/src/space/_vendor/memora/LICENSE`, which is byte-identical to the [upstream license](https://github.com/microsoft/Memora). Space-specific modifications are recorded in `backend/src/space/_vendor/memora/README.md`. |
 
-The MIT License permits commercial use, modification and distribution. It requires the copyright notice and the permission notice to stay with the software, and it grants no trademark or patent rights. The vendored runtime stays under MIT and is not relicensed under the AGPL.
+The MIT License permits commercial use, modification and distribution. It requires the copyright notice and the permission notice to stay with the software, and it grants no trademark or patent rights. The vendored runtime keeps its own MIT terms, separate from Space's license.
 
 ## Backend dependencies
 

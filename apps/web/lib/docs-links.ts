@@ -10,6 +10,5 @@ export const docsLinks = {
   memory: guide("MEMORY.md"),
 } as const;
 
-// Space is licensed under the AGPL-3.0, whose section 13 asks that people who use it over a
-// network can get its source. Every screen a visitor can reach links here.
-export const sourceCode = { href: repository, label: "Source code (AGPL-3.0)" } as const;
+// Space is open source under the MIT License. Every screen a visitor can reach links here.
+export const sourceCode = { href: repository, label: "Source code (MIT)" } as const;

@@ -691,8 +691,8 @@ export function SettingsView({
               <section>
                 <h2>About</h2>
                 <p className="sp-muted">
-                  Space is free software under the GNU Affero General Public
-                  License, version 3. Anyone who uses it can get its source.
+                  Space is free software under the MIT License. Anyone can
+                  use, change and share it.
                 </p>
                 <a className="sp-setting-link" href={sourceCode.href} target="_blank" rel="noreferrer">
                   {sourceCode.label}

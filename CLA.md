@@ -2,7 +2,7 @@
 
 Version 1.0 · 22 September 2026
 
-This Contributor License Agreement ("Agreement") covers any contribution you submit to Space ("the Project"). It is between you ("You") and Hugo SEQUIER ("the Licensor"), who licenses the Project under the GNU Affero General Public License, version 3.
+This Contributor License Agreement ("Agreement") covers any contribution you submit to Space ("the Project"). It is between you ("You") and Hugo SEQUIER ("the Licensor"), who licenses the Project under the MIT License.
 
 You keep the copyright in your contribution. You grant the Licensor the rights below so the Project can be distributed, maintained, relicensed and supported over time.
 
@@ -20,7 +20,7 @@ You retain all right, title and interest in Your Contribution. You grant the Lic
 
 - reproduce, prepare derivative works of, publicly display, publicly perform, distribute, and otherwise use and make available Your Contribution and derivative works of it;
 - sublicense and distribute Your Contribution and derivative works of it under any terms;
-- relicense Your Contribution, in whole or in part, under any terms, and to change the license terms applied to any version of the Project that includes it, including moving between the GNU Affero General Public License, another open-source license, a source-available license and a commercial license;
+- relicense Your Contribution, in whole or in part, under any terms, and to change the license terms applied to any version of the Project that includes it, including moving between the MIT License, another open-source license, a source-available license and a commercial license;
 - assign and transfer these rights, in whole or in part, including to a company that takes over the Project or the Licensor's business.
 
 This grant requires no further payment, notice, or approval for any use described above. You agree not to assert any moral right, or any equivalent right in another jurisdiction, in a way that interferes with these rights.
