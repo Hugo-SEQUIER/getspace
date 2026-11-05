@@ -6,7 +6,8 @@ import httpx
 import pytest
 from pydantic import BaseModel, Field, SecretStr
 
-from space.model_provider import MemoryModels, ModelError, anthropic_schema
+from space import model_provider
+from space.model_provider import DecisionError, MemoryModels, ModelError, anthropic_schema
 from space.settings import Settings
 
 
@@ -112,6 +113,19 @@ def test_relevance_model_override_does_not_change_extraction_or_memory_fingerpri
     provider.session(lambda: None).invoke("evidence", response_format=Output, purpose="relevance")
     assert requested == ["test", "assessor"]
     assert provider.info()["relevance_model"] == "assessor"
+
+
+def test_decision_fingerprint_follows_only_the_decision_model_and_endpoint(monkeypatch):
+    original = models(monkeypatch, lambda request: httpx.Response(200, json={}))
+
+    def changed(**update):
+        return MemoryModels(original.settings.model_copy(update=update)).decision_fingerprint
+
+    assert changed(memory_text_model="other") == original.decision_fingerprint
+    assert changed(memory_decision_model="other/decider") != original.decision_fingerprint
+    assert changed(memory_decision_url="https://other.invalid/decisions") != (
+        original.decision_fingerprint
+    )
 
 
 @pytest.mark.parametrize(
@@ -551,3 +565,30 @@ def test_anthropic_key_changes_the_chat_fingerprint_only_when_set(monkeypatch):
     routed = anthropic_models(monkeypatch, lambda request: None)
     assert plain.info()["anthropic_model"] is None
     assert plain.chat_fingerprint != routed.chat_fingerprint
+
+
+def test_a_refused_decision_is_logged_once_an_hour_per_status(caplog, monkeypatch):
+    answers = iter([404, 404, 402, "timeout", 404])
+
+    def handler(request):
+        answer = next(answers)
+        if answer == "timeout":
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(answer, json={"error": {"message": "my private diary entry"}})
+
+    provider = models(monkeypatch, handler)
+    with caplog.at_level("WARNING", logger="space.model_provider"):
+        for _ in range(4):
+            # Every caller still gets the error and falls back as before.
+            with pytest.raises(DecisionError):
+                provider.session(lambda: None).decide({"state": "my private diary entry"})
+        monkeypatch.setattr(model_provider, "REFUSAL_REPORT_SECONDS", 0)
+        with pytest.raises(DecisionError):
+            provider.session(lambda: None).decide({"state": "my private diary entry"})
+    assert [record.getMessage() for record in caplog.records] == [
+        "DecisionError: model provider answered HTTP 404; check SPACE_MEMORY_DECISION_MODEL",
+        "DecisionError: model provider answered HTTP 402; check SPACE_MEMORY_DECISION_MODEL",
+        "DecisionError: model provider answered HTTP 404; check SPACE_MEMORY_DECISION_MODEL",
+    ]
+    for leaked in ("my private diary entry", "test-secret-key"):
+        assert leaked not in caplog.text

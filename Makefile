@@ -80,10 +80,10 @@ check-memory-models:
 benchmark-memory:
 	uv run --directory backend --locked python scripts/benchmark_memory.py
 
-# Costs provider usage. Example: make benchmark-decisions MODELS=perplexity/pplx-decider-v1.1-27b,typesafe/jev-1.13
+# Costs provider usage. Example: make benchmark-decisions MODELS=perplexity/pplx-decider-v1.2,typesafe/jev-1.13
 benchmark-decisions:
 	uv run --directory backend --locked python scripts/benchmark_decisions.py \
-		--models "$(or $(MODELS),perplexity/pplx-decider-v1.1-27b)" $(ARGS)
+		--models "$(or $(MODELS),perplexity/pplx-decider-v1.2)" $(ARGS)
 
 evaluate-retrieval:
 	uv run --directory backend --locked python scripts/evaluate_retrieval.py \

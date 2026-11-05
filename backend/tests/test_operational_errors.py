@@ -3,6 +3,7 @@ import pytest
 from psycopg import OperationalError
 from psycopg_pool import PoolTimeout
 
+from space.model_provider import DecisionError, ModelError
 from space.operational_errors import operation_unavailable
 
 
@@ -12,6 +13,8 @@ from space.operational_errors import operation_unavailable
         (PoolTimeout("SECRET"), "database connection busy"),
         (OperationalError("SECRET"), "database operation failed"),
         (httpx.ConnectError("SECRET"), "upstream connection failed"),
+        (DecisionError("SECRET", status=404), "model provider answered HTTP 404"),
+        (ModelError("SECRET"), "internal operation failed"),
         (ValueError("SECRET"), "internal operation failed"),
     ],
 )

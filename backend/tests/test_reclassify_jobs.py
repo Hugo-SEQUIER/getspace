@@ -75,6 +75,47 @@ def test_next_write_queues_one_catch_up_that_reclassifies_only_limited_claims(
         assert claim["value"] == memory["memory"]["claims"][0]["value"]
 
 
+def unavailable_memories(service, owner, space, monkeypatch, count):
+    """Store memories the way a refused decision model leaves them: unassigned, unavailable."""
+    item(service, owner, space, "category", "Dev")
+    project = item(service, owner, space, "project", "Atlas")
+    models = service.memory_models = ClassifyingModels()
+    models.failure = True
+    monkeypatch.setattr(reclassify_jobs, "maybe_enqueue", lambda *args: None)
+    saved = [remember(service, owner, space, f"Atlas fact {n}") for n in range(count)]
+    monkeypatch.undo()
+    for memory in saved:
+        assert memory["memory"]["claims"][0]["classification"]["reason"] == "unavailable"
+    models.failure = False
+    return saved, project
+
+
+def test_each_decision_model_gets_one_catch_up_for_what_an_outage_left_unassigned(
+    commands, queue, monkeypatch
+):
+    service, owner, space, _ = commands
+    saved, project = unavailable_memories(service, owner, space, monkeypatch, 2)
+    remember(service, owner, space, "Queues the catch-up")
+    while (job := jobs.claim(queue)) is not None:
+        jobs.process(service, queue, job)
+    current = {m["id"]: m for m in service.list_memories(owner, space)["items"]}
+    for memory in saved:
+        classification = current[memory["id"]]["claims"][0]["classification"]
+        assert classification["reason"] == "matched"
+        assert classification["project_ids"] == [project["id"]]
+    remember(service, owner, space, "Only checks")
+    assert [r["status"] for r in reclassify_jobs_in(service, owner, space)] == ["ready"]
+    # Replacing the decision model, as when one is retired, earns one more catch-up...
+    service.memory_models.decision_fingerprint = "fixture-decision-v2"
+    remember(service, owner, space, "Queues another")
+    statuses = sorted(r["status"] for r in reclassify_jobs_in(service, owner, space))
+    assert statuses == ["queued", "ready"]
+    # ...but never a second one beside a catch-up that has not finished.
+    service.memory_models.decision_fingerprint = "fixture-decision-v3"
+    remember(service, owner, space, "Waits for it")
+    assert len(reclassify_jobs_in(service, owner, space)) == 2
+
+
 def test_catch_up_needs_classification_and_never_fails_the_write(commands, monkeypatch):
     service, owner, space, _ = commands
     service.memory_models = Models()

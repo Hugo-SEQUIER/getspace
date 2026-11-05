@@ -2338,7 +2338,7 @@ class Workspace:
     @admitted("_write_admission")
     @key_operation
     def reclassify_limited(self, identity, space_id, resource_id, job_id):
-        """Reclassify only claims the old catalog limit left unassigned in one memory.
+        """Reclassify only claims a limit or an unavailable model left unassigned in one memory.
 
         Parameters: the queued writer's identity, the memory resource and the catch-up job.
         What it does: re-reads the current revision, so a concurrent edit wins; classifies

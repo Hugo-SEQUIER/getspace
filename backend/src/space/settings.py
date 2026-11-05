@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     memory_relevance_provider: Literal["model", "decision", "typesafe"] = "model"
     memory_classification_provider: Literal["disabled", "decision", "typesafe"] = "disabled"
     memory_relationship_provider: Literal["disabled", "decision", "typesafe"] = "disabled"
-    memory_decision_model: str = "perplexity/pplx-decider-v1.1-27b"
+    memory_decision_model: str = "perplexity/pplx-decider-v1.2"
     memory_decision_url: str = DECISIONS_URL
     # Unset uses SPACE_MEMORY_API_KEY, as when OpenRouter serves both text and decisions.
     memory_decision_api_key: SecretStr | None = None

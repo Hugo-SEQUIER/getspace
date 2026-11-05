@@ -9,7 +9,7 @@ Space can organize memories using categories and sections defined by the user, p
 3. Create or edit a project and choose its section. New classifications include a matched project's active parent section automatically.
 4. With classification enabled, new claims and text edits are classified against the current catalog. A claim can have multiple categories, projects and sections. No classification call runs during recall.
 5. Open a memory's details to inspect its assignments. **Edit organization → Save assignment** pins the complete assignment. Automatic edits and rebuilds preserve this assignment for the same stable claim ID. An empty manual assignment is also a deliberate correction. **Replace with automatic classification** explicitly releases the pin; a provider failure or size limit preserves the existing assignment and reports an error.
-6. Existing memories are not silently backfilled, with one exception: claims left unassigned only because the catalog was too large are reclassified once in the background. **Classify now** classifies an existing unpinned claim. Category, project and section filters narrow loaded memories or current search results. **Load older memory** remains available even when filters match nothing. Text search continues to search the Space through the existing server query.
+6. Existing memories are not silently backfilled, with one exception: claims left unassigned only because the catalog or the input was too large, or because the decision model was unavailable, are reclassified in the background, once per decision model ([catch-up](SPACE_MAP.md#catching-up-existing-memories)). **Classify now** classifies an existing unpinned claim. Category, project and section filters narrow loaded memories or current search results. **Load older memory** remains available even when filters match nothing. Text search continues to search the Space through the existing server query.
 
 `global` means a clearly expressed lasting preference or rule that applies across projects. `project` requires at least one project assignment. `unassigned` is a scope value for insufficient context; it can coexist with useful categories or sections. **Uncategorized** means no active user category is assigned. Missing matches never default to global, and unassigned memories remain discoverable.
 
@@ -21,7 +21,7 @@ Migration `0017_memory_organization` extends the `workspace_items.kind` check to
 
 ```dotenv
 SPACE_MEMORY_CLASSIFICATION_PROVIDER=decision
-SPACE_MEMORY_DECISION_MODEL=perplexity/pplx-decider-v1.1-27b
+SPACE_MEMORY_DECISION_MODEL=perplexity/pplx-decider-v1.2
 ```
 
 Classification defaults to `disabled` and requires an enabled memory provider and a decision model on OpenRouter's Decisions API, reached with `SPACE_MEMORY_API_KEY` or `SPACE_MEMORY_DECISION_API_KEY`. It is independent of `SPACE_MEMORY_RELEVANCE_PROVIDER`. Configure it on both the API and the extraction worker: `compose.yaml` passes `SPACE_MEMORY_CLASSIFICATION_PROVIDER` and the decision settings to both. [Data and privacy](PRIVACY.md#what-leaves-the-server) lists what the decision model receives. Manual organization works without an enabled model provider. Enabling classification does not change the embedding fingerprint or require re-embedding existing memories.

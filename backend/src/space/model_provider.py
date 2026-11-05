@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import math
 import threading
 import time
@@ -13,13 +14,26 @@ import httpx
 from space.read_timing import read_stage
 from space.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 class ModelError(Exception):
     """Content-free errors only; never expose upstream bodies or credentials."""
 
+    def __init__(self, message, *, status=None):
+        super().__init__(message)
+        # The HTTP status of a provider's error answer, never the answer itself.
+        self.status = status
+
 
 class DecisionError(ModelError):
     """Only a decision-model transport or protocol failure permits a fallback."""
+
+
+# Every decision feature falls back when the provider refuses, so a refusal is reported
+# as well as raised: from about 17 to 20 October 2026 a retired model answered 404 and
+# nothing showed it. Each process reports a status at most this often.
+REFUSAL_REPORT_SECONDS = 3600
 
 
 class NoCookies(DefaultCookiePolicy):
@@ -98,6 +112,8 @@ class MemoryModels:
         self._client = None
         self._client_lock = threading.Lock()
         self._closed = False
+        self._refusals = {}
+        self._refusal_lock = threading.Lock()
         self.enabled = settings.memory_provider != "disabled"
 
     def _digest(self, values) -> str:
@@ -142,6 +158,15 @@ class MemoryModels:
         )
 
     @property
+    def decision_fingerprint(self) -> str:
+        """Identify the decision model that organizes claims. A change of model lets each
+        Space catch up on what the previous one left unassigned (space.reclassify_jobs).
+        """
+        return self._digest(
+            [self.settings.memory_decision_url, self.settings.memory_decision_model]
+        )
+
+    @property
     def embedding_model(self) -> str:
         """Name stored with every index row, so a model change is detectable."""
         return self.settings.memory_embedding_model or "none"
@@ -177,7 +202,26 @@ class MemoryModels:
     def session(self, authorize):
         if not self.enabled:
             raise ModelError("Configure a memory model provider before building or semantic recall")
-        return ModelSession(self.settings, authorize, client_context=self.client_context)
+        return ModelSession(
+            self.settings, authorize, client_context=self.client_context, refused=self.refused
+        )
+
+    def refused(self, error):
+        """Report a decision request the provider refused, at most hourly per status.
+
+        Records the error's type and status only, never the provider's answer. This
+        edition runs no error tracking service, so the record is a server log line.
+        """
+        now = time.monotonic()
+        with self._refusal_lock:
+            last = self._refusals.get(error.status)
+            if last is not None and now - last < REFUSAL_REPORT_SECONDS:
+                return
+            self._refusals[error.status] = now
+        logger.warning(
+            "DecisionError: model provider answered HTTP %s; check SPACE_MEMORY_DECISION_MODEL",
+            error.status,
+        )
 
     def client_context(self):
         # Pool only connections. Auth headers, payloads and request budgets remain
@@ -206,11 +250,12 @@ class MemoryModels:
 
 
 class ModelSession:
-    def __init__(self, settings, authorize, *, client_context=None):
+    def __init__(self, settings, authorize, *, client_context=None, refused=None):
         self.settings, self.authorize = settings, authorize
         self.client_context = client_context or (
             lambda: httpx.Client(timeout=90, follow_redirects=False, trust_env=False)
         )
+        self.refused = refused or (lambda error: None)
         self.deadline = time.monotonic() + 180
         self.calls = 0
         self.embeddings = {}
@@ -244,17 +289,24 @@ class ModelSession:
     def decide(self, payload):
         """Parameters: a Decisions API payload of state and typed questions.
 
-        What it does: asks the configured decision model, within the session's budget.
+        What it does: asks the configured decision model, within the session's budget,
+        and reports an error answer, which every caller otherwise absorbs in its fallback.
         Output: the provider response; the caller validates every answer.
         """
-        return self._request(
-            self.settings.memory_decision_url,
-            {**payload, "model": self.settings.memory_decision_model},
-            self.settings.memory_decision_api_key or self.settings.memory_api_key,
-            timeout=self.settings.memory_decision_timeout,
-            failure=DecisionError,
-            stage="decision",
-        )
+        try:
+            return self._request(
+                self.settings.memory_decision_url,
+                {**payload, "model": self.settings.memory_decision_model},
+                self.settings.memory_decision_api_key or self.settings.memory_api_key,
+                timeout=self.settings.memory_decision_timeout,
+                failure=DecisionError,
+                stage="decision",
+            )
+        except DecisionError as error:
+            # A timeout has no status: it is expected now and then, and falls back.
+            if error.status is not None:
+                self.refused(error)
+            raise
 
     def _request(
         self,
@@ -314,7 +366,8 @@ class ModelSession:
                         )
                         raise failure(
                             f"Memory model request failed ({operation}, HTTP "
-                            f"{response.status_code}); check the configured provider"
+                            f"{response.status_code}); check the configured provider",
+                            status=response.status_code,
                         )
                     chunks, length = [], 0
                     for chunk in response.iter_bytes():

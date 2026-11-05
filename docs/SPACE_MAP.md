@@ -139,15 +139,15 @@ Shortlisting needs an embedding for each catalog item. The text embedded is `<ki
 
 ### Catching up existing memories
 
-Claims stored unassigned with reason `catalog_limit` or `input_limit` failed because of the old limit, not because their content was uncertain. Space has no background authority of its own: every job runs under a verified user or agent grant, and the worker rechecks that grant before each step. The catch-up runs under the grant of the next memory write.
+Claims stored unassigned with reason `catalog_limit` or `input_limit` failed because of the old limit, not because their content was uncertain. Claims with reason `unavailable` failed because no decision came back, as for every claim written from about 17 to 20 October 2026, while the retired model answered 404. Space has no background authority of its own: every job runs under a verified user or agent grant, and the worker rechecks that grant before each step. The catch-up runs under the grant of the next memory write.
 
-- After any committed `remember`, `remember_claims`, `build_memory` or `change_memory` with classification enabled, Space queues one `reclassify` job for the Space, unless one is queued, running or finished, or one failed within the last day. Queuing never fails or retries the write that triggered it.
+- After any committed `remember`, `remember_claims`, `build_memory` or `change_memory` with classification enabled, Space queues one `reclassify` job for the Space, unless one is queued or running, or one for the configured decision model finished or failed within the last day. The job's `provider_fingerprint` holds the decision model's fingerprint (`MemoryModels.decision_fingerprint`, its endpoint and name), so replacing the model, as when the configured one is retired, earns each Space one more catch-up. Queuing never fails or retries the write that triggered it.
 - The job lists the Space's memory resources from readable IDs at queue time. It processes 5 memories per worker turn, checkpoints progress in `import_completed`, and yields to other Spaces between turns, the same way Memora imports do.
-- For each memory, it re-reads the current revision and reclassifies only claims whose reason is `catalog_limit` or `input_limit` and that are not manually pinned. Text, other claims and relationships are unchanged. A concurrent edit wins: a revision conflict re-reads once, then leaves that memory for a later catch-up.
+- For each memory, it re-reads the current revision and reclassifies only claims whose reason is `catalog_limit`, `input_limit` or `unavailable` and that are not manually pinned. Text, other claims and relationships are unchanged, so a claim written while the model was unavailable keeps no inferred links of its own until its text is edited. A concurrent edit wins: a revision conflict re-reads once, then leaves that memory for a later catch-up.
 - Requests count toward the Space's model request counter. A provider outage, or a model request limit the operator set, fails the job after the usual retries; a later write can queue a new one after a day, and already-reclassified claims are skipped.
 - `memory_job` listings for agents show only `remember` and `build` jobs, so the catch-up does not appear among an agent's own jobs.
 
-This is a narrow exception to the rule that existing memories are not silently backfilled. Claims left unassigned for other reasons (`uncertain`, `disabled`, `unavailable`) stay as they are and can still be classified with **Classify now**.
+This is a narrow exception to the rule that existing memories are not silently backfilled. Claims left unassigned for other reasons (`uncertain`, `disabled`) stay as they are and can still be classified with **Classify now**.
 
 ### Evaluation before release
 
@@ -341,7 +341,7 @@ Expected touch points; confirm during implementation.
 - Folder and database placement: valid and invalid targets, project overrides section, archive and restore of the parent, documents in a folder keep their own project.
 - Shortlist: small catalogs bypass it and produce the same requests as today; name mentions always kept; semantic neighbors ranked from cached vectors; parent sections added; 24-item cap; descriptions trimmed only in the provider copy; missing or outdated item vectors recomputed; embedding failure on item save does not fail the save.
 - Pipeline order: vectors are identical before and after moving classification behind embedding.
-- Catch-up job: only `catalog_limit` and `input_limit` claims are reclassified, pinned claims are skipped, a concurrent edit wins, quota exhaustion pauses and resumes.
+- Catch-up job: only `catalog_limit`, `input_limit` and `unavailable` claims are reclassified, pinned claims are skipped, a concurrent edit wins, quota exhaustion pauses and resumes, and a new decision model gets one more catch-up but never beside one that has not finished.
 - Explicit routing: valid targets, cross-Space and wrong-kind targets rejected before provider work, more than 8 rejected, pin survives rebuild, `change_memory` replaces and clears it.
 - Automatic routing: detection threshold, candidates from the shortlist and project children, 8-candidate cap, provider failure leaves the claim unrouted without failing the write, disabled classification makes no calls.
 - Large-catalog evaluation: the frozen 100-item corpus meets the release targets, and the eight-item corpus is unchanged.

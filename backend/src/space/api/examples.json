@@ -309,7 +309,7 @@
    "provider": {
     "classification_provider": "decision",
     "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
-    "decision_model": "perplexity/pplx-decider-v1.1-27b",
+    "decision_model": "perplexity/pplx-decider-v1.2",
     "embedding_dim": 1536,
     "embedding_endpoint": "https://models.example.com/v1",
     "embedding_model": "fixture-embed",
@@ -437,7 +437,7 @@
   "response": {
    "classification_provider": "decision",
    "decision_endpoint": "https://openrouter.ai/api/alpha/decisions",
-   "decision_model": "perplexity/pplx-decider-v1.1-27b",
+   "decision_model": "perplexity/pplx-decider-v1.2",
    "embedding_dim": 1536,
    "embedding_endpoint": "https://models.example.com/v1",
    "embedding_model": "fixture-embed",
