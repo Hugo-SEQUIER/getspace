@@ -6,11 +6,13 @@ from typing import Any, Literal
 from uuid import UUID
 
 from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.middleware.bearer_auth import RequireAuthMiddleware
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from starlette.routing import Route
 
 from space import (
     __version__,
@@ -40,6 +42,7 @@ from space.memory import (
 from space.memory_pipeline import BuildMemory
 from space.model_provider import MemoryModels
 from space.oauth_server import issuer_url, resource_url
+from space.openai_discovery import SECURITY_SCHEMES, OpenAIDiscovery
 from space.private_access import PrivateConnections
 from space.read_timing import collect_read_timings
 from space.security.auth import Identity, TokenVerifier
@@ -48,11 +51,25 @@ from space.workspace import CommandError, SaveResource, Workspace
 
 
 class SpaceMCP(FastMCP):
-    """FastMCP that lists tools in the form the connector directories check."""
+    """FastMCP that lists tools in the form the connector directories check, and lets
+    OpenAI's clients list them before signing in.
+    """
+
+    def streamable_http_app(self):
+        app = super().streamable_http_app()
+        # OpenAI's clients list the tools without a token (space.openai_discovery).
+        app.router.routes = [
+            Route(route.path, endpoint=OpenAIDiscovery(route.endpoint))
+            if isinstance(route, Route) and isinstance(route.endpoint, RequireAuthMiddleware)
+            else route
+            for route in app.router.routes
+        ]
+        return app
 
     async def list_tools(self):
         # Claude's directory reads the title from the annotations, and flags a parameter with
-        # no type, which a request model referenced only by $ref has.
+        # no type, which a request model referenced only by $ref has. OpenAI reads whether a
+        # tool needs sign-in from securitySchemes, and older clients from _meta.
         return [
             tool.model_copy(
                 update={
@@ -66,6 +83,8 @@ class SpaceMCP(FastMCP):
                             for name, schema in tool.inputSchema.get("properties", {}).items()
                         }
                     },
+                    "securitySchemes": SECURITY_SCHEMES,
+                    "meta": (tool.meta or {}) | {"securitySchemes": SECURITY_SCHEMES},
                 }
             )
             for tool in await super().list_tools()
@@ -335,10 +354,11 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        # Destructive: records replaces a whole table, deleting the rows it omits.
         @server.tool(
             title="Save a workspace item",
             annotations=ToolAnnotations(
-                readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
             ),
         )
         async def save_workspace_item(
