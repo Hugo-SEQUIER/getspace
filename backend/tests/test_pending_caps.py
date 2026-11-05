@@ -15,9 +15,16 @@ CAP = 10000
 CHALLENGE = "A" * 43
 
 
+# The filled rows hold codes below 300000, and a pending code is unique, so these stay clear of
+# them: a random code would collide with a filled one now and then and fail the test.
+_next_code = 900000
+
+
 def device_begin(connection, *, capped):
+    global _next_code
     digest = hashlib.sha256(secrets.token_bytes(32)).digest()
-    code = f"{secrets.randbelow(10**6):06d}"
+    _next_code += 1
+    code = f"{_next_code:06d}"
     connection.execute(
         "SELECT space.device_begin(%s,%s,%s,%s,interval '10 minutes',%s)",
         (digest, code, "Agent", "other", capped),
