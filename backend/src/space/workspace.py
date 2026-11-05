@@ -2428,8 +2428,15 @@ class Workspace:
             # select the exact memories whose current metadata and bodies are needed.
             snapshot, indexed = self._recall_state(identity, space_id)
             if request.strategy in {"semantic", "prompt"} and not indexed:
+                # Agents relay this to people. A new Space has no memory while the provider
+                # works, and naming the provider there read as "nothing can be stored".
                 raise CommandError(
-                    "Configure the memory provider and build memory before semantic recall",
+                    "This Space has no saved memory yet, so semantic recall has nothing to "
+                    "search. Use strategy='auto', or save memory with remember or "
+                    "remember_claims first."
+                    if self.memory_models.enabled
+                    else "No memory provider is configured, so semantic recall is unavailable. "
+                    "Use strategy='auto' or 'lexical'.",
                     409,
                 )
             ranked, engine = [], ENGINE
