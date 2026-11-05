@@ -21,7 +21,7 @@ Use the user's timezone and the current date. The window starts at the last morn
 
 1. Tasks: `list_resources(kind="task")`, following `next_cursor`. Keep tasks whose `updated_at` falls inside the window, and note their status.
 2. Documents: `list_resources(kind="document")`, following `next_cursor`. Keep documents updated inside the window; skip routine channel briefs unless they changed.
-3. Task-list databases: `list_workspace_items(kind="database")`. For each database that has a task setting, read its rows with `query_database`. Pull rows whose planned day is today, and rows that are open (not Done) and overdue or due within the next week.
+3. Task-list databases: `list_workspace_items(kind="database")`. For each database that has a task setting, read its rows with `read_database`. Pull rows whose planned day is today, and rows that are open (not Done) and overdue or due within the next week.
 4. Projects: `list_workspace_items(kind="project")`. Treat a `todo` project as paused or not started, and do not propose work for it unless the user asks.
 5. Approvals: rows marked "Needs approval", and tasks in `needs_you` or Review status.
 

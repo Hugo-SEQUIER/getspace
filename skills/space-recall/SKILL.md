@@ -29,7 +29,7 @@ get_context(space_id, {
 })
 ```
 
-`mode="search"` requires a topic. `mode="resume"` needs no query and returns recent handoffs, and with `compact=true` the query is ignored. `strategy="lexical"` makes no model call and needs no provider. `semantic` and `prompt` need indexed memory: without it the request is refused as a conflict, and without a configured provider it fails as temporarily unavailable. `compact` is valid only with `resume`.
+`mode="search"` requires a topic. `mode="resume"` needs no query and returns recent handoffs, and with `compact=true` the query is ignored. `strategy="lexical"` makes no model call and needs no provider. `semantic` and `prompt` need a configured provider and saved memory: without either the request is refused as a conflict whose message says which, and a new Space has no saved memory yet. `auto` needs neither, so prefer it unless you need the semantic path itself. `compact` is valid only with `resume`.
 
 ## Read the result before you answer
 
@@ -72,7 +72,7 @@ An empty result is a fact about one query, not about the Space. Check, in order:
 
 1. Did you search, or are you in `resume` mode looking for handoffs that were never written?
 2. Was the topic phrased the way it would have been stored? Try the words the user used.
-3. If you asked for `strategy: "semantic"` or `"prompt"`, a conflict error means no indexed memory exists, and a busy-style failure means no provider is configured. Either is a configuration result, not an empty Space; retry lexically or report it.
+3. If you asked for `strategy: "semantic"` or `"prompt"`, a conflict error means the semantic path could not run, and its message says why. No saved memory yet is the normal state of a new Space, not a missing provider: retry with `auto` and keep saving memory as usual. Report a missing provider only when the message names one.
 4. A `503` is capacity, not emptiness. The server is busy: retry with growing delay and jitter. Never report a 503 as "memory holds nothing".
 5. A historical question needs a historical answer. Older evidence may still be indexed while the current record has moved on; ask about the period you need.
 

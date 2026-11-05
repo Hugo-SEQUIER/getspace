@@ -27,6 +27,7 @@ Optional workflows for a connected agent: recover context, preserve useful knowl
 | [space-tasks](space-tasks/SKILL.md) | "Save this idea as a task" | Preserve the original request, purpose, scope and completion criteria; find or update the canonical task |
 | [space-journal](space-journal/SKILL.md) | "Record today" or "what did we do yesterday?" | Dated daily records and recaps, using the user's timezone and supported event dates |
 | [space-weekly-review](space-weekly-review/SKILL.md) | "What moved forward last week?" | Outcomes, carryover, decisions, lessons and proposed priorities over an explicit week |
+| [space-systems](space-systems/SKILL.md) | "What works for cold email?", "log this lesson" or "review the X system" | Apply a system's verdicts before recurring work and record their use, add hypotheses and lessons to its lab, review the system at its cadence, and promote or demote entries only on evidence |
 | [space-morning](space-morning/SKILL.md) | "Morning" or "what should I do today?" | Read-only start-of-day brief: changes since the last morning or journal, rows planned for today, and at most five proposed items; changes nothing without approval |
 
 ## Maintenance
@@ -84,7 +85,9 @@ Every tool named in a skill is an MCP tool. A client that surfaces MCP tools cal
 
 ## Installing
 
-Use the client's skill installer or configured skill directory, and copy only the folders the user wants. Each should end up as `<skills directory>/<skill-name>/SKILL.md`. Configure and authorize the Space MCP connection separately; a skill file does not establish a connection or grant access.
+The skills live in the `skills/` folder of [space-skills](https://github.com/Hugo-SEQUIER/space-skills). In Cursor and Claude, the plugin at the root of that repository installs all of them together with the Space MCP connection, plus a memory rule in Cursor; its README explains how.
+
+In other clients, use the client's skill installer or configured skill directory, and copy only the folders the user wants. Each should end up as `<skills directory>/<skill-name>/SKILL.md`. Configure and authorize the Space MCP connection separately; a skill file does not establish a connection or grant access.
 
 Each folder also carries `agents/openai.yaml` for Codex, which reads it for the skill's display name, short description and example prompt. Copying a folder without that file leaves the skill working but unnamed in the Codex interface, so keep the two files together. Prime Agent, Claude Code and the other clients ignore it.
 
@@ -129,7 +132,7 @@ Run the skill-creator validator for new or changed skills. Schema and prose chec
 | Update a project without reading it first | The stale revision is refused and the current project is read before the retry |
 | Archive a project, then save it again | The save is reported as a restore, and the project is not described as deleted |
 | Add a record to a database and keep the field IDs | Existing fields and records keep their IDs and their values stay attached |
-| Create a board that groups by a text field | The write is rejected with the grouping rule and the snapshot is not described as saved |
+| Create a board that groups by a text field | The write is rejected with the grouping rule and the save is not described as saved |
 | Search for a string that appears only inside a database row | The database is returned as a hit, and the row is read before it is quoted |
 | Search while the Space changes mid-page | The continuation is refused, a fresh pass is run, and the result is labelled partial |
 | Ask where a record is, then ask what the evidence means | The first answer names the record and its ID; the second cites revisions from ranked recall |
@@ -159,4 +162,4 @@ Run the skill-creator validator for new or changed skills. Schema and prose chec
 | Import documents with memory unavailable | Documents-only work proceeds only if approved; unsaved memory is reported honestly |
 | A write conflicts or its response is lost | The latest version is reconciled on conflict; unchanged retries reuse the command ID and payload |
 
-The pack contains seventeen skills. Schema, packaging and documentation checks are separate from live client behavior. The import skill uses existing document and prepared-claim APIs; its approval and batch rules are agent instructions, not new server enforcement. No private workspace records are created to validate these documentation changes.
+The pack contains eighteen skills. Schema, packaging and documentation checks are separate from live client behavior. The import skill uses existing document and prepared-claim APIs; its approval and batch rules are agent instructions, not new server enforcement. No private workspace records are created to validate these documentation changes.
