@@ -190,7 +190,11 @@ def _systems_references(value, decisions):
         verdict["memory_id"] = target("resource", verdict["memory_id"])
     if verdict and verdict.get("entry_id"):
         verdict["entry_id"] = target("item", verdict["entry_id"])
-        verdict["system"]["id"] = target("item", verdict["system"]["id"])
+        # A verdict restored from elsewhere may carry no system block; its entry still points
+        # at the copy, and the missing system stays missing.
+        system = verdict.get("system") or {}
+        if system.get("id"):
+            system["id"] = target("item", system["id"])
 
 
 def _transform(workspace, identity, space_id, restore_id, groups, decisions):

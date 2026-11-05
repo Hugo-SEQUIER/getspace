@@ -10,7 +10,7 @@ from test_workspace import command_database as command_database_fixture
 from test_workspace import commands as commands_fixture
 from test_workspace import delegated
 
-from space import space_map, systems, workspace_items
+from space import archive_schema, space_map, systems, workspace_items
 from space.memory import RecallRequest
 from space.workspace import CommandError
 
@@ -415,3 +415,117 @@ def test_a_promotion_that_fails_after_its_memory_recovers_on_retry(lab, monkeypa
     entry = promote(service, owner, space, entry, command_id=command_id)
     [found] = recall(service, owner, space)
     assert found["id"] == entry["verdict"]["memory_id"]
+
+
+def test_a_verdict_topic_drops_the_characters_a_memory_topic_forbids(lab):
+    service, owner, space, _, _ = lab
+
+    def promoted_named(name, domain="Copy & hooks"):
+        system = systems.save_system(
+            service,
+            owner,
+            space,
+            systems.SaveSystem(
+                command_id=uuid4(), expected_revision=0, data=systems.SystemData(name=name)
+            ),
+        )
+        entry = systems.save_entry(
+            service,
+            owner,
+            space,
+            systems.SaveLabEntry(
+                command_id=uuid4(),
+                expected_revision=0,
+                data=systems.LabEntryInput(
+                    name="A hook with a measured lift",
+                    system_id=system["id"],
+                    domain=domain,
+                    evidence="measured",
+                    source="Review",
+                ),
+            ),
+        )
+        return promote(service, owner, space, entry)
+
+    entry = promoted_named("Pipes | and\nnewlines")
+    memory = service.get_resource(owner, space, UUID(entry["verdict"]["memory_id"]))
+    assert memory["recall"]["topics"] == ["Pipes and newlines", "Copy & hooks"]
+
+    fallback = promoted_named("|||\n", domain="Social")
+    memory = service.get_resource(owner, space, UUID(fallback["verdict"]["memory_id"]))
+    assert memory["recall"]["topics"] == ["Social"]
+
+
+def test_a_restored_verdict_without_its_system_is_still_recalled(lab):
+    from dataclasses import replace
+
+    from test_restore_staging import stage
+    from test_workspace_archive import read_archive
+
+    from space import restore_merge as merge
+
+    service, owner, space, _, entry = lab
+    entry = promoted(service, owner, space, entry)
+    archive = read_archive(service, owner, space)
+    for record in archive["entries"]:
+        verdict = record["value"].get("verdict")
+        if record["entity"] == "resource" and verdict:
+            verdict.pop("system")
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    upload = stage(service, target, target_space, archive)
+    review = merge.review(service, target, target_space, upload.id, merge.Review())
+    merge.commit(
+        service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
+    )
+    [found] = recall(service, target, target_space)
+    assert found["verdict"]["label"] == "works"
+    assert "system" not in found["verdict"] and "url" not in found["verdict"]
+
+
+def test_archive_validation_rejects_a_dangling_system_or_playbook(lab):
+    from test_workspace_archive import read_archive
+
+    service, owner, space, system, entry = lab
+    broken = read_archive(service, owner, space)
+    for record in broken["entries"]:
+        if record["value"]["id"] == entry["id"]:
+            record["value"]["system_id"] = str(uuid4())
+    with pytest.raises(ValueError, match="linked system"):
+        archive_schema.validate_archive(broken)
+
+    broken = read_archive(service, owner, space)
+    for record in broken["entries"]:
+        if record["value"]["id"] == system["id"]:
+            record["value"]["playbook_id"] = str(uuid4())
+    with pytest.raises(ValueError, match="linked playbook"):
+        archive_schema.validate_archive(broken)
+
+
+def test_a_retried_create_answers_with_the_entry_after_its_system_is_archived(lab):
+    service, owner, space, system, _ = lab
+    command_id = uuid4()
+    data = systems.LabEntryInput(name="Third idea", system_id=system["id"], domain="Social")
+    created = systems.save_entry(
+        service,
+        owner,
+        space,
+        systems.SaveLabEntry(command_id=command_id, expected_revision=0, data=data),
+    )
+    current = workspace_items.get(service, owner, space, UUID(system["id"]))
+    workspace_items.visibility(
+        service,
+        owner,
+        space,
+        UUID(system["id"]),
+        workspace_items.ChangeVisibility(
+            command_id=uuid4(), expected_revision=current["revision"], deleted=True
+        ),
+    )
+    again = systems.save_entry(
+        service,
+        owner,
+        space,
+        systems.SaveLabEntry(command_id=command_id, expected_revision=0, data=data),
+    )
+    assert again["id"] == created["id"] and again["name"] == "Third idea"

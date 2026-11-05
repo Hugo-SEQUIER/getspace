@@ -340,6 +340,13 @@ def validate_archive(raw):
                 linked = groups.get(("item", _id(ref)))
                 if not linked or linked[-1]["value"]["kind"] != kind:
                     raise ValueError("Archive is missing a classification item")
+            if entity == "item" and value.get("system_id"):
+                linked = groups.get(("item", _id(value["system_id"])))
+                if not linked or linked[-1]["value"]["kind"] != "system":
+                    raise ValueError("Archive is missing a linked system")
+            if entity == "item" and value.get("playbook_id"):
+                if not groups.get(("resource", _id(value["playbook_id"]))):
+                    raise ValueError("Archive is missing a linked playbook")
             for claim in value.get("_memory", {}).get("claims", []):
                 for ref in (claim.get("routing") or {}).get("target_ids", []):
                     linked = groups.get(("item", _id(ref)))

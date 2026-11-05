@@ -334,6 +334,7 @@ def _active_system(workspace, identity, space_id, system_id):
 def _commit(workspace, identity, space_id, kind, item_id, command_id, expected_revision, data):
     model = SystemData if kind == "system" else LabEntryData
     data = model.model_validate(data).model_dump(mode="json")
+    workspace_items.check_item_size(data)
     workspace_items._commit(
         workspace,
         identity,
@@ -397,12 +398,14 @@ def save_entry(workspace, identity, space_id, request: SaveLabEntry):
     in testing. A live verdict is not edited: its memory would no longer match it.
     Output: the saved entry.
     """
-    _active_system(workspace, identity, space_id, request.data.system_id)
+    # A retry answers with what its first attempt wrote, before any check that the system is
+    # still active: the write already happened, so the system may have been archived since.
     entry_id = request.entry_id or uuid5(request.command_id, "lab_entry")
+    if replayed := _replayed(workspace, identity, space_id, request, entry_id):
+        return replayed
+    _active_system(workspace, identity, space_id, request.data.system_id)
     data = request.data.model_dump(mode="json")
     if request.entry_id:
-        if replayed := _replayed(workspace, identity, space_id, request, request.entry_id):
-            return replayed
         current = _current(
             workspace, identity, space_id, entry_id, "lab_entry", request.expected_revision
         )
@@ -444,6 +447,16 @@ def gate(entry, system):
     if system is None or system["deleted"]:
         problems.append("Assign an active system")
     return problems
+
+
+def _topic(name, fallback):
+    """Parameters: a system name and the entry's domain.
+    What it does: makes the name a topic a memory accepts. A topic forbids `|`, CR and LF,
+    holds at most 100 characters and is never empty.
+    Output: the cleaned name, or the domain when nothing of the name is left.
+    """
+    cleaned = " ".join(name.replace("|", " ").split())[:100].strip()
+    return cleaned or fallback
 
 
 def _verdict_text(entry, system, label):
@@ -517,6 +530,9 @@ def promote(workspace, identity, space_id, entry_id, request: Promote):
     label = VERDICT_LABELS[request.verdict]
     promoted_at = datetime.now(UTC)
     memory_id = uuid5(request.command_id, "verdict")
+    topics = [_topic(system["name"], entry["domain"])]
+    if topics[0] != entry["domain"]:
+        topics.append(entry["domain"])
     memory = workspace.remember(
         identity,
         space_id,
@@ -524,7 +540,7 @@ def promote(workspace, identity, space_id, entry_id, request: Promote):
             command_id=uuid5(request.command_id, "verdict-memory"),
             title=entry["name"],
             text=_verdict_text(entry, system, label),
-            topics=[system["name"][:100], entry["domain"]],
+            topics=topics,
             importance=2 if entry["evidence"] == "measured" else 1,
         ),
         verdict={

@@ -513,10 +513,12 @@ def _entry(item: dict, request: RecallRequest, source_url, entry_url=None) -> di
         )
         entry["url"] += "#memory-" + item["entry_id"]
     if item.get("verdict"):
-        # A promoted lab entry: its label, evidence level and a link back to the entry.
+        # A promoted lab entry: its label, evidence level and a link back to the entry. A
+        # stored verdict block may lack its system; the link is then left out.
         verdict = dict(item["verdict"])
-        if entry_url is not None:
-            verdict["url"] = entry_url(verdict["system"]["id"], verdict["entry_id"])
+        system = verdict.get("system") or {}
+        if entry_url is not None and system.get("id") and verdict.get("entry_id"):
+            verdict["url"] = entry_url(system["id"], verdict["entry_id"])
         entry["verdict"] = verdict
     if item.get("evidence_context"):
         entry["evidence_context"] = item["evidence_context"]
