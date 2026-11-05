@@ -721,36 +721,6 @@
 .sp-memory-layout.is-list .sp-memory-list-head {
   grid-template-columns: minmax(0, 1fr) 110px;
 }
-/* The list reads one page at a time; older memory sits behind this compact footer. */
-.sp-memory-layout.is-list .sp-memory-more {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 12px 2px 4px;
-  border-top: 1px solid var(--color-rule);
-}
-.sp-memory-layout.is-list .sp-memory-more p {
-  margin: 0;
-  font-size: var(--text-caption);
-  line-height: 1.5;
-}
-.sp-memory-layout.is-list .sp-memory-more button {
-  flex: 0 0 auto;
-  font-size: var(--text-meta);
-  color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-rule);
-  border-radius: 999px;
-  padding: 4px 12px;
-  min-height: 26px;
-  cursor: pointer;
-}
-.sp-memory-layout.is-list .sp-memory-more button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
 .sp-memory-layout .sp-empty,
 .sp-memory-layout .sp-memory-loading {
   position: absolute;

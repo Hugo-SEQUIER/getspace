@@ -175,7 +175,7 @@ function useData() {
   const [cursors, setCursors] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [memoryLoading, setMemoryLoading] = useState(false);
-  const [memoryMoreLoading, setMemoryMoreLoading] = useState(false);
+  const [memoryAllLoading, setMemoryAllLoading] = useState(false);
   const [memoryLoaded, setMemoryLoaded] = useState(false);
   const [error, setError] = useState("");
   const [memoryError, setMemoryError] = useState("");
@@ -183,7 +183,7 @@ function useData() {
   const generation = useRef(0);
   const pending = useRef(new Map<string, string>());
   const memoryRequests = useRef(0);
-  const memoryMoreBusy = useRef(false);
+  const memoryAllBusy = useRef(false);
   const latestResources = useRef(resources);
   latestResources.current = resources;
   const memoryHasLoaded = useRef(memoryLoaded);
@@ -627,43 +627,16 @@ function useData() {
     };
   }, [space, jobPollVersion]);
 
-  // Parameters: none. It continues from the loaded cursor.
-  // What it does: appends the next newest-first page and keeps the cursor that follows
-  //   it. A full reload started while this page was in flight owns the list instead.
-  // Output: nothing. Failures reach the view as memoryError.
-  const loadMoreMemories = useCallback(async () => {
-    if (!space || !memoryCursor || memoryMoreBusy.current) return;
-    const current = memoryRequests.current;
-    memoryMoreBusy.current = true;
-    setMemoryMoreLoading(true);
-    setMemoryError("");
-    try {
-      const result = await memoryPage(space.id, { after: memoryCursor });
-      if (current !== memoryRequests.current) return;
-      const page = normalizeMemories(result.items, resources);
-      setMemories((old) => [
-        ...old,
-        ...page.filter((m) => !old.some((o) => o.id === m.id)),
-      ]);
-      setMemoryCursor(result.next_cursor);
-      setMemoryLoaded(true);
-    } catch (e) {
-      if (current === memoryRequests.current) setMemoryError(message(e));
-    } finally {
-      memoryMoreBusy.current = false;
-      setMemoryMoreLoading(false);
-    }
-  }, [space, memoryCursor, resources, memoryPage]);
-
   // Parameters: none. It continues until the server has no older page.
-  // What it does: walks the newest-first pages and appends them, so the graph can show
-  //   every memory. A full reload started while a page is in flight owns the list instead.
+  // What it does: walks the newest-first pages and appends them, so both views hold every
+  //   memory and the list can page through all of them. A full reload started while a page
+  //   is in flight owns the list instead.
   // Output: nothing. Failures reach the view as memoryError.
   const loadAllMemories = useCallback(async () => {
-    if (!space || !memoryCursor || memoryMoreBusy.current) return;
+    if (!space || !memoryCursor || memoryAllBusy.current) return;
     const current = memoryRequests.current;
-    memoryMoreBusy.current = true;
-    setMemoryMoreLoading(true);
+    memoryAllBusy.current = true;
+    setMemoryAllLoading(true);
     setMemoryError("");
     try {
       let cursor: string | null = memoryCursor;
@@ -686,10 +659,15 @@ function useData() {
         setMemoryLoaded(true);
       }
     } catch (e) {
-      if (current === memoryRequests.current) setMemoryError(message(e));
+      if (current === memoryRequests.current) {
+        setMemoryError(message(e));
+        // Stop the view effect from retrying a failed walk; its Retry button reads the
+        // first page again and starts a fresh walk from there.
+        setMemoryCursor(null);
+      }
     } finally {
-      memoryMoreBusy.current = false;
-      setMemoryMoreLoading(false);
+      memoryAllBusy.current = false;
+      setMemoryAllLoading(false);
     }
   }, [space, memoryCursor, resources, memoryPage]);
 
@@ -1182,8 +1160,8 @@ function useData() {
     setReadErrors({});
     setDismissedReadError("");
     setMemoryCursor(null);
-    memoryMoreBusy.current = false;
-    setMemoryMoreLoading(false);
+    memoryAllBusy.current = false;
+    setMemoryAllLoading(false);
     setMemoryError("");
     setError("");
     setLoading(false);
@@ -1436,7 +1414,7 @@ function useData() {
     organizationError: (["project", "category"] as const).map(kind => readErrors[kind]).find(Boolean),
     retryOrganization: () => retryReads(["project", "category"]),
     memoryLoading,
-    memoryMoreLoading,
+    memoryAllLoading,
     memoryLoaded,
     memoryCursor,
     memoryError,
@@ -1451,7 +1429,6 @@ function useData() {
     loadMore,
     loadMemories,
     loadProvider,
-    loadMoreMemories,
     loadAllMemories,
     searchMemories,
     readResource,
