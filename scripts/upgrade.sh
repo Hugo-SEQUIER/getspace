@@ -3,11 +3,11 @@
 #   scripts/upgrade.sh
 #   scripts/upgrade.sh v0.4.0
 #   scripts/upgrade.sh --build     # build the images here instead of downloading them
-# It downloads the release's images, backs up the database and the file folder, switches this
-# folder to the release, moves any file bytes still in the database onto the folder and
-# restarts Space. If the download fails, nothing changes. Database migrations run on start
-# and only move forward, so it refuses to go back to an older release; restore a backup taken
-# with that release instead.
+# It downloads the release's images, backs up the database and the file folder, stops Space,
+# switches this folder to the release, applies its migrations, moves any file bytes still in
+# the database onto the folder and starts the new release. If the download fails, nothing
+# changes. Migrations only move forward, so it refuses to go back to an older release;
+# restore a backup taken with that release instead.
 set -euo pipefail
 
 # Everything runs inside main, which bash reads completely before running it: switching
@@ -62,6 +62,11 @@ main() {
   fi
   # The dump and the file folder, both needed to restore this version.
   scripts/backup.sh
+  # Nothing may serve from here until the new release is up: an older release reads a part's
+  # bytes from the database column the move empties, so a download, viewer or thumbnail in
+  # that window answers 500. Stopping before the checkout keeps the service names below in
+  # step with the compose.yaml of the release that is running, and leaves db and caddy up.
+  docker compose stop web api worker webhooks
   git -c advice.detachedHead=false checkout --quiet "$target"
   set_version "$target"
   if [ "$build" -eq 1 ]; then

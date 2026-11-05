@@ -3,8 +3,11 @@
 #   backups/space-<UTC time>.dump           every document, task, database, memory and setting
 #   backups/space-<UTC time>.files.tar.gz   the folder holding the bytes of uploaded files
 # Both are needed. The database keeps the path of each file part, not its bytes, so a dump
-# alone restores documents whose files are missing. Copy both off the server, with .env: a
-# backup on the same disk is not one.
+# alone restores documents whose files are missing. They are taken a few seconds apart rather
+# than at one instant, so a document written or deleted between them leaves the pair
+# disagreeing on one part; `docker compose run --rm migrate python -m space.files.reconcile`
+# names that part after a restore. Copy both off the server, with .env: a backup on the same
+# disk is not one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

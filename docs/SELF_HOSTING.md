@@ -152,7 +152,7 @@ scripts/upgrade.sh            # the latest release
 scripts/upgrade.sh v0.4.0     # or a specific one
 ```
 
-The script downloads the release's images, takes a backup with `scripts/backup.sh`, switches the folder to the release, sets `SPACE_VERSION` in `.env` and restarts Space. If the images cannot be downloaded, it stops before changing anything. `scripts/upgrade.sh --build` builds the images on the server instead, which needs 2 GB of memory. The `migrate` service applies new database migrations before the API starts. Migrations only move forward, so the script refuses an older release; to go back, restore a backup taken with that version. [Releases](https://github.com/Hugo-SEQUIER/getspace/releases) lists what each version changes.
+The script downloads the release's images, takes a backup with `scripts/backup.sh`, stops the website, the API, the workers and the webhooks, switches the folder to the release, sets `SPACE_VERSION` in `.env` and starts the new release. It stops them because a release that kept file bytes in the database reads them from the column the move empties, so the outage covers the migration and the move (seconds, or minutes on a large v0.5.0 installation) instead of every download answering 500 while it runs. If the images cannot be downloaded, it stops before changing anything. `scripts/upgrade.sh --build` builds the images on the server instead, which needs 2 GB of memory. The `migrate` service applies new database migrations before the API starts. Migrations only move forward, so the script refuses an older release; to go back, restore a backup taken with that version. [Releases](https://github.com/Hugo-SEQUIER/getspace/releases) lists what each version changes.
 
 The script refuses to run if files of the checkout were changed locally, since switching releases would overwrite them. Put your own additions, such as an Ollama service, in `compose.override.yaml` next to `compose.yaml`: Docker Compose reads it automatically and upgrades leave it alone.
 
@@ -162,7 +162,7 @@ The script refuses to run if files of the checkout were changed locally, since s
 scripts/backup.sh
 ```
 
-This writes two files for the same moment: `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation (every document, task, database, memory, agent connection and setting), and `backups/space-<UTC time>.files.tar.gz`, the uploaded files of the documents that keep one, from the `files-data` volume at `/var/lib/space/files`. A backup is the pair: the dump alone brings back documents whose files are not there. Copy both, plus `.env`, somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /opt/space && scripts/backup.sh` takes a nightly backup; prune old files yourself.
+This writes two files, seconds apart, that belong together: `backups/space-<UTC time>.dump`, a PostgreSQL archive of the whole installation (every document, task, database, memory, agent connection and setting), and `backups/space-<UTC time>.files.tar.gz`, the uploaded files of the documents that keep one, from the `files-data` volume at `/var/lib/space/files`. Because the two are not taken at one instant, a document written or deleted between them leaves the pair disagreeing on one part, which `docker compose run --rm migrate python -m space.files.reconcile` names after a restore. A backup is the pair: the dump alone brings back documents whose files are not there. Copy both, plus `.env`, somewhere off the server, and keep `.env` as private as the backup, since each contains secrets. A `cron` entry such as `0 3 * * * cd /opt/space && scripts/backup.sh` takes a nightly backup; prune old files yourself.
 
 Uploaded files live outside PostgreSQL, in the `files-data` volume. The database keeps their path, their sizes and a digest, so a Space with large files grows that volume rather than the database and its dumps. Watch the disk: `docker system df -v` shows the volume's size, and `du -sh /var/lib/space/files` inside the `api` container gives the same number.
 
@@ -176,7 +176,7 @@ This stops the website, the API and the workers, replaces the database contents 
 
 ### Moving uploaded files out of the database
 
-An installation upgraded from v0.5.0 keeps the files it received in the database, because that release stored them there. The upgrade runs the move for you; to run it yourself, or to check one that was interrupted:
+An installation upgraded from v0.5.0 keeps the files it received in the database, because that release stored them there. The upgrade runs the move for you, and it stops Space first so no request reads a part whose bytes are already gone; a download during it gets the site unavailable rather than a 500. To run the move yourself, or to check one that was interrupted:
 
 ```sh
 docker compose run --rm migrate python -m space.files.move --dry-run
