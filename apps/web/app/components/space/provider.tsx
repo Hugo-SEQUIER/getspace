@@ -81,8 +81,8 @@ const MEMORY_PAGE_SIZE = 50;
 // The server caps one memory page at 200. A complete read and a search both ask for that
 // cap instead of one display page, so the vectors view and every query see every memory.
 const MEMORY_MAX_PAGE_SIZE = 200;
-// Files saved in the sample workspace stay in this tab's memory; only their documents are
-// written to browser storage, so a reload keeps the page and loses the bytes.
+// Files travel through the same API as everything else; this indirection keeps the file
+// paths in one place.
 const fileRequest: FileRequest = (path, method, body, signal) => api(path, method, body, signal);
 
 export type FileDraft = {
@@ -1326,9 +1326,17 @@ function useData() {
       `spaces/${space.id}/databases/${database.id}/changes`,
       change,
     );
-    const next = { ...result.database, records: database.records, recordsLoaded: true };
-    rememberDatabase(next);
-    return next;
+    // The rows are known when this page held them, or when the change itself carried them.
+    // Otherwise the save only touched the schema (a project link, for example) and the answer
+    // holds no rows: remember the database without any, so opening it reads them.
+    if (saved.recordsLoaded || change.upsert.length || change.delete.length) {
+      const next = { ...result.database, records: database.records, recordsLoaded: true };
+      rememberDatabase(next);
+      return next;
+    }
+    const { records: _rows, ...withoutRows } = result.database;
+    rememberDatabase(withoutRows as WorkspaceDatabase);
+    return { ...withoutRows, records: [], recordsLoaded: false } as WorkspaceDatabase;
   }
   async function latestDatabase(id: string) {
     if (!space) throw new Error("Open a space first.");
@@ -1359,6 +1367,9 @@ function useData() {
     // A self-hosted Space has no plan: only a viewer role makes it read-only.
     canWrite: space?.role !== "viewer",
     deleteResource,
+    // Systems write through the same command IDs: an identical payload reuses one, so a
+    // retried submit lands once.
+    command,
     deleteTasks,
     switchWorkspace,
     agents,

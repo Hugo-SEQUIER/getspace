@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { api, message, watchApi } from "../../../lib/client";
+import { message, watchApi } from "../../../lib/client";
 import {
   entryTimeline, isVerdict, laneLabel, promotionBlocker, promotionGate,
   type LabEntry, type LabRevision, type System,
 } from "../../../lib/space/systems";
 import { useFeedback } from "../notifications";
 import { Modal, authorName } from "./ui";
+import { useSpace } from "./provider";
 import { Icon } from "./ui-icon";
 import { EntryDialog } from "./systems-forms";
 import { EvidenceMeter, LaneMark, dayLabel, dayPhrase } from "./systems-parts";
@@ -191,6 +192,7 @@ function ActionDialog({ action, entry, spaceId, onClose, onDone }: {
   action: Action; entry: LabEntry; spaceId: string; onClose: () => void; onDone: (entry: LabEntry) => void;
 }) {
   const copy = ACTIONS[action];
+  const data = useSpace();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -199,13 +201,13 @@ function ActionDialog({ action, entry, spaceId, onClose, onDone }: {
     event.preventDefault();
     if (action === "use" && !text.trim()) { setError("Say where it was used."); return; }
     setBusy(true);
-    const base = { command_id: crypto.randomUUID(), expected_revision: entry.revision };
+    const base = { expected_revision: entry.revision };
     try {
       onDone(action === "use"
-        ? await api<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/uses`, "POST", { ...base, used_in: text.trim() })
+        ? await data.command<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/uses`, { ...base, used_in: text.trim() })
         : action === "validated" || action === "invalidated"
-          ? await api<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/promote`, "POST", { ...base, verdict: action, note: text.trim() })
-          : await api<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/demote`, "POST", { ...base, status: action, note: text.trim() }));
+          ? await data.command<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/promote`, { ...base, verdict: action, note: text.trim() })
+          : await data.command<LabEntry>(`spaces/${spaceId}/systems/entries/${entry.id}/demote`, { ...base, status: action, note: text.trim() }));
     } catch (e) {
       setError(message(e));
       setBusy(false);
@@ -233,7 +235,7 @@ function ActionDialog({ action, entry, spaceId, onClose, onDone }: {
   );
 }
 
-// Parameters: the open entry and the Space (null in the sample workspace).
+// Parameters: the open entry and the Space's ID.
 // What it does: reads the entry's revisions and shows what changed in each, newest first,
 // with its note, author and time. It reads again whenever the entry gets a new revision.
 // Output: a section.

@@ -23,7 +23,7 @@ function ago(at: string) {
   return dayPhrase(at);
 }
 
-// Parameters: the workspace base, the Space (null in the sample workspace) and, on a
+// Parameters: the workspace base, the Space's ID and, on a
 // system's page, that system's id and name.
 // What it does: follows the lab's latest revisions and names what each changed, who made
 // it and when, linking to the entry. Rows that arrive after the first read slide in from

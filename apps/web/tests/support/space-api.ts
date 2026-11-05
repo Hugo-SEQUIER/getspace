@@ -36,6 +36,19 @@ export type FolderRow = { id: string; kind: 'folder'; name: string; description:
 export type SectionRow = { id: string; kind: 'section'; name: string; description: string; revision: number; deleted: boolean };
 /** The fixture backend's part size, the same as the real one. */
 export const FILE_PART_BYTES = 1_048_576;
+/** Parameters: the namespace UUID and a name, as the backend calls uuid5(command_id, kind).
+ * What it does: builds the version 5 UUID (SHA-1 of the namespace bytes and the name) that a
+ * create derives from its command, so a retried create lands on the item it already made.
+ * Output: the UUID string. */
+export function uuid5(namespace: string, name: string) {
+  const digest = createHash('sha1')
+    .update(Buffer.concat([Buffer.from(namespace.replace(/-/g, ''), 'hex'), Buffer.from(name, 'utf8')]))
+    .digest();
+  digest[6] = (digest[6] & 0x0f) | 0x50;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = digest.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 export type SeenMark = { resource_id: string; seen_revision: number; seen_at: string };
 /** A project or database as the items API returns it: its data plus identity and revision. */
 export type Item = { id: string; kind: 'project' | 'database'; revision: number; deleted?: boolean; [field: string]: unknown };
@@ -144,7 +157,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     fileReads: [] as string[],
     /** File IDs whose staged parts the app discarded after a failed upload. */
     fileDiscards: [] as string[],
-    /** A part number whose upload is refused, to exercise a failed upload. */
+    /** A part number whose upload is refused, as a part the Space already holds. */
     failFilePart: null as number | null,
     /** The last archive upload: its manifest and the text of each part. */
     restore: null as { manifest: { id: string; sha256: string; bytes: number; parts: number }; parts: string[] } | null,
@@ -250,12 +263,15 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     if (filePart && method === 'POST') {
       const [, fileId, index] = filePart, part = Number(index);
       const raw = Buffer.from(body.data, 'base64');
-      if (!raw.length || raw.length > FILE_PART_BYTES) return send({ error: 'A file part holds 1 byte to 1 MiB.' }, 413);
-      if (part >= 250) return send({ error: 'A file has at most 250 parts.' }, 422);
-      if (part === state.failFilePart) return send({ error: 'This Space has reached its storage limit.' }, 429);
+      if (part >= 250) return send({ error: 'A file has at most 250 parts' }, 422);
+      if (!raw.length) return send({ error: 'A file part cannot be empty' }, 422);
+      if (raw.length > FILE_PART_BYTES) return send({ error: 'A file part holds at most 1 MiB' }, 413);
+      // The one refusal a Space can give a part it already holds: other bytes under the same
+      // number. The whole upload is retried, never the part alone.
+      if (part === state.failFilePart) return send({ error: 'This file part was already uploaded with different content' }, 409);
       const parts = state.fileParts.get(fileId) ?? [];
       if (parts[part] !== undefined && parts[part] !== body.data)
-        return send({ error: 'This file part already holds different bytes. Upload the file again.' }, 409);
+        return send({ error: 'This file part was already uploaded with different content' }, 409);
       parts[part] = body.data;
       state.fileParts.set(fileId, parts);
       return send({ file_id: fileId, part, bytes: raw.length });
@@ -398,12 +414,17 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     if (path.endsWith('/systems') && method === 'POST') {
       state.systemCommands.push(body);
       expect(body.command_id).toBeTruthy();
-      const current = state.systems.find(system => system.id === body.system_id);
+      // A create names no system and saves at revision 0; an update names the system it read.
+      if ((body.system_id === undefined) !== (body.expected_revision === 0))
+        return send({ error: 'Create with revision 0; updates require the system ID' }, 422);
+      // The ID of a created system comes from its command, so a retry lands on the same one.
+      const id = body.system_id ?? uuid5(body.command_id, 'system');
+      const current = state.systems.find(system => system.id === id);
       if ((current?.revision ?? 0) !== body.expected_revision)
         return send({ error: 'This system changed. Refresh before saving.' }, 409);
       if (!body.data.name?.trim()) return send({ error: 'A name is required' }, 400);
       const saved: SystemRow = {
-        ...blankSystem(), ...current, ...body.data, id: body.system_id ?? crypto.randomUUID(), kind: 'system',
+        ...blankSystem(), ...current, ...body.data, id, kind: 'system',
         revision: body.expected_revision + 1, deleted: false, updated_at: fixtureNow(),
       };
       state.systems = [...state.systems.filter(system => system.id !== saved.id), saved];
@@ -419,7 +440,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (!state.systems.some(system => system.id === body.data.system_id && !system.deleted))
         return send({ error: 'Choose an active system' }, 409);
       const saved: LabEntryRow = {
-        ...blankEntry(), ...current, ...body.data, id: body.entry_id ?? crypto.randomUUID(), revision: body.expected_revision + 1, updated_at: fixtureNow(),
+        ...blankEntry(), ...current, ...body.data, id: body.entry_id ?? uuid5(body.command_id, 'lab_entry'), revision: body.expected_revision + 1, updated_at: fixtureNow(),
       };
       putEntry(saved);
       return send(saved);
@@ -479,7 +500,7 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (areaItem.kind === 'system' && body.deleted && state.labEntries.some(entry => !entry.deleted && entry.system_id === areaItem.id && entry.verdict))
         return send({ error: "Move this system's verdicts back to Testing or retire them first" }, 409);
       if (areaItem.kind === 'lab_entry' && body.deleted && areaItem.verdict)
-        return send({ error: 'Move this verdict back to Testing before archiving it' }, 409);
+        return send({ error: 'Move this verdict back to Testing or retire it first' }, 409);
       const saved = { ...areaItem, revision: areaItem.revision + 1, deleted: body.deleted, updated_at: fixtureNow() };
       if (saved.kind === 'system') state.systems = state.systems.map(item => item.id === saved.id ? saved as SystemRow : item);
       else putEntry(saved as LabEntryRow);

@@ -41,6 +41,10 @@ test('a database is linked to a project and shown on its page', async ({ app, sc
   // The Databases tab shows the same list.
   await screen.getByRole('button', 'Databases').tap();
   await expect(section.getByRole('link', 'Launch tasks')).toBeVisible();
+  // The link save carried no rows, so opening the database reads them rather than showing an
+  // empty table at the revision the link wrote.
   await section.getByRole('link', 'Launch tasks').tap();
   await expect(browser).toHaveURL(`/app/databases/${launchId}`);
+  await expect(screen.getByText(/1 of 1 record/)).toBeVisible();
+  expect(space.databaseReads.at(-1)).toBe(launchId);
 });

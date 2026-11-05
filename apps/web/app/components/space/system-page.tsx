@@ -1,6 +1,6 @@
 import Link, { useRouter, useSearchParams } from "@web/lib/navigation";
 import { useCallback, useRef, useState } from "react";
-import { api, message } from "../../../lib/client";
+import { message } from "../../../lib/client";
 import {
   LANES, cadenceLabel, localToday, percent, reviewState, systemInput,
   type LabEntry, type LabStatus, type System,
@@ -81,8 +81,8 @@ export function SystemPage({ base, id }: { base: string; id: string }) {
     if (!system || !spaceId) return;
     setBusy(true);
     try {
-      keep(await api<System>(`spaces/${spaceId}/systems`, "POST", {
-        command_id: crypto.randomUUID(), system_id: system.id, expected_revision: system.revision,
+      keep(await data.command<System>(`spaces/${spaceId}/systems`, {
+        system_id: system.id, expected_revision: system.revision,
         data: { ...systemInput(system), last_review: localToday() },
       }));
       setNotice("Review recorded for today");

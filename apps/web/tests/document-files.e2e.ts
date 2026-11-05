@@ -130,7 +130,7 @@ test('a failed upload discards the parts it already sent', async ({ app, screen,
   const dialog = screen.getByRole('dialog', 'Upload files');
   await dialog.getByLabel('Choose a file to import').setInputFiles(await fixture('backup.zip', randomBytes(FILE_PART_BYTES * 2 + 5)));
   await dialog.getByRole('button', 'Save file').tap();
-  await expect(screen.getByText('This Space has reached its storage limit.')).toBeVisible();
+  await expect(screen.getByText('This file part was already uploaded with different content')).toBeVisible();
   await expect.poll(() => space.fileDiscards.length).toBe(1);
   expect(space.fileParts.size).toBe(0);
   expect(space.fileCommands).toEqual([]);
@@ -274,7 +274,7 @@ test('a failed file in a batch is reported while the others save', async ({ app,
   await dialog.getByRole('button', 'Save 2 files').tap();
   await expect(dialog.getByRole('status', 'notes.txt: Saved')).toBeVisible();
   await expect(dialog.getByRole('status', 'backup.zip: Failed')).toBeVisible();
-  await expect(dialog.getByText(/This Space has reached its storage limit\./)).toBeVisible();
+  await expect(dialog.getByText(/This file part was already uploaded with different content/)).toBeVisible();
   await expect(dialog.getByRole('button', 'Retry the failed file')).toBeEnabled();
   expect(space.fileCommands).toHaveLength(1);
   await expect.poll(() => space.fileDiscards.length).toBe(1);

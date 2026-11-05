@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { api, message } from "../../../lib/client";
+import { message } from "../../../lib/client";
 import {
   CADENCES, EVIDENCE, SYSTEM_STATUSES, entryInput, systemInput,
   type Cadence, type Evidence, type LabEntry, type LabEntryInput, type System, type SystemInput, type SystemStatus,
@@ -23,13 +23,6 @@ const blankSystem: SystemInput = {
   counter_metric: "", source_of_truth: "", review_cadence: null, last_review: null, next_decision: "", playbook_id: null,
 };
 
-/** Archives an item through the shared visibility route; the backend refuses a live verdict. */
-async function archive<T extends System | LabEntry>(spaceId: string, item: T) {
-  return api<T>(`spaces/${spaceId}/items/${item.id}/visibility`, "POST", {
-    command_id: crypto.randomUUID(), expected_revision: item.revision, deleted: true,
-  });
-}
-
 // Parameters: the Space, the system to edit (none to create), and what to do once saved or archived.
 // What it does: edits every field of a system in one form and saves it as one revision; an
 // existing system can also be archived from the footer's left.
@@ -50,8 +43,8 @@ export function SystemDialog({ spaceId, system, onClose, onSaved, onArchived }: 
     if (!draft.name.trim()) { setError("Enter a name."); return; }
     setBusy(true);
     try {
-      onSaved(await api<System>(`spaces/${spaceId}/systems`, "POST", {
-        command_id: crypto.randomUUID(), ...(system ? { system_id: system.id } : {}),
+      onSaved(await data.command<System>(`spaces/${spaceId}/systems`, {
+        ...(system ? { system_id: system.id } : {}),
         expected_revision: system?.revision ?? 0, data: { ...draft, name: draft.name.trim() },
       }));
     } catch (e) {
@@ -67,7 +60,10 @@ export function SystemDialog({ spaceId, system, onClose, onSaved, onArchived }: 
     })) return;
     setBusy(true);
     try {
-      onArchived?.(await archive(spaceId, system));
+      // The backend refuses a live verdict: archive goes through the shared visibility route.
+      onArchived?.(await data.command<System>(`spaces/${spaceId}/items/${system.id}/visibility`, {
+        expected_revision: system.revision, deleted: true,
+      }));
     } catch (e) {
       setError(message(e));
       setBusy(false);
@@ -149,6 +145,7 @@ export function EntryDialog({ spaceId, entry, systemId, systems, domains, onClos
   onClose: () => void; onSaved: (entry: LabEntry) => void; onArchived?: (entry: LabEntry) => void;
 }) {
   const confirm = useConfirm();
+  const data = useSpace();
   const [draft, setDraft] = useState<LabEntryInput>(entry ? entryInput(entry) : {
     name: "", system_id: systemId, domain: "", evidence: "untested", why: "", apply: "", applies_to: "", source: "", captured: null, note: "",
   });
@@ -162,8 +159,8 @@ export function EntryDialog({ spaceId, entry, systemId, systems, domains, onClos
     if (!draft.domain) { setError("Choose a domain."); return; }
     setBusy(true);
     try {
-      onSaved(await api<LabEntry>(`spaces/${spaceId}/systems/entries`, "POST", {
-        command_id: crypto.randomUUID(), ...(entry ? { entry_id: entry.id } : {}),
+      onSaved(await data.command<LabEntry>(`spaces/${spaceId}/systems/entries`, {
+        ...(entry ? { entry_id: entry.id } : {}),
         expected_revision: entry?.revision ?? 0, data: { ...draft, name: draft.name.trim() },
       }));
     } catch (e) {
@@ -179,7 +176,9 @@ export function EntryDialog({ spaceId, entry, systemId, systems, domains, onClos
     })) return;
     setBusy(true);
     try {
-      onArchived?.(await archive(spaceId, entry));
+      onArchived?.(await data.command<LabEntry>(`spaces/${spaceId}/items/${entry.id}/visibility`, {
+        expected_revision: entry.revision, deleted: true,
+      }));
     } catch (e) {
       setError(message(e));
       setBusy(false);

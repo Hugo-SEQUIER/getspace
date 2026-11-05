@@ -3,7 +3,7 @@ import { message, watchApi } from "../../../lib/client";
 import type { WorkspaceDatabase } from "../../../lib/space/databases";
 import type { MemoryVector, Project, Resource, Status } from "../../../lib/space/types";
 
-type Kind = "document" | "task" | "project" | "database" | "memory" | "category" | "section" | "skill" | "system" | "lab_entry";
+type Kind = "document" | "task" | "project" | "database" | "memory" | "category" | "section" | "system" | "lab_entry";
 export type Entry = {
   id: string;
   kind: Kind;
@@ -51,7 +51,6 @@ const labels = {
   memory: "Memory",
   category: "Categories",
   section: "Sections",
-  skill: "Skills",
   system: "Systems",
   lab_entry: "Lab entries",
 };
@@ -59,7 +58,7 @@ const labels = {
 /** The route that opens each kind of entry by its id. */
 const paths: Record<Exclude<Kind, "category" | "section" | "lab_entry">, string> = {
   document: "documents", task: "tasks", project: "projects", database: "databases",
-  memory: "memory", skill: "skills", system: "systems",
+  memory: "memory", system: "systems",
 };
 
 function entryHref(base: string, item: Pick<Entry, "id" | "kind" | "system_id">) {
