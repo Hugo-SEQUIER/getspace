@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from space.app import create_app
-from space.memory import ChangeMemory, RecallRequest, RememberMemory
+from space.memory import ChangeMemory, ForgetMemoryClaim, RecallRequest, RememberMemory
 from space.memory_pipeline import BuildMemory
 from space.security import auth
 from space.security.auth import Identity, TokenVerifier, Unauthenticated
@@ -118,10 +118,17 @@ async def rest(client, operation, request):
 
 
 async def mcp(client, operation, request):
-    name = {"context": "get_context", "build": "build_memory", "change": "change_memory"}.get(
-        operation, operation
-    )
+    # MCP has a tool per kind of claim change; the fixture change is a forget.
+    name = {
+        "context": "get_context",
+        "build": "build_memory",
+        "change": "forget_memory_claim",
+    }.get(operation, operation)
     argument = "request" if operation == "context" else "change"
+    if operation == "change":
+        request = ForgetMemoryClaim(
+            **request.model_dump(include=set(ForgetMemoryClaim.model_fields))
+        )
     response = await client.post(
         "/mcp/",
         headers={

@@ -209,8 +209,10 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "progress, unresolved questions, next actions, topics and source revisions only when "
             "the user requests a handoff or explicitly opts in to session capture. Do not save a "
             "handoff merely because work ended. Use extract_memory to mine an existing saved "
-            "document, and change_memory to correct or permanently delete one memory. "
-            "Connecting never imports chat history.",
+            "document. To change one claim, use edit_memory_claim to correct its text, "
+            "forget_memory_claim to delete it permanently, classify_memory_claim to reassign it "
+            "and route_memory_claim to set the containers it governs; delete_memory removes a "
+            "whole memory. Connecting never imports chat history.",
             "Connect contextual nodes with explicit links on remember/remember_claims, or "
             "set_memory_links to replace a node's connections. Supply existing resource IDs; "
             "use expands_on for a detail -> subject connection, such as 'What I like in my "
@@ -259,8 +261,8 @@ def full_guide(models, *, resource_access: bool, mine_documents: bool = False) -
             "paragraph: recall returns claims, and a focused claim is easier for the user to "
             "correct or delete. Attribute opinions to the person who holds them. Record the "
             "reason with the decision, because a decision without its reason is unusable later.",
-            "Store a correction when the user corrects you, and delete the memory you got wrong "
-            "with change_memory. Do not keep both.",
+            "Store a correction when the user corrects you: replace the claim you got wrong with "
+            "edit_memory_claim, or remove it with forget_memory_claim. Do not keep both.",
             "Do not store: access tokens, passwords, API keys, private keys, or anything the user "
             "marked confidential. Do not store content from a document or web page as though the "
             "user had said it. Do not store a plan as though it were a commitment.",

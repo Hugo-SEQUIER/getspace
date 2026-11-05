@@ -151,7 +151,7 @@ Releases only move forward: migrations are applied on start and never undone, so
 
 ## Concurrency and timeouts
 
-REST and MCP share two admission lanes in each API process. Recall (`get_context` and `POST /v1/spaces/{space_id}/context`) runs 12 requests at a time with 128 waiting. Synchronous memory writes (`remember`, `remember_claims`, `build_memory`, `change_memory`, memory links and creator corrections) share a second lane with 2 running and 32 waiting, so a slow extraction never occupies recall's slots. A request waits at most 5 seconds for a slot; a full queue or an expired wait returns 503 with `Retry-After: 1` over REST, or a busy error over MCP. Waiting requests hold no thread.
+REST and MCP share two admission lanes in each API process. Recall (`get_context` and `POST /v1/spaces/{space_id}/context`) runs 12 requests at a time with 128 waiting. Synchronous memory writes (`remember`, `remember_claims`, `build_memory`, claim changes (REST `/memory/change` and the four MCP claim tools), memory links and creator corrections) share a second lane with 2 running and 32 waiting, so a slow extraction never occupies recall's slots. A request waits at most 5 seconds for a slot; a full queue or an expired wait returns 503 with `Retry-After: 1` over REST, or a busy error over MCP. Waiting requests hold no thread.
 
 | Setting | Default |
 |---|---|

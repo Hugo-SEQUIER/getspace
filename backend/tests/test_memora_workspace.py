@@ -210,7 +210,7 @@ def test_build_is_idempotent_readable_and_rejects_forged_memory(commands):
         for internal in ("text_hash", "vectors"):
             assert internal.encode() not in value
     # Ordinary writes cannot forge generated memory or bypass the index.
-    with pytest.raises(CommandError, match="change_memory"):
+    with pytest.raises(CommandError, match="edit_memory_claim"):
         service.save(
             writer,
             space,
@@ -965,7 +965,8 @@ def test_mcp_and_rest_share_memory_without_a_review_interface(commands, signing)
         ]
         assert {
             "remember",
-            "change_memory",
+            "edit_memory_claim",
+            "forget_memory_claim",
             "build_memory",
             "remember_claims",
             "extract_memory",

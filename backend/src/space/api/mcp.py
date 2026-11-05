@@ -27,10 +27,13 @@ from space import (
 from space.admission import AdmissionError, dispatch
 from space.memory import (
     MAX_MEMORY_LIST,
-    ChangeMemory,
+    ClassifyMemoryClaim,
+    EditMemoryClaim,
+    ForgetMemoryClaim,
     RecallRequest,
     RememberClaims,
     RememberMemory,
+    RouteMemoryClaim,
     SaveHandoff,
     SetMemoryLinks,
 )
@@ -532,7 +535,7 @@ def create_mcp(
             an active folder in this Space; unchanged archived references may remain.
             A project must name an existing project in this Space. Kind cannot change.
             Tasks cannot carry recall.category="handoff". Generated memory is never
-            edited here: use remember, remember_claims, extract_memory or change_memory.
+            edited here: use remember, remember_claims, extract_memory or edit_memory_claim.
             Prefer a status from task_columns; a new status value is saved as a column
             labelled from it (add_task_column picks the label), and set_task_status moves
             a task without resending its body. Set status
@@ -799,8 +802,9 @@ def create_mcp(
             matched word is; a search returns its best matches and no cursor. Without a
             query, follow next_cursor to page through the Space. Excluded memory resources
             are also listed, with recall.excluded=true, but cannot be recalled. Stale memory
-            is flagged and remains recallable unless excluded. Use change_memory to edit,
-            reclassify or forget one claim.
+            is flagged and remains recallable unless excluded. To change one claim, use
+            edit_memory_claim, forget_memory_claim, classify_memory_claim or
+            route_memory_claim.
             """
             # A bound call keeps the keyword-only page parameters out of `command`'s
             # positional contract with the admission queue.
@@ -877,7 +881,7 @@ def create_mcp(
             its index rows and its command history are removed. Deletion is permanent.
             Read the memory with list_memories first to get its current revision. Deleting
             an already absent record is a success. To remove a single claim and keep the
-            rest, use change_memory with action="forget" instead.
+            rest, use forget_memory_claim instead.
             """
             return await command(
                 lambda actor: resource_deletion.delete_memory(
@@ -886,30 +890,94 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        # One tool per kind of claim change, because the directories refuse a tool that
+        # selects among operations. Each overwrites or removes the claim, so all are
+        # destructive; edit and automatic classification call the configured models.
         @server.tool(
-            title="Change a memory claim",
+            title="Edit a memory claim",
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
             ),
         )
-        async def change_memory(
-            space_id: UUID, change: ChangeMemory, agent_id: UUID | None = None
+        async def edit_memory_claim(
+            space_id: UUID, change: EditMemoryClaim, agent_id: UUID | None = None
         ) -> dict[str, Any]:
-            """Edit, reclassify or permanently remove one claim, using its current IDs.
+            """Replace the text of one memory claim, using its current IDs.
 
-            resource_id is the memory record and entry_id is the claim; both come from
-            list_memories. action is edit, forget, classify or route. route sets routes_to,
-            the containers this claim governs; an empty list clears and pins it. A forget
-            removes the claim from the index immediately and is not a reversible exclusion,
-            though its text
-            remains in the previous immutable revision. classify pins manual assignments:
-            scope, category_ids, project_ids and section_ids, each list holding at most 32
-            unique IDs, and a project's active parent section is added automatically.
-            classify without classification replaces the assignments using the decision model when
-            configured. Never replace a user correction without their request. Read
-            list_memories first to get current entry IDs and values.
+            resource_id is the memory record and entry_id is the claim; read both, with the
+            current revision and value, from list_memories first. The new value, at most
+            2,000 characters, is re-indexed through the configured providers, and the
+            previous text remains in the earlier immutable revision. Never replace a user
+            correction without their request. Reuse command_id unchanged on retry.
             """
-            return await command(workspace.change_memory, space_id, change, agent_id=agent_id)
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Forget a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def forget_memory_claim(
+            space_id: UUID, change: ForgetMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Permanently remove one claim from a memory and keep its other claims.
+
+            resource_id is the memory record and entry_id is the claim; read both, with the
+            current revision, from list_memories first. The claim leaves the index at once,
+            so recall stops returning it. This is not a reversible exclusion, though its text
+            remains in the earlier immutable revision. To remove a whole memory record, use
+            delete_memory. Reuse command_id unchanged on retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Classify a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
+            ),
+        )
+        async def classify_memory_claim(
+            space_id: UUID, change: ClassifyMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Set the scope, categories, projects and sections of one memory claim.
+
+            Pass classification to pin a manual assignment: scope, category_ids,
+            project_ids and section_ids, each list holding at most 32 unique IDs; a
+            project's active parent section is added automatically. Omit classification to
+            have the decision model reclassify the claim, when one is configured. Either
+            replaces the claim's current assignments, so never replace a user correction
+            without their request. Read the IDs and current revision from list_memories
+            first, and reuse command_id unchanged on retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
+
+        @server.tool(
+            title="Route a memory claim",
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def route_memory_claim(
+            space_id: UUID, change: RouteMemoryClaim, agent_id: UUID | None = None
+        ) -> dict[str, Any]:
+            """Set the containers one memory claim governs as a placement rule.
+
+            routes_to holds up to 8 container IDs from get_space_map, where what the claim
+            describes belongs. It replaces the claim's current routing; an empty list clears
+            it and pins the clear, so automatic routing leaves the claim alone. Read the IDs
+            and current revision from list_memories first, and reuse command_id unchanged on
+            retry.
+            """
+            return await command(
+                workspace.change_memory, space_id, change.as_change(), agent_id=agent_id
+            )
 
     # SDK-generated argument models otherwise include rejected input in errors.
     # Keep this covered by the transport regression test when upgrading the SDK.

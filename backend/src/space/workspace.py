@@ -951,7 +951,8 @@ class Workspace:
                 priority = old.get("priority")
             if old["recall"]["category"] == "memory" and memory is None:
                 raise CommandError(
-                    "Use change_memory to edit or delete a memory, or build_memory to rebuild it",
+                    "Change a memory's claims with edit_memory_claim or forget_memory_claim, "
+                    "delete it with delete_memory, or rebuild it with build_memory",
                     409,
                 )
             if recall is None:

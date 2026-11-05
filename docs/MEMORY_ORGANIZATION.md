@@ -29,7 +29,7 @@ Classification defaults to `disabled` and requires an enabled memory provider an
 REST and MCP share the same operations:
 
 - `/items` / `save_workspace_item`: `kind=category|section`, with `data={name, description}`; project data also accepts `section_id`.
-- `/memory/change` / `change_memory`: `action=classify` and a `classification` object pins a manual assignment. The object contains `scope`, `category_ids`, `project_ids` and `section_ids`. Omitting `classification` explicitly requests automatic classification by the decision model. All changes require the memory resource, entry ID, expected revision and idempotent command ID.
+- `/memory/change` with `action=classify`, or the MCP tool `classify_memory_claim`: a `classification` object pins a manual assignment. The object contains `scope`, `category_ids`, `project_ids` and `section_ids`. Omitting `classification` explicitly requests automatic classification. All changes require the memory resource, entry ID, expected revision and idempotent command ID.
 - Memory listing, resource reading and recall expose `classification` separately from `memory_type`. It records assignment IDs, `method` (`manual`, `decision`, `unassigned`) and a bounded status reason.
 
 Assignments live inside the memory revisions. Archive validation checks referenced item kinds, and restore-as-copy remaps category, project and section IDs, including project parents. Existing text edits and manual assignments retain their normal authority during a merge.

@@ -8,7 +8,7 @@ fallback and output budgeting. It has no database, model, key or network access.
 import json
 import re
 import unicodedata
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
@@ -333,6 +333,45 @@ class ChangeMemory(Input):
         if self.value is not None and not self.value.strip():
             raise ValueError("A memory must contain text")
         return self
+
+
+class MemoryClaimChange(Input):
+    """One claim addressed by its current IDs, for an MCP tool that makes one kind of change.
+
+    Directories require each operation to be its own tool, so MCP offers a tool per
+    action where REST takes ChangeMemory with an action field.
+    Output of as_change: the equivalent ChangeMemory, validated as REST validates it.
+    """
+
+    action: ClassVar[Literal["edit", "forget", "classify", "route"]]
+    command_id: UUID
+    resource_id: UUID
+    expected_revision: int = Field(ge=1, strict=True)
+    entry_id: UUID
+
+    def as_change(self) -> ChangeMemory:
+        return ChangeMemory(action=self.action, **self.model_dump())
+
+
+class EditMemoryClaim(MemoryClaimChange):
+    action = "edit"
+    value: str = Field(min_length=1, max_length=2000)
+
+
+class ForgetMemoryClaim(MemoryClaimChange):
+    action = "forget"
+
+
+class ClassifyMemoryClaim(MemoryClaimChange):
+    action = "classify"
+    # Omitted, the decision model reclassifies the claim.
+    classification: MemoryAssignment | None = None
+
+
+class RouteMemoryClaim(MemoryClaimChange):
+    action = "route"
+    # The containers this claim governs; an empty list clears routing and pins it.
+    routes_to: list[UUID] = Field(max_length=8)
 
 
 class RecallRequest(Input):

@@ -26,7 +26,10 @@ def delete_resource(workspace, identity, space_id, resource_id, expected_revisio
         if row is None:
             return {"deleted": True}
         if row["memory_kind"] == "memory":
-            raise CommandError("Generated memory is changed with change_memory", 400)
+            raise CommandError(
+                "Delete generated memory with delete_memory, or one claim with forget_memory_claim",
+                400,
+            )
         if row["kind"] not in {"document", "record"}:
             raise CommandError("Only documents and tasks can be deleted here", 400)
         task = (
