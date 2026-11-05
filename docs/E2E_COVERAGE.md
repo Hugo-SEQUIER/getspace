@@ -20,6 +20,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | First-run tour | `auth.setup` (dismissed) | | Content of the tour not yet asserted |
 | Documents: create, list, open | `workspace`, `documents` | | |
 | Documents: edit, revisions, history, delete | `documents` | | Folders, sections, drag into folder and upload are not covered |
+| Documents: original files (upload in parts, preview, download, convert to a page, discard after a failed upload) | `stack/document-files` (a three-part file read back intact after a reload, deleted with its parts; a staged part discarded through the proxy) | `document-files` (PDF pages, Word and PowerPoint in the sandboxed frame, a multi-part download, conversion, a failed upload discarded, a large file previewed on request) | `tests/document-files.test.mjs` unit-tests names, types, parts, base64, text bounds and slide order; the backend's parts and cleanup are in `backend/tests/test_document_files.py` |
 | Tasks: create, detail, status | `workspace`, `projects` | `tasks` | |
 | Tasks: board drag, keyboard moves, columns, bulk actions, view-only | | `tasks` | |
 | Tasks board: database rows planned for today | | `today-plan` | |

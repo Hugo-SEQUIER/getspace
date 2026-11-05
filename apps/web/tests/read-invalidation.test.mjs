@@ -52,3 +52,14 @@ test("a new connection token refreshes connections and identities, never Space c
   for (const path of ["spaces/one/resources?kind=task", "spaces/one/items?kind=project", "workspaces"])
     assert.equal(affected(path), false, path);
 });
+
+test("staged file parts change no reads, and saving the file refreshes documents and search", () => {
+  const part = affectedReads("spaces/one/files/file-id/parts/3");
+  for (const path of ["spaces/one/resources?kind=document", "spaces/one/search/index", "spaces/one/overview"])
+    assert.equal(part(path), false, path);
+  const saved = affectedReads("spaces/one/files");
+  for (const path of ["spaces/one/resources?kind=document", "spaces/one/resources/doc-id", "spaces/one/search/index", "spaces/one/memories"])
+    assert.equal(saved(path), true, path);
+  for (const path of ["spaces/two/resources?kind=document", "spaces/one/items?kind=project", "spaces/one/tasks/columns"])
+    assert.equal(saved(path), false, path);
+});

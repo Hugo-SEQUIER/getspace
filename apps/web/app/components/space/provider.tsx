@@ -22,6 +22,19 @@ import {
 import { normalizeMemories } from "../../../lib/space/memory-model";
 import { agentTokenRequest, type AgentToken } from "../../../lib/space/agent-tokens";
 import { resourceSaveCommand, type ResourceDraft } from "../../../lib/space/resource-model";
+import {
+  MAX_FILE_BYTES,
+  cleanFileName,
+  cleanFileType,
+  downloadFileParts,
+  fileDiscardPath,
+  fileParts,
+  forgetFiles,
+  rememberedFile,
+  sha256Hex,
+  uploadFileParts,
+  type FileRequest,
+} from "../../../lib/space/document-files";
 import type { Profile } from "../../../lib/space/profile";
 
 /** How this installation guards access: an access key, or nothing on a private network. */
@@ -57,6 +70,20 @@ import type {
 
 // Keep initial requests small; the API supports larger explicit pages when needed.
 const MEMORY_PAGE_SIZE = 50;
+// Files saved in the sample workspace stay in this tab's memory; only their documents are
+// written to browser storage, so a reload keeps the page and loses the bytes.
+const fileRequest: FileRequest = (path, method, body, signal) => api(path, method, body, signal);
+
+export type FileDraft = {
+  /** A new ID for each chosen file; retrying a save reuses it so staged parts are reused. */
+  id: string;
+  file: File;
+  bytes: Uint8Array;
+  title: string;
+  body: string;
+  project?: string;
+  folder?: string;
+};
 type ItemKind = "project" | "database" | "category" | "section" | "folder";
 type WorkspaceItem = (Project | WorkspaceDatabase | OrganizationItem | DocumentFolder) & { kind: ItemKind };
 type MemoryPage = { items: MemoryResponse[]; next_cursor: string | null; provider: Provider };
@@ -295,6 +322,8 @@ function useData() {
     const reset = (event: Event) => {
       const { status, error } = (event as CustomEvent<{ status: number; error: string }>).detail;
       clearData();
+      // Downloaded files belong to the account that opened them.
+      forgetFiles();
       if (status !== 401 && error) { setAccountId(undefined); setError(error); }
     };
     window.addEventListener(ACCESS_RESET_EVENT, reset);
@@ -772,6 +801,57 @@ function useData() {
     setNotice("Saved successfully");
     return saved;
   }
+  // Parameters: the chosen file with its bytes and text, and optional progress and cancellation.
+  // What it does: uploads the original in parts, then saves the document that keeps it.
+  // Output: the saved document, which carries the file's details.
+  async function saveFile(
+    draft: FileDraft,
+    { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {},
+  ) {
+    const target = writableSpace();
+    const bytes = draft.bytes.byteLength;
+    if (!bytes) throw new Error("This file is empty.");
+    if (bytes > MAX_FILE_BYTES) throw new Error("Choose a file up to 250 MB.");
+    const name = cleanFileName(draft.file.name), type = cleanFileType(draft.file.type, name);
+    const sha256 = await sha256Hex(draft.bytes);
+    let saved: Resource;
+    try {
+      await uploadFileParts(fileRequest, { spaceId: target.id, fileId: draft.id, data: draft.bytes, signal, onProgress });
+      signal?.throwIfAborted();
+      saved = await command<Resource>(`spaces/${target.id}/files`, {
+        file_id: draft.id, name, type, bytes, sha256, title: draft.title, body: draft.body,
+        project: draft.project || null, folder: draft.folder || null,
+      });
+    } catch (error) {
+      // Staged parts count towards storage until the hourly sweep; free them now. Parts a
+      // document already committed are never touched, so an unclear failure is safe too.
+      void api(fileDiscardPath(target.id, draft.id), "DELETE").catch(() => {});
+      throw error;
+    }
+    setResources((old) => [saved, ...old.filter((r) => r.id !== saved.id)]);
+    setMemoryLoaded(false);
+    setNotice("File saved");
+    return saved;
+  }
+  // Parameters: a document that keeps a file, the revision being read, and optional progress
+  // and cancellation.
+  // What it does: downloads the file's parts and checks the whole file's SHA-256; files opened
+  // recently come from memory.
+  // Output: the original file as a Blob.
+  function readFile(
+    resource: Resource,
+    revision: number | undefined,
+    { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {},
+  ) {
+    const file = resource.file;
+    if (!file) return Promise.reject(new Error("This document has no original file."));
+    if (!space) return Promise.reject(new Error("Open a space first."));
+    const spaceId = space.id;
+    // A shared download must not be cancelled by the first viewer that closes.
+    return rememberedFile(`${spaceId}:${resource.id}:${file.id}`, () =>
+      downloadFileParts(fileRequest, { spaceId, resourceId: resource.id, file, revision, onProgress }),
+    ).then((blob) => { signal?.throwIfAborted(); return blob; });
+  }
   async function deleteResource(resource: Resource) {
     await removeResource(resource);
     setNotice(resource.kind === "task" ? "Task deleted" : "Document deleted");
@@ -1208,6 +1288,8 @@ function useData() {
     readResource,
     loadSelectedMemory,
     saveResource,
+    saveFile,
+    readFile,
     changeMemory,
     buildMemory,
     memoryJobs,

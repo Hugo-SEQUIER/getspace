@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { message } from "../../../lib/client";
 import { useFeedback } from "../notifications";
 import { documentBlocks, documentText } from "../../../lib/space/document-content";
+import { fileLabel } from "../../../lib/space/document-files";
 import {
   categoryColors,
   statuses,
@@ -55,6 +56,9 @@ function DocumentRail({
 
 const ImportDocumentDialog = dynamic(() =>
   import("./import-dialogs").then((m) => m.ImportDocumentDialog),
+);
+const DocumentFileView = dynamic(() =>
+  import("./document-file-view").then((m) => m.DocumentFileView),
 );
 
 export function DocumentsView({ base, id }: { base: string; id?: string }) {
@@ -149,10 +153,11 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
         (r) => r.kind === "task" && r.project === selected.project,
       )
     : [];
+  // A file's text is read from the file, not written as Markdown, so it has no outline.
   const headings = useMemo(
     () =>
-      documentBlocks(selected?.body ?? "").filter((b) => b.type === "heading"),
-    [selected?.body],
+      selected?.file ? [] : documentBlocks(selected?.body ?? "").filter((b) => b.type === "heading"),
+    [selected?.body, selected?.file],
   );
   const readableText = documentText(selected?.body ?? "").trim();
   const words = readableText ? readableText.split(/\s+/).length : 0;
@@ -534,7 +539,9 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                     <span>
                       {selected.recall?.category === "handoff"
                         ? "Session handoff"
-                        : "Document"}
+                        : selected.file
+                          ? `${fileLabel(selected.file)} file`
+                          : "Document"}
                     </span>
                     {project && (
                       <>
@@ -569,7 +576,7 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                     <button onClick={() => setPanel("history")}>
                       Revision {selected.revision}
                     </button>
-                    {words > 0 && (
+                    {words > 0 && !selected.file && (
                       <>
                         <span>·</span>
                         <span>
@@ -578,7 +585,17 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                       </>
                     )}
                   </div>
-                  {selected.body?.trim() ? (
+                  {selected.file ? (
+                    <>
+                      <DocumentFileView resource={selected} revision={revision} />
+                      {selected.body?.trim() && (
+                        <details className="sp-file-extracted">
+                          <summary>Text for search and agents · {words.toLocaleString()} {words === 1 ? "word" : "words"}</summary>
+                          <div className="sp-file-text">{selected.body}</div>
+                        </details>
+                      )}
+                    </>
+                  ) : selected.body?.trim() ? (
                     <DocumentMarkdown text={selected.body} anchors />
                   ) : (
                     <div className="sp-doc-empty-body">
@@ -685,7 +702,9 @@ export function DocumentsView({ base, id }: { base: string; id?: string }) {
                           ))
                         ) : (
                           <p className="sp-doc-rail-note">
-                            Headings will appear here as your document grows.
+                            {selected.file
+                              ? "This document keeps its original file. Download it to keep a copy."
+                              : "Headings will appear here as your document grows."}
                           </p>
                         )}
                       </nav>

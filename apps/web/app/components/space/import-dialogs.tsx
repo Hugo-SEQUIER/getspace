@@ -1,17 +1,20 @@
+import "../../document-files.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { message } from "../../../lib/client";
 import {
   databaseFromImport,
+  importLimits,
   inferColumn,
   type ImportTable,
 } from "../../../lib/space/import-data";
 import {
   databaseExtensions,
-  documentExtensions,
   readDatabaseFile,
   readDocumentFile,
+  readOriginalFileText,
 } from "../../../lib/space/import-files";
+import { MAX_FILE_BYTES, fileExtension, fileLabel, fileSummary } from "../../../lib/space/document-files";
 import {
   fieldTypes,
   type FieldType,
@@ -22,17 +25,23 @@ import { useSpace } from "./provider";
 import { Modal } from "./ui";
 import { Icon } from "./ui-icon";
 import { DocumentMarkdown } from "./document-markdown";
-import { insertDocumentImage } from "../../../lib/space/document-content";
+import { documentImageExtensions, insertDocumentImage } from "../../../lib/space/document-content";
 import { useFeedback } from "../notifications";
 
 function FilePicker({
   extensions,
   busy,
   choose,
+  formats,
+  limit = "Up to 10 MB · Parsed on your device",
 }: {
+  /** Accepted extensions; leave empty to accept any file. */
   extensions: string[];
   busy: boolean;
   choose: (file: File) => void;
+  /** The formats line under the prompt, when it differs from the extension list. */
+  formats?: string;
+  limit?: string;
 }) {
   const [over, setOver] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +77,7 @@ function FilePicker({
         <input
           type="file"
           aria-label="Choose a file to import"
-          accept={extensions.map((extension) => `.${extension}`).join(",")}
+          accept={extensions.length ? extensions.map((extension) => `.${extension}`).join(",") : undefined}
           disabled={busy}
           onChange={(event) => {
             pick(event.target.files);
@@ -82,9 +91,9 @@ function FilePicker({
           Drop a file here, or browse
         </strong>
         <span>
-          {extensions.map((extension) => extension.toUpperCase()).join(" · ")}
+          {formats ?? extensions.map((extension) => extension.toUpperCase()).join(" · ")}
         </span>
-        <small>Up to 10 MB · Parsed on your device</small>
+        <small>{limit}</small>
       </label>
     </>
   );
@@ -332,6 +341,14 @@ export function ImportDatabaseDialog({
   );
 }
 
+// Markdown and text become editable pages and pictures image pages, as before; every other
+// file, and any of those over 10 MB, is kept as the original, with its readable text saved
+// for search and agents.
+const editableExtensions = ["md", "markdown", "txt", ...documentImageExtensions];
+const convertibleExtensions = ["pdf", "docx"];
+
+type Original = { id: string; file: File; bytes: Uint8Array; text: string; note: string };
+
 export function ImportDocumentDialog({
   close,
   created,
@@ -349,43 +366,88 @@ export function ImportDocumentDialog({
     [note, setNote] = useState("");
   const [image, setImage] = useState("");
   const [imageDescription, setImageDescription] = useState("");
+  const [original, setOriginal] = useState<Original | null>(null);
+  const [keep, setKeep] = useState<"original" | "convert">("original");
   const [reading, setReading] = useState(false),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const [progress, setProgress] = useState(0);
   useFeedback({
     error,
     clearError: () => setError(""),
-    loading: reading ? "Reading document file…" : saving ? "Importing document…" : "",
+    loading: reading ? "Reading document file…" : saving ? (original && keep === "original" ? "Saving file…" : "Importing document…") : "",
   });
   const request = useRef(0),
-    savingRef = useRef(false);
+    savingRef = useRef(false),
+    upload = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
       request.current++;
+      upload.current?.abort();
     },
     [],
   );
+  const keepOriginal = !!original && keep === "original";
+  const extension = original ? fileExtension(original.file.name) : "";
+  const convertible = !!original && convertibleExtensions.includes(extension) && original.file.size <= importLimits.bytes;
+  function reset() {
+    setBody("");
+    setNote("");
+    setImage("");
+    setOriginal(null);
+    setKeep("original");
+  }
   async function choose(file: File) {
     const token = ++request.current;
     setReading(true);
     setError("");
-    setBody("");
-    setNote("");
-    setImage("");
+    reset();
     try {
-      const parsed = await readDocumentFile(file);
-      if (token !== request.current) return;
-      setBody(parsed.text);
-      setNote(parsed.note);
-      setImage(parsed.image ?? "");
-      setImageDescription(file.name.replace(/\.[^.]+$/, "").slice(0, 300));
-      setTitle(file.name.replace(/\.[^.]+$/, "").slice(0, 300));
+      const name = file.name.replace(/\.[^.]+$/, "").slice(0, 300);
+      if (!file.size) throw new Error("This file is empty.");
+      // Editable pages and image pages are built on this device up to 10 MB; anything
+      // larger is kept as the original file instead.
+      if (editableExtensions.includes(fileExtension(file.name)) && file.size <= importLimits.bytes) {
+        const parsed = await readDocumentFile(file);
+        if (token !== request.current) return;
+        setBody(parsed.text);
+        setNote(parsed.note);
+        setImage(parsed.image ?? "");
+        setImageDescription(name);
+      } else {
+        if (file.size > MAX_FILE_BYTES) throw new Error("Choose a file up to 250 MB.");
+        const buffer = await file.arrayBuffer();
+        const read = await readOriginalFileText(file, buffer);
+        if (token !== request.current) return;
+        setOriginal({ id: crypto.randomUUID(), file, bytes: new Uint8Array(buffer), ...read });
+      }
+      setTitle(name || file.name.slice(0, 300));
     } catch (error) {
       if (token === request.current) setError(message(error));
     } finally {
       if (token === request.current) setReading(false);
     }
   }
+  async function convert() {
+    if (!original) return;
+    const token = ++request.current;
+    setKeep("convert");
+    setReading(true);
+    setError("");
+    try {
+      const parsed = await readDocumentFile(original.file);
+      if (token !== request.current) return;
+      setBody(parsed.text);
+      setNote(parsed.note);
+    } catch (error) {
+      if (token !== request.current) return;
+      setError(message(error));
+      setKeep("original");
+    } finally {
+      if (token === request.current) setReading(false);
+    }
+  }
+  const ready = keepOriginal ? !!title.trim() : !!body.trim() && !!title.trim();
   return (
     <Modal
       title="Import a document"
@@ -400,34 +462,79 @@ export function ImportDocumentDialog({
         aria-busy={reading || saving}
         onSubmit={async (event) => {
           event.preventDefault();
-          if (savingRef.current || reading || !data.canWrite || !title.trim() || !body.trim())
-            return;
+          if (savingRef.current || reading || !data.canWrite || !ready) return;
           savingRef.current = true;
           setSaving(true);
           setError("");
+          setProgress(0);
           try {
-            const document = await data.saveResource(
-              { kind: "document", title: title.trim(), body, status: "todo", project: initialProject, folder: initialFolder },
-            );
+            let document: Resource;
+            if (keepOriginal && original) {
+              const controller = new AbortController();
+              upload.current = controller;
+              document = await data.saveFile(
+                { id: original.id, file: original.file, bytes: original.bytes, title: title.trim(), body: original.text, project: initialProject, folder: initialFolder },
+                { signal: controller.signal, onProgress: setProgress },
+              );
+            } else {
+              document = await data.saveResource(
+                { kind: "document", title: title.trim(), body, status: "todo", project: initialProject, folder: initialFolder },
+              );
+            }
             created(document);
           } catch (error) {
-            setError(message(error));
+            if ((error as Error)?.name !== "AbortError") setError(message(error));
           } finally {
+            upload.current = null;
             savingRef.current = false;
             setSaving(false);
           }
         }}
       >
         <p className="sp-import-intro">
-          Give your existing work a home. We’ll turn readable content into an
-          editable Space document, or keep an image as its own document.
+          Keep PDFs, Word documents, presentations, spreadsheets and other files in your
+          Space with a preview, or turn Markdown and text into an editable page.
         </p>
         <FilePicker
-          extensions={documentExtensions}
+          extensions={[]}
+          formats="PDF · DOCX · PPTX · XLSX · images · any other file"
+          limit="Up to 250 MB · Text is read on your device"
           busy={reading || saving}
           choose={(file) => void choose(file)}
         />
-        {note && (
+        {original && (
+          <>
+            <div className="sp-import-file-card">
+              <div className="sp-file-card">
+                <span className="sp-file-badge" aria-hidden="true">{fileLabel(original.file).slice(0, 4)}</span>
+                <span className="sp-file-name">
+                  <strong title={original.file.name}>{original.file.name}</strong>
+                  <small>{fileSummary({ name: original.file.name, type: original.file.type, bytes: original.file.size })}</small>
+                </span>
+              </div>
+            </div>
+            {convertibleExtensions.includes(extension) && (
+              <fieldset className="sp-import-modes" disabled={saving}>
+                <legend>Save it as</legend>
+                <label className="sp-import-mode">
+                  <input type="radio" name="import-mode" checked={keep === "original"} onChange={() => { request.current++; setReading(false); setKeep("original"); }} />
+                  <span>
+                    <strong>Keep the original file</strong>
+                    <small>See it as it looks, download it any time. Its text stays searchable.</small>
+                  </span>
+                </label>
+                <label className="sp-import-mode">
+                  <input type="radio" name="import-mode" checked={keep === "convert"} disabled={!convertible} onChange={() => void convert()} />
+                  <span>
+                    <strong>Convert to an editable page</strong>
+                    <small>{convertible ? "Keeps the text only; images, layout and the file itself are not kept." : "Available for files up to 10 MB."}</small>
+                  </span>
+                </label>
+              </fieldset>
+            )}
+          </>
+        )}
+        {(note || original) && (
           <>
             <label className="sp-field">
               Document title
@@ -439,50 +546,62 @@ export function ImportDocumentDialog({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </label>
-            <div className="sp-import-preview-heading">
-              <strong>{image ? "Review the image" : "Review the content"}</strong>
-              {!image && <span>
-                {body.trim()
-                  ? body.trim().split(/\s+/).length.toLocaleString()
-                  : 0}{" "}
-                words
-              </span>}
-            </div>
-            {image ? (
+            {keepOriginal && original ? (
+              <p className="sp-import-note">{original.note}</p>
+            ) : keep === "convert" && reading ? null : (
               <>
-                <label className="sp-field">
-                  Image description
-                  <input
-                    value={imageDescription}
-                    disabled={saving}
-                    maxLength={300}
-                    onChange={event => {
-                      setImageDescription(event.target.value);
-                      setBody(insertDocumentImage("", 0, 0, image, event.target.value).text);
-                    }}
-                  />
-                </label>
-                <div className="sp-import-image-preview" aria-label="Imported image preview">
-                  <DocumentMarkdown text={body} />
+                <div className="sp-import-preview-heading">
+                  <strong>{image ? "Review the image" : "Review the content"}</strong>
+                  {!image && <span>
+                    {body.trim()
+                      ? body.trim().split(/\s+/).length.toLocaleString()
+                      : 0}{" "}
+                    words
+                  </span>}
                 </div>
-              </>
-            ) : (
-              <>
-                <label className="sr-only" htmlFor="import-document-content">
-                  Imported content
-                </label>
-                <textarea
-                  id="import-document-content"
-                  className="sp-import-document-text"
-                  value={body}
-                  disabled={saving}
-                  maxLength={500000}
-                  onChange={(e) => setBody(e.target.value)}
-                />
+                {image ? (
+                  <>
+                    <label className="sp-field">
+                      Image description
+                      <input
+                        value={imageDescription}
+                        disabled={saving}
+                        maxLength={300}
+                        onChange={event => {
+                          setImageDescription(event.target.value);
+                          setBody(insertDocumentImage("", 0, 0, image, event.target.value).text);
+                        }}
+                      />
+                    </label>
+                    <div className="sp-import-image-preview" aria-label="Imported image preview">
+                      <DocumentMarkdown text={body} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="sr-only" htmlFor="import-document-content">
+                      Imported content
+                    </label>
+                    <textarea
+                      id="import-document-content"
+                      className="sp-import-document-text"
+                      value={body}
+                      disabled={saving}
+                      maxLength={500000}
+                      onChange={(e) => setBody(e.target.value)}
+                    />
+                  </>
+                )}
+                <p className="sp-import-note">{note}</p>
               </>
             )}
-            <p className="sp-import-note">{note}</p>
           </>
+        )}
+        {saving && keepOriginal && (
+          <div className="sp-import-progress" role="status" aria-label="Upload progress">
+            <progress max={1} value={progress} />
+            <span>Uploading… {Math.round(progress * 100)}%</span>
+          </div>
         )}
         <div className="sp-modal-footer">
           <span className="sp-muted">
@@ -494,9 +613,9 @@ export function ImportDocumentDialog({
             </button>
             <button
               className="sp-primary"
-              disabled={reading || saving || !data.canWrite || !body.trim() || !title.trim()}
+              disabled={reading || saving || !data.canWrite || !ready}
             >
-              Import document
+              {keepOriginal ? "Save file" : "Import document"}
             </button>
           </div>
         </div>

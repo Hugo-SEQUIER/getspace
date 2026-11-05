@@ -62,11 +62,18 @@ test("the allowlist admits what the app needs and refuses what it does not", () 
     ["GET", `${space}/webhooks`], ["POST", `${space}/webhooks/${UUID}`],
     ["GET", `agents?workspace_id=${UUID}`], ["POST", `agents/${UUID}/identity`],
     ["GET", `oauth/details?authorization_id=${UUID}`], ["POST", "oauth/consent"],
+    ["POST", `${space}/files/${UUID}/parts/0`], ["POST", `${space}/files/${UUID}/parts/249`], ["POST", `${space}/files`],
+    ["DELETE", `${space}/files/${UUID}`],
+    ["GET", `${space}/resources/${UUID}/file/0`], ["GET", `${space}/resources/${UUID}/file/3?revision=2`],
+
   ]) assert.ok(proxyAllowed(proxyPath(path), method), `${method} ${path}`);
   for (const [method, path] of [
     ["POST", `${space}/read-version`], ["GET", `${space}/unknown`], ["GET", "admin"],
     ["GET", `${space}/api-keys/${UUID}`], ["GET", "openapi.json"],
     // An app's own OAuth endpoints live outside /v1 and never pass through the website.
     ["POST", "oauth/token"], ["POST", "oauth/register"], ["GET", "oauth/authorize"],
+    ["POST", `${space}/files/${UUID}`], ["GET", `${space}/files/${UUID}`],
+    ["POST", `${space}/files/${UUID}/parts/x`], ["GET", `${space}/resources/${UUID}/file`],
+
   ]) assert.ok(!proxyAllowed(proxyPath(path), method), `${method} ${path} must be refused`);
 });

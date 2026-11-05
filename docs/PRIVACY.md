@@ -7,6 +7,7 @@ A self-hosted installation keeps its data on the machine that runs it, under the
 Almost everything lives in the PostgreSQL database, in the `db-data` Docker volume:
 
 - **Content.** Documents, tasks, projects, folders, sections, categories, databases and their records, handoffs and memories, each with every revision.
+- **Original files.** A document that keeps its uploaded file stores it in parts of at most 1 MiB. Files are parsed and previewed in the browser, never on the server: Word and PowerPoint previews render in a frame that runs no scripts and loads nothing from the network, and SVG files are only downloaded.
 - **The memory index.** For each current memory claim: its embedding, SHA-256 hashes of the claim text and of its cue labels, its type, declared importance, embedding model, source reference and identifiers.
 - **Search fingerprints.** Keyed fingerprints of every word in each current revision, used to find candidates for recall.
 - **Agents and access.** Agent identities (a name and a harness), agent connections and whether they may write, SHA-256 digests of agent tokens and API keys, API key names and prefixes, and webhook subscriptions with their receiver URLs and signing secrets.

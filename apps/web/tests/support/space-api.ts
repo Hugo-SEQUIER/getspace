@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { test as base, type Browser } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import { PROXY_LOCAL, proxyAllowed, proxyPath } from '../../lib/space/proxy-allowlist.ts';
@@ -25,7 +26,10 @@ export type Task = {
   author_agent?: { id: string; name: string; harness: string; revision: number } | null;
   updated_at: string;
 };
-export type Document = Omit<Task, 'kind'> & { kind: 'document' };
+export type DocumentFile = { id: string; name: string; type: string; bytes: number; sha256: string; parts: number };
+export type Document = Omit<Task, 'kind'> & { kind: 'document'; folder?: string; file?: DocumentFile };
+/** The fixture backend's part size, the same as the real one. */
+export const FILE_PART_BYTES = 1_048_576;
 export type SeenMark = { resource_id: string; seen_revision: number; seen_at: string };
 /** A project or database as the items API returns it: its data plus identity and revision. */
 export type Item = { id: string; kind: 'project' | 'database'; revision: number; deleted?: boolean; [field: string]: unknown };
@@ -112,6 +116,17 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     failDelete: new Set<string>(),
     failCreate: false,
     exportRequests: [] as { after: string | null; snapshot?: number }[],
+    /** Staged base64 parts of each uploaded file, by file ID. */
+    fileParts: new Map<string, string[]>(),
+    /** Bodies of every file save, in order, and the document each command created. */
+    fileCommands: [] as Record<string, unknown>[],
+    fileDocuments: new Map<string, Document>(),
+    /** `<document id>/<part>` for every file part the app read. */
+    fileReads: [] as string[],
+    /** File IDs whose staged parts the app discarded after a failed upload. */
+    fileDiscards: [] as string[],
+    /** A part number whose upload is refused, to exercise a failed upload. */
+    failFilePart: null as number | null,
     /** The last archive upload: its manifest and the text of each part. */
     restore: null as { manifest: { id: string; sha256: string; bytes: number; parts: number }; parts: string[] } | null,
     unexpected: [] as string[],
@@ -206,17 +221,73 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       state.tasks = state.tasks.map(item => item.id === id ? saved : item);
       return send(saved);
     }
+    // Original files: staged parts, the save that turns them into a document, and part reads,
+    // with the backend's checks on part size, part count and the whole file's SHA-256.
+    const filePart = /\/files\/([^/]+)\/parts\/(\d+)$/.exec(path);
+    if (filePart && method === 'POST') {
+      const [, fileId, index] = filePart, part = Number(index);
+      const raw = Buffer.from(body.data, 'base64');
+      if (!raw.length || raw.length > FILE_PART_BYTES) return send({ error: 'A file part holds 1 byte to 1 MiB.' }, 413);
+      if (part >= 250) return send({ error: 'A file has at most 250 parts.' }, 422);
+      if (part === state.failFilePart) return send({ error: 'This Space has reached its storage limit.' }, 429);
+      const parts = state.fileParts.get(fileId) ?? [];
+      if (parts[part] !== undefined && parts[part] !== body.data)
+        return send({ error: 'This file part already holds different bytes. Upload the file again.' }, 409);
+      parts[part] = body.data;
+      state.fileParts.set(fileId, parts);
+      return send({ file_id: fileId, part, bytes: raw.length });
+    }
+    const fileDiscard = /\/files\/([^/]+)$/.exec(path);
+    if (fileDiscard && method === 'DELETE') {
+      state.fileDiscards.push(fileDiscard[1]);
+      const committed = state.documents.some(item => item.file?.id === fileDiscard[1]);
+      const parts = committed ? [] : state.fileParts.get(fileDiscard[1]) ?? [];
+      if (!committed) state.fileParts.delete(fileDiscard[1]);
+      return send({ discarded: parts.filter(Boolean).length });
+    }
+    if (path.endsWith('/files') && method === 'POST') {
+      state.fileCommands.push(body);
+      expect(body.command_id).toBeTruthy();
+      const earlier = state.fileDocuments.get(body.command_id);
+      if (earlier) return send(earlier);
+      const staged = state.fileParts.get(body.file_id) ?? [];
+      const count = Math.ceil(body.bytes / FILE_PART_BYTES);
+      const parts = staged.map(part => Buffer.from(part, 'base64'));
+      if (staged.length !== count || parts.some((part, index) => !part || (index < count - 1 && part.length !== FILE_PART_BYTES)))
+        return send({ error: 'Some parts of this file are missing. Upload it again.' }, 409);
+      const whole = Buffer.concat(parts);
+      if (whole.length !== body.bytes || createHash('sha256').update(whole).digest('hex') !== body.sha256)
+        return send({ error: 'The uploaded parts do not match this file. Upload it again.' }, 409);
+      const saved: Document = {
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(state.fileDocuments.size + 1).padStart(12, '0')}`,
+        kind: 'document', title: body.title, body: body.body, status: 'todo', revision: 1, author: 'you',
+        updated_at: '2026-10-22T09:00:00Z',
+        ...(body.project ? { project: body.project } : {}), ...(body.folder ? { folder: body.folder } : {}),
+        file: { id: body.file_id, name: body.name, type: body.type.toLowerCase(), bytes: body.bytes, sha256: body.sha256, parts: count },
+      };
+      state.fileDocuments.set(body.command_id, saved);
+      state.documents = [...state.documents, saved];
+      return send(saved);
+    }
+    const fileRead = /\/resources\/([^/]+)\/file\/(\d+)$/.exec(path);
+    if (fileRead && method === 'GET') {
+      const document = state.documents.find(item => item.id === fileRead[1]);
+      state.fileReads.push(`${fileRead[1]}/${fileRead[2]}`);
+      const data = document?.file && state.fileParts.get(document.file.id)?.[Number(fileRead[2])];
+      return data ? send({ data }) : send({ error: 'This document has no file.' }, 404);
+    }
     if (path.endsWith('/resources')) {
       if (method === 'POST') {
         state.resourceCommands.push(body);
         expect(body.expected_revision).toBe(0);
-        expect(body.kind).toBe('task');
+        expect(['task', 'document']).toContain(body.kind);
         expect(body.command_id).toBeTruthy();
         await pass('create');
         if (state.failCreate) { state.failCreate = false; return send({ error: 'Task creation failed. Please retry.' }, 503); }
         const { command_id, expected_revision, resource_id, ...draft } = body;
         const saved = { ...draft, id: createdId, revision: 1, author: 'you', updated_at: '2026-09-23T00:00:00Z' };
-        state.tasks = [...state.tasks, saved];
+        if (draft.kind === 'task') state.tasks = [...state.tasks, saved];
+        else state.documents = [...state.documents, saved];
         return send(saved);
       }
       const tasks = url.searchParams.get('kind') === 'task';
@@ -232,6 +303,12 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (state.failDelete.delete(id) || (task && task.revision !== expected))
         return send({ error: 'This resource changed. Reload before deleting.' }, 409);
       state.tasks = state.tasks.filter(item => item.id !== id);
+      // Deleting a document that keeps a file removes the file too.
+      const file = state.documents.find(item => item.id === id)?.file;
+      if (file) {
+        state.fileParts.delete(file.id);
+        state.documents = state.documents.filter(item => item.id !== id);
+      }
       return send({ deleted: true });
     }
     if (resource) {

@@ -139,8 +139,10 @@ export async function api<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   path = scopedPath(path);
-  const mutation = method !== "GET" && !/\/(search|context|export|preview)$/.test(path);
-  // Signing in or out changes the account; renaming the profile keeps the session and its cache.
+  // Searches, exports and staged file parts change nothing anyone has read.
+  const mutation = method !== "GET" && !/\/(search|context|export|preview)$|\/files\/[^/]+\/parts\/\d+$/.test(path);
+  // Signing in or out changes the account; saving its profile or first-run marker keeps the
+  // session and its cache.
   const auth = path.startsWith("auth/") && path !== "auth/profile";
   const affected = affectedReads(path);
   if (mutation && auth) { resetReadCache(0, "", true); await optionalStorage(diskCleanup); }

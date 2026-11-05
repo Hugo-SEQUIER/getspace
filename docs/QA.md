@@ -50,6 +50,12 @@ No. Space stores content as readable JSON in PostgreSQL, and the claim index add
 
 **Proof:** `docs/PRIVACY.md`, `backend/src/space/security/payloads.py`.
 
+### Can a document keep a PDF, a Word file or a presentation?
+
+Yes. Upload keeps the original file, of any type up to 250 MB, as parts of at most 1 MiB, and the document's body holds the text the browser read from it. Search, recall and agents read that text and see the file's name, type and size; the file itself is viewed and downloaded on the website. Its parts are ordinary stored rows, counted at about the file's own size, and the cleanup sweep removes parts no document committed within an hour.
+
+**Proof:** `backend/src/space/document_files.py`, `backend/migrations/versions/0041_document_files.sql`.
+
 ### Can a database export reveal what was written?
 
 Yes, all of it. A backup made by `scripts/backup.sh` is a complete `pg_dump` of the database, with every document and memory as readable JSON. Keep backups as private as the server.

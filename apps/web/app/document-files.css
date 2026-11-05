@@ -1,0 +1,296 @@
+/* Original files kept by documents: the reader's file card and previews, and the upload
+   dialog's review of a file Space keeps. */
+
+.sp-file-view {
+  margin: 4px 0 32px;
+}
+.sp-file-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--sp-card-radius, 16px);
+  box-shadow: var(--sp-card-soft-shadow, var(--shadow-card));
+}
+.sp-file-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--color-selection);
+  color: var(--color-accent);
+  font-size: var(--text-caption);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.sp-file-name {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.sp-file-name strong {
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-file-name small {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sp-file-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sp-file-loading {
+  display: grid;
+  gap: 8px;
+  padding: 28px 0 12px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-file-loading progress {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-panel);
+  accent-color: var(--color-accent);
+  overflow: hidden;
+}
+.sp-file-loading progress::-webkit-progress-bar {
+  background: var(--color-panel);
+}
+.sp-file-loading progress::-webkit-progress-value {
+  background: var(--color-accent);
+}
+.sp-file-loading progress::-moz-progress-bar {
+  background: var(--color-accent);
+}
+.sp-file-problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 16px 0 0;
+  color: var(--color-text);
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.sp-file-note {
+  margin: 12px 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  line-height: 1.6;
+}
+.sp-file-on-request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 16px 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.sp-file-preview {
+  margin-top: 16px;
+  min-width: 0;
+}
+.sp-file-preview > :is(img, video) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+}
+.sp-file-preview > audio {
+  width: 100%;
+}
+.sp-file-pdf {
+  display: grid;
+  gap: 16px;
+  min-height: 240px;
+  padding: 16px;
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+}
+.sp-file-page {
+  position: relative;
+  width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(32 37 34 / 0.14);
+}
+.sp-file-page canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sp-file-frame {
+  position: relative;
+  min-height: 240px;
+  overflow: hidden;
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+}
+.sp-file-frame iframe {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+  border: 0;
+  transform-origin: 0 0;
+}
+.sp-file-sheet {
+  display: grid;
+  gap: 12px;
+  min-height: 120px;
+}
+.sp-file-sheet-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-file-sheet-picker select {
+  max-width: 260px;
+}
+.sp-file-sheet-scroll {
+  max-height: 520px;
+}
+.sp-file-sheet-scroll td {
+  min-width: 90px;
+}
+.sp-file-text {
+  max-height: 560px;
+  min-height: 120px;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  font: var(--text-small) / 1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sp-file-extracted {
+  margin: 0 0 28px;
+  color: var(--color-text);
+  font-size: var(--text-small);
+}
+.sp-file-extracted summary {
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  padding: 6px 0;
+}
+.sp-file-extracted .sp-file-text {
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: var(--text-small);
+}
+
+/* The upload dialog's review of a file Space keeps. */
+.sp-import-file-card {
+  margin: 0 0 18px;
+}
+.sp-import-file-card .sp-file-card {
+  box-shadow: none;
+  border-radius: var(--radius-lg);
+}
+.sp-import-modes {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+.sp-import-modes legend {
+  margin-bottom: 8px;
+  color: var(--color-ink);
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+.sp-import-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.sp-import-mode:has(input:checked) {
+  border-color: var(--color-selection-border);
+  background: var(--color-panel);
+}
+.sp-import-mode:has(input:disabled) {
+  cursor: default;
+  opacity: 0.7;
+}
+.sp-import-mode input {
+  margin-top: 3px;
+  accent-color: var(--color-accent);
+}
+.sp-import-mode span {
+  display: grid;
+  gap: 2px;
+}
+.sp-import-mode strong {
+  color: var(--color-ink);
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+.sp-import-mode small {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  line-height: 1.5;
+}
+.sp-import-progress {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.sp-import-progress progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--color-accent);
+}
+
+@media (max-width: 760px) {
+  .sp-file-card {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .sp-file-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .sp-file-pdf {
+    padding: 8px;
+    gap: 8px;
+  }
+}

@@ -47,11 +47,13 @@ Direct runtime dependencies from `apps/web/package.json`, at the versions locked
 | @dnd-kit/core | 6.3.1 | MIT |
 | @dnd-kit/utilities | 3.2.2 | MIT |
 | @hono/node-server | 2.1.3 | MIT |
+| @jvmr/pptx-to-html | 1.1.2 | MIT |
 | @tanstack/query-core | 5.104.0 | MIT |
 | @tanstack/react-query | 5.104.0 | MIT |
 | @tanstack/react-router | 1.170.41 | MIT |
 | @tanstack/react-start | 1.168.60 | MIT |
 | d3-force | 3.0.0 | ISC |
+| docx-preview | 0.4.1 | Apache-2.0 |
 | effect | 4.0.0 | MIT |
 | fflate | 0.8.3 | MIT |
 | idb | 8.0.3 | ISC |
