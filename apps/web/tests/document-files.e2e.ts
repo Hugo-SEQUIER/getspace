@@ -245,7 +245,8 @@ test('several files upload at once and land in Files', async ({ app, screen, bro
   await dialog.getByRole('button', 'Save 3 files').tap();
 
   await expect(screen.getByRole('button', /^Files/)).toHaveAttribute('aria-pressed', 'true');
-  await expect(browser).toHaveURL(/\/app\/documents$/);
+  // The directory lands on its Files facet, which is the `type` address parameter.
+  await expect(browser).toHaveURL(/\/app\/documents\?type=files$/);
   const grid = screen.getByRole('list', 'Files');
   await expect(grid.getByRole('listitem')).toHaveCount(3);
   await expect(grid.getByRole('link', /Quarterly plan/)).toBeVisible();

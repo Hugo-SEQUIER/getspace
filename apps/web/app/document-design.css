@@ -17,59 +17,15 @@
 .sp-app .sp-doc-tree-page {
   border-radius: 7px;
 }
-.sp-app .sp-doc-library {
-  max-width: 1380px;
-  padding: 40px 40px 72px;
-}
-.sp-app .sp-doc-library-heading {
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 36px;
-}
-.sp-app .sp-doc-library-heading h1 {
-  margin: 0 0 9px;
-  font-size: 36px;
-  line-height: 1.2;
-  font-weight: 650;
-  letter-spacing: -0.035em;
-}
-.sp-app .sp-doc-library-heading p {
-  color: var(--color-muted, #737b76);
-  font-size: 16px;
-  line-height: 1.5;
-}
-.sp-app .sp-doc-library-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-top: 4px;
-}
-.sp-app .sp-doc-library-actions :is(button, .sp-button),
 .sp-app .sp-doc-topbar .sp-actions :is(button, .sp-button) {
   min-height: 36px;
   border-radius: 9px;
   font-size: 14px;
   font-weight: 500;
 }
-.sp-app .sp-doc-library-actions .sp-primary {
-  padding-inline: 14px;
-  background: var(--color-accent, #42644c);
-  border-color: var(--color-accent, #42644c);
-  color: #fff;
-  box-shadow: none;
-}
-.sp-app .sp-doc-library-actions .sp-primary:hover {
-  background: #35543e;
-}
 .sp-app .sp-doc-section-title h2 {
   font-size: 14px;
   font-weight: 550;
-}
-.sp-app .sp-doc-private {
-  margin-top: 0;
-  font-size: 12px;
 }
 .sp-app .sp-doc-recents {
   margin-bottom: 32px;
@@ -128,63 +84,6 @@
 .sp-app .sp-doc-card-footer > span:last-child {
   flex-shrink: 0;
 }
-.sp-app .sp-doc-library-toolbar {
-  flex-wrap: wrap;
-  gap: 18px 20px;
-  padding-bottom: 15px;
-}
-.sp-app .sp-doc-tabs {
-  gap: 20px;
-  min-height: 36px;
-}
-.sp-app .sp-doc-tabs button {
-  position: relative;
-  min-height: 36px;
-  padding: 7px 0;
-  border: 0;
-  border-radius: 0;
-  font-size: 14px;
-  gap: 7px;
-}
-.sp-app .sp-doc-tabs button[aria-pressed="true"] {
-  background: transparent;
-  color: var(--color-accent, #42644c);
-  font-weight: 600;
-}
-.sp-app .sp-doc-tabs button[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-accent, #42644c);
-  border-radius: 1px;
-}
-.sp-app .sp-doc-tabs button > span {
-  color: var(--color-muted, #737b76);
-  font-size: 12px;
-  font-weight: 400;
-}
-.sp-app .sp-doc-library-controls {
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-.sp-app .sp-doc-library-controls .sp-search {
-  width: 190px;
-  min-height: 36px;
-  border-radius: 9px;
-}
-.sp-app .sp-doc-library-controls .sp-search input {
-  font-size: 13px;
-}
-.sp-app .sp-doc-library-controls select {
-  min-height: 36px;
-  border-radius: 9px;
-  font-size: 13px;
-  max-width: 160px;
-}
 .sp-app .sp-doc-collection .sp-table-wrap {
   position: relative;
   border: 0;
@@ -192,45 +91,6 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-.sp-app .sp-doc-table {
-  min-width: 560px;
-  font-size: 13px;
-}
-.sp-app .sp-doc-table thead {
-  background: transparent;
-}
-.sp-app .sp-doc-table th {
-  padding: 13px 10px;
-  font-size: 12px;
-  font-weight: 450;
-  background: transparent;
-}
-.sp-app .sp-doc-table td {
-  height: 66px;
-  padding: 12px 10px;
-  background: transparent;
-}
-.sp-app .sp-doc-table :is(th, td):first-child {
-  padding-left: 0;
-}
-.sp-app .sp-doc-table .sp-document-link {
-  font-size: 14px;
-  font-weight: 500;
-}
-.sp-app .sp-doc-row-icon,
-.sp-app .sp-doc-row-icon.is-handoff {
-  width: 28px;
-  height: 32px;
-  border: 0;
-  background: transparent;
-  color: var(--color-accent, #42644c);
-}
-.sp-app .sp-doc-library-footer {
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 18px;
-  font-size: 12px;
 }
 .sp-app .sp-doc-topbar {
   height: 56px;
@@ -389,9 +249,6 @@
   .sp-app .sp-doc-workspace {
     grid-template-columns: 280px minmax(0, 1fr);
   }
-  .sp-app .sp-doc-library {
-    padding-inline: 28px;
-  }
   .sp-app .sp-doc-reading-layout {
     display: block;
   }
@@ -417,9 +274,6 @@
   .sp-app .sp-doc-topbar {
     padding-inline: 24px;
   }
-  .sp-app .sp-doc-library-actions .sp-doc-browse {
-    display: inline-flex;
-  }
   .sp-app .sp-doc-tree-pane {
     height: auto;
   }
@@ -430,52 +284,8 @@
   .sp-app .sp-doc-card-wrap {
     flex: 0 0 240px;
   }
-  .sp-app .sp-doc-library-controls {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
-  .sp-app .sp-doc-library-controls .sp-search {
-    flex: 1;
-  }
-  .sp-app .sp-doc-table {
-    min-width: 0;
-  }
-  .sp-app .sp-doc-table :is(th, td):nth-child(3),
-  .sp-app .sp-doc-table :is(th, td):last-child {
-    display: none;
-  }
 }
 @media (max-width: 760px) {
-  .sp-app .sp-doc-library {
-    padding: 28px 20px 48px;
-  }
-  .sp-app .sp-doc-library-heading {
-    gap: 20px;
-    margin-bottom: 30px;
-  }
-  .sp-app .sp-doc-library-heading h1 {
-    font-size: 30px;
-  }
-  .sp-app .sp-doc-library-heading p {
-    font-size: 15px;
-  }
-  .sp-app .sp-doc-library-actions {
-    gap: 7px;
-    padding-top: 0;
-  }
-  .sp-app .sp-doc-library-actions :is(button, .sp-button) {
-    padding-inline: 10px;
-    font-size: 13px;
-  }
-  .sp-app .sp-doc-library-actions .sp-doc-browse span {
-    display: inline;
-  }
-  .sp-app .sp-doc-private {
-    max-width: 45%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .sp-app .sp-doc-recent-grid {
     gap: 12px;
     margin-inline: 0;
@@ -485,35 +295,6 @@
   .sp-app .sp-doc-card-wrap {
     flex-basis: 240px;
     scroll-snap-align: start;
-  }
-  .sp-app .sp-doc-library-toolbar {
-    gap: 15px;
-  }
-  .sp-app .sp-doc-library-controls {
-    width: 100%;
-  }
-  .sp-app .sp-doc-library-controls .sp-search {
-    width: 100%;
-    flex-basis: 100%;
-  }
-  .sp-app .sp-doc-library-controls select {
-    flex: 1;
-    max-width: none;
-    min-width: 0;
-  }
-  .sp-app .sp-doc-table {
-    min-width: 0;
-  }
-  .sp-app .sp-doc-table :is(th, td):first-child {
-    width: auto;
-    padding-right: 8px;
-  }
-  .sp-app .sp-doc-table :is(th, td):nth-child(4) {
-    padding-right: 0;
-    font-size: 12px;
-  }
-  .sp-app .sp-doc-table .sp-document-link {
-    font-size: 13px;
   }
   .sp-app .sp-doc-topbar {
     padding-inline: 14px;

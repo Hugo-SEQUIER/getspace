@@ -45,7 +45,7 @@ import type { Profile } from "../../../lib/space/profile";
 /** How this installation guards access: an access key, or nothing on a private network. */
 export type AccessMode = "key" | "private";
 import { statuses, type ResourceView } from "../../../lib/space/types";
-import { mergeSeen, seenRevisions } from "../../../lib/space/attention";
+import { mergeSeen, seenRevisions, seenTimes } from "../../../lib/space/attention";
 import { mergeTaskSummary, optimisticTask, settleLimited, taskColumnLabel, taskColumnsWithResources } from "../../../lib/space/task-model";
 import {
   invitationToken,
@@ -128,6 +128,8 @@ function useData() {
   const [resources, setResources] = useState<Resource[]>([]);
   // Which revision of each document or task the owner last opened.
   const [views, setViews] = useState<Record<string, number>>({});
+  // When the signed-in person last opened each document or task, for "Recently opened".
+  const [viewTimes, setViewTimes] = useState<Record<string, string>>({});
   const latestViews = useRef(views);
   latestViews.current = views;
   const [viewsReady, setViewsReady] = useState(false);
@@ -700,6 +702,7 @@ function useData() {
     return watchApi<{ items: ResourceView[] }>(`spaces/${space.id}/views`, value => {
       if (current !== generation.current) return;
       setViews(seenRevisions(value.items));
+      setViewTimes(seenTimes(value.items));
       setViewsReady(true);
       setViewsSettled(true);
     }, () => {
@@ -715,6 +718,8 @@ function useData() {
     if (!pending.length) return;
     latestViews.current = mergeSeen(latestViews.current, pending);
     setViews(old => mergeSeen(old, pending));
+    const now = new Date().toISOString();
+    setViewTimes(old => ({ ...old, ...Object.fromEntries(pending.map(item => [item.id, now])) }));
     if (!space) return;
     try {
       await api(`spaces/${space.id}/views`, "POST", {
@@ -1121,6 +1126,7 @@ function useData() {
     setTaskColumnsReady(false);
     setTaskColumnsError("");
     setViews({});
+    setViewTimes({});
     latestViews.current = {};
     setViewsReady(false);
     setViewsSettled(false);
@@ -1345,6 +1351,7 @@ function useData() {
     space,
     resources: resources.map(resource => optimisticTask(resource, pendingTaskStatuses)),
     views,
+    viewTimes,
     viewsReady,
     viewsSettled,
     watchViews,

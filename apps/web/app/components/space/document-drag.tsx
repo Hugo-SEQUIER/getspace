@@ -12,8 +12,22 @@ import { Icon } from "./ui-icon";
 import { useFeedback } from "../notifications";
 import "./document-drag.css";
 
-const DragState = createContext({ disabled: true, dragging: false, canWrite: false });
-const targetId = (folder: string) => `document-folder:${folder || "unfiled"}`;
+type DragState = {
+  disabled: boolean;
+  dragging: boolean;
+  canWrite: boolean;
+  /** Moves a document to a folder ("" for Unfiled) with the same checks as a drop. */
+  move: (document: Resource, folder: string) => Promise<void>;
+};
+const DragState = createContext<DragState>({ disabled: true, dragging: false, canWrite: false, move: async () => {} });
+// Every surface that accepts a drop (a tree row, a folder tile) registers its own target for the
+// same folder; the tree keeps the plain id so keyboard moves can focus its row afterwards.
+const targetId = (folder: string, surface = "tree") =>
+  `document-folder${surface === "tree" ? "" : `-${surface}`}:${folder || "unfiled"}`;
+const folderFromTarget = (id: unknown): string | null => {
+  const match = typeof id === "string" ? /^document-folder(?:-[a-z]+)?:(.+)$/.exec(id) : null;
+  return match ? (match[1] === "unfiled" ? "" : match[1]) : null;
+};
 const keepPreviewInView: Modifier = ({ transform, overlayNodeRect, windowRect }) => {
   if (!overlayNodeRect || !windowRect) return transform;
   return {
@@ -33,7 +47,7 @@ const folderCoordinates: KeyboardCoordinateGetter = (event, { context, currentCo
       const rect = context.droppableRects.get(container.id);
       return rect && rect.width > 0 && rect.height > 0 ? [{ id: container.id, rect }] : [];
     })
-    .sort((a, b) => a.rect.top - b.rect.top);
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
   const direction = event.code === "ArrowDown" ? 1 : -1;
   const currentTarget = context.over?.id ?? context.active?.data.current?.folderTarget;
   let index = targets.findIndex(target => target.id === currentTarget);
@@ -68,10 +82,13 @@ export function DocumentDragProvider({
     useSensor(KeyboardSensor, { coordinateGetter: folderCoordinates }),
   );
   const folders = data.folders.filter(folder => !folder.deleted);
-  const destinationName = (id: unknown) => id === targetId("")
-    ? "Unfiled" : folders.find(folder => targetId(folder.id) === id)?.name;
+  const destinationName = (id: unknown) => {
+    const folder = folderFromTarget(id);
+    if (folder === null) return undefined;
+    return folder === "" ? "Unfiled" : folders.find(item => item.id === folder)?.name;
+  };
 
-  async function move(document: Resource, folder: string, focusTarget: boolean) {
+  async function move(document: Resource, folder: string, focusTarget = false) {
     if (unavailable || saving.current || (document.folder ?? "") === folder) return;
     const destination = folder ? folders.find(item => item.id === folder) : undefined;
     if (folder && !destination) return;
@@ -101,7 +118,7 @@ export function DocumentDragProvider({
   }
 
   return (
-    <DragState.Provider value={{ disabled: unavailable, dragging: !!active, canWrite: data.canWrite }}>
+    <DragState.Provider value={{ disabled: unavailable, dragging: !!active, canWrite: data.canWrite, move: (document, folder) => move(document, folder) }}>
       <DndContext
         id="space-document-folders"
         sensors={sensors}
@@ -125,7 +142,7 @@ export function DocumentDragProvider({
             onDragEnd: ({ active, over }) => {
               const name = destinationName(over?.id);
               if (!name) return "Move cancelled.";
-              if (active.data.current?.folderTarget === over?.id)
+              if (folderFromTarget(active.data.current?.folderTarget) === folderFromTarget(over?.id))
                 return "Document is already in this folder.";
               return `Dropped in ${name}. Saving move.`;
             },
@@ -141,9 +158,9 @@ export function DocumentDragProvider({
         onDragCancel={() => setActive(null)}
         onDragEnd={({ active, over, activatorEvent }) => {
           const document: Resource | undefined = active.data.current?.document;
-          const folder = folders.find(folder => targetId(folder.id) === over?.id);
-          if (document && (folder || over?.id === targetId("")))
-            void move(document, folder?.id ?? "", activatorEvent instanceof KeyboardEvent);
+          const folder = folderFromTarget(over?.id);
+          if (document && folder !== null && (folder === "" || folders.some(item => item.id === folder)))
+            void move(document, folder, activatorEvent instanceof KeyboardEvent);
           setActive(null);
         }}
       >
@@ -186,17 +203,23 @@ export function useDocumentDraggable(document: Resource, surface: string) {
   return { setNodeRef, isDragging, onPointerDown, handle };
 }
 
-export function DocumentFolderDropTarget({ folder = "", className, children }: {
+// Parameters: the folder the target stands for ("" for Unfiled), the surface it sits on (the tree
+//   rail by default, or a tile in the directory), its classes and content.
+// What it does: makes the element a drop target; each surface has its own target for a folder.
+// Output: the element, with a "Move here" label while a document hovers over it.
+export function DocumentFolderDropTarget({ folder = "", surface = "tree", className, children }: {
   folder?: string;
+  surface?: string;
   className: string;
   children: ReactNode;
 }) {
   const { disabled, dragging } = useDocumentDragState();
-  const { setNodeRef, isOver } = useDroppable({ id: targetId(folder), disabled });
+  const id = targetId(folder, surface);
+  const { setNodeRef, isOver } = useDroppable({ id, disabled });
   return (
     <div
       ref={setNodeRef}
-      id={targetId(folder)}
+      id={id}
       data-folder-drop={folder || "unfiled"}
       className={`${className} ${dragging ? "sp-doc-drop-folder" : ""} ${isOver ? "is-drop-target" : ""}`}
     >{children}{isOver && <span className="sp-doc-drop-label">Move here</span>}</div>

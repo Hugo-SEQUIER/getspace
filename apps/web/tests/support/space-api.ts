@@ -31,7 +31,9 @@ export type DocumentFile = {
   id: string; name: string; type: string; bytes: number; sha256: string; parts: number;
   width?: number; height?: number; duration?: number; thumbnail?: FileThumbnail;
 };
-export type Document = Omit<Task, 'kind'> & { kind: 'document'; folder?: string; file?: DocumentFile };
+export type Document = Omit<Task, 'kind'> & { kind: 'document'; folder?: string; file?: DocumentFile; recall?: { category: string } };
+export type FolderRow = { id: string; kind: 'folder'; name: string; description: string; section_id: string | null; project_id?: string | null; revision: number; deleted: boolean };
+export type SectionRow = { id: string; kind: 'section'; name: string; description: string; revision: number; deleted: boolean };
 /** The fixture backend's part size, the same as the real one. */
 export const FILE_PART_BYTES = 1_048_576;
 export type SeenMark = { resource_id: string; seen_revision: number; seen_at: string };
@@ -90,7 +92,10 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     documents: [] as Document[],
     projects: [{ id: 'project-a', kind: 'project', name: 'Fixture project', description: '', status: 'todo', revision: 1 }] as Item[],
     databases: [] as Item[],
-    /** Every project or database save the app sent, in order. */
+    /** Document folders and the sections that group them, active and archived. */
+    folders: [] as FolderRow[],
+    sections: [] as SectionRow[],
+    /** Every project, database, folder or section save the app sent, in order. */
     itemCommands: [] as Record<string, unknown>[],
     agents: [] as AgentIdentity[],
     connections: [] as Connection[],
@@ -313,9 +318,25 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
     if (path.endsWith('/resources')) {
       if (method === 'POST') {
         state.resourceCommands.push(body);
-        expect(body.expected_revision).toBe(0);
         expect(['task', 'document']).toContain(body.kind);
         expect(body.command_id).toBeTruthy();
+        if (body.resource_id) {
+          // An update: the website sends the whole resource at the revision it last saw.
+          const list: (Task | Document)[] = body.kind === 'document' ? state.documents : state.tasks;
+          const current = list.find(item => item.id === body.resource_id);
+          if (!current || current.revision !== body.expected_revision)
+            return send({ error: 'This resource changed. Load the latest revision before saving.' }, 409);
+          const { command_id, expected_revision, resource_id, folder, project, ...fields } = body;
+          const saved = {
+            ...current, ...fields, revision: current.revision + 1, updated_at: '2026-10-22T10:00:00Z',
+            ...(folder !== undefined ? { folder: folder || undefined } : {}),
+            ...(project !== undefined ? { project: project || undefined } : {}),
+          };
+          if (body.kind === 'document') state.documents = state.documents.map(item => item.id === saved.id ? saved as Document : item);
+          else state.tasks = state.tasks.map(item => item.id === saved.id ? saved as Task : item);
+          return send(saved);
+        }
+        expect(body.expected_revision).toBe(0);
         await pass('create');
         if (state.failCreate) { state.failCreate = false; return send({ error: 'Task creation failed. Please retry.' }, 503); }
         const { command_id, expected_revision, resource_id, ...draft } = body;
@@ -353,6 +374,18 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
         ?? state.documents.find(item => item.id === resource[1]);
       return task ? send(task) : send({ error: 'Task not found' }, 404);
     }
+    // Folders and sections archive or restore through visibility, like a project.
+    const containerVisibility = /\/items\/([^/]+)\/visibility$/.exec(path);
+    const container = containerVisibility && (state.folders.find(entry => entry.id === containerVisibility[1]) ?? state.sections.find(entry => entry.id === containerVisibility[1]));
+    if (containerVisibility && container && method === 'POST') {
+      state.itemCommands.push({ ...body, id: container.id });
+      if (body.expected_revision !== container.revision)
+        return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
+      const saved = { ...container, revision: container.revision + 1, deleted: body.deleted };
+      if (saved.kind === 'folder') state.folders = state.folders.map(entry => entry.id === saved.id ? saved as FolderRow : entry);
+      else state.sections = state.sections.map(entry => entry.id === saved.id ? saved as SectionRow : entry);
+      return send(saved);
+    }
     const listOf = (kind: unknown) => kind === 'project' ? 'projects' : kind === 'database' ? 'databases' : null;
     const item = /\/items\/([^/]+)(\/visibility)?$/.exec(path);
     if (item) {
@@ -368,6 +401,18 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       if (current.revision !== body.expected_revision) return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
       const saved = { ...current, deleted: body.deleted, revision: current.revision + 1 };
       state[key] = state[key].map(entry => entry.id === saved.id ? saved : entry);
+      return send(saved);
+    }
+    // Folders and sections: saves with a revision check, then archive through visibility below.
+    if (path.endsWith('/items') && method === 'POST' && (body?.kind === 'folder' || body?.kind === 'section')) {
+      state.itemCommands.push(body);
+      const list: (FolderRow | SectionRow)[] = body.kind === 'folder' ? state.folders : state.sections;
+      const current = list.find(entry => entry.id === body.item_id);
+      if ((current?.revision ?? 0) !== body.expected_revision)
+        return send({ error: 'This workspace item changed. Refresh before saving.' }, 409);
+      const saved = { ...(current ?? {}), ...body.data, id: body.item_id, kind: body.kind, revision: body.expected_revision + 1, deleted: false };
+      if (body.kind === 'folder') state.folders = [...state.folders.filter(entry => entry.id !== saved.id), saved as FolderRow];
+      else state.sections = [...state.sections.filter(entry => entry.id !== saved.id), saved as SectionRow];
       return send(saved);
     }
     if (path.endsWith('/items') && method === 'POST') {
@@ -387,8 +432,11 @@ export async function mockSpace(browser: Browser, baseUrl: string) {
       return send(saved);
     }
     if (path.endsWith('/items')) {
-      const key = listOf(url.searchParams.get('kind'));
+      const kind = url.searchParams.get('kind');
       const deleted = url.searchParams.get('deleted') === 'true';
+      if (kind === 'folder') return send({ items: state.folders.filter(entry => !!entry.deleted === deleted), next_cursor: null });
+      if (kind === 'section') return send({ items: state.sections.filter(entry => !!entry.deleted === deleted), next_cursor: null });
+      const key = listOf(kind);
       const listed = key ? state[key].filter(entry => !!entry.deleted === deleted) : [];
       // A database listing carries the schema and a record count, never the rows.
       return send({ items: key === 'databases' ? listed.map(listedDatabase) : listed, next_cursor: null });

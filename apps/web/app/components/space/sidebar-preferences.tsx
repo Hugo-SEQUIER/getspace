@@ -16,6 +16,8 @@ type Preferences = {
   collapsed: Record<string, boolean>;
   favorites: string[];
   icons: Record<string, PageIconChoice>;
+  /** How the Documents directory lists documents. */
+  documentsView: "list" | "grid";
 };
 export type SidebarPage = {
   key: string;
@@ -30,6 +32,7 @@ function defaults(): Preferences {
     sidebarCollapsed: false,
     collapsed: {},
     icons: {},
+    documentsView: "list",
     favorites: [],
   };
 }
@@ -63,6 +66,7 @@ function readPreferences(raw: string): Preferences {
     : [];
   return {
     sidebarCollapsed: input.sidebarCollapsed === true,
+    documentsView: input.documentsView === "grid" ? "grid" : "list",
     favorites: [...new Set([...favorites, ...legacyShortcuts])],
     collapsed: record(input.collapsed)
       ? (Object.fromEntries(
@@ -71,7 +75,8 @@ function readPreferences(raw: string): Preferences {
               typeof value === "boolean" &&
               (key === "workspace" || key === "favorites" ||
                 key === "document-tree:folders" || key === "document-tree:unfiled" ||
-                /^document-tree:(section|folder):.{1,200}$/.test(key)),
+                key === "document-folders:folders" ||
+                /^document-(tree|folders):(section|folder):.{1,200}$/.test(key)),
           ),
         ) as Record<string, boolean>)
       : {},
