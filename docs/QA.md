@@ -56,9 +56,9 @@ No. Space stores content as readable JSON in PostgreSQL, and the claim index add
 
 **Proof:** `docs/PRIVACY.md`, `backend/src/space/security/payloads.py`.
 
-### Can a document keep a PDF, a Word file or a presentation?
+### Can a document keep a PDF, a Word file, a presentation, a picture or a video?
 
-Yes. Upload keeps the original file, of any type up to 250 MB, as parts of at most 1 MiB, and the document's body holds the text the browser read from it. Search, recall and agents read that text and see the file's name, type and size; the file itself is viewed and downloaded on the website. Its parts are ordinary stored rows, counted at about the file's own size, and the cleanup sweep removes parts no document committed within an hour.
+Yes. Upload keeps the original file, of any type up to 250 MB, as parts of at most 1 MiB, and the document's body holds the text the browser read from it. Search, recall and agents read that text and see the file's name, type and size, a picture's or video's pixel size and a recording's length; a picture or video has no text, so its title is what describes it. The file itself is viewed and downloaded on the website, which shows a thumbnail the browser made at upload for pictures, videos and PDFs, stored as one more part of at most 64 KiB. Its parts are ordinary stored rows, counted at about the file's own size, and the cleanup sweep removes parts no document committed within an hour.
 
 **Proof:** `backend/src/space/document_files.py`, `backend/migrations/versions/0041_document_files.sql`.
 

@@ -45,8 +45,9 @@ How to read this page:
 | Command | One client operation with one `command_id`, for example one `extract_memory` call. | `Workspace._save`, `jobs.enqueue` |
 | Command ID / idempotent replay | Repeating a `command_id` with the same payload returns the originally committed revision and spends no model call. The same ID with a different payload raises 409 `This command ID was already used for another operation.` The queue applies the same rule to a job ID and says `This job ID was already used for another request or grant`. | `Workspace._previous`, `jobs.enqueue` |
 | Command fingerprint | An HMAC of the request under the Space key. A reused command ID is compared by fingerprint, so a different payload cannot replay an old result. | `Workspace._save`, `Workspace._memory_retry` |
-| Original file | A file a person uploaded on the website that a document keeps, up to 250 MiB, such as a PDF, a Word document or a presentation. The document's `file` field gives its name, media type, size, SHA-256 digest and part count, and its body holds the text the browser extracted from it. Edits keep the file; it cannot be replaced or removed. | `backend/src/space/document_files.py`, `Workspace.save_file` |
+| Original file | A file a person uploaded on the website that a document keeps, up to 250 MiB, such as a PDF, a Word document or a presentation. The document's `file` field gives its name, media type, size, SHA-256 digest and part count, a picture's or video's `width` and `height`, a recording's `duration` and its `thumbnail` when the browser read them, and its body holds the text the browser extracted from it. Edits keep the file; it cannot be replaced or removed. | `backend/src/space/document_files.py`, `Workspace.save_file` |
 | File part | Up to 1 MiB of an original file, stored in its own `space.file_parts` row with a digest bound to the file ID and part number. A part is staged when it arrives and attached in the transaction that creates its document. | `space.file_parts` in `backend/migrations/versions/0041_document_files.sql` |
+| Thumbnail | A WebP or JPEG of at most 64 KiB the browser made at upload from a picture, a video frame or a PDF's first page, stored as a one-part file under its own ID beside the original and attached to the same document. | `document_files.Thumbnail`, `read_part(thumbnail=True)` |
 
 ## Memory anatomy
 
@@ -132,7 +133,7 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Claim IDs, memory IDs, revisions, entry indices, timestamps | Claim text (`value`) and the memory title |
 | `embedding` vector and `embedding_model` name | Cue labels, before hashing |
 | `text_hash` and `cue_hashes` | The memory record's `entries` text |
-| File part IDs, sizes and digests | Original file bytes, file names and media types |
+| File part IDs, sizes and digests | Original file and thumbnail bytes, file names, media types, pixel sizes and durations |
 | Claim type and declared importance | Creator, classification and links |
 
 [Data and privacy](PRIVACY.md) lists what is stored and who can read it.
@@ -168,6 +169,8 @@ This split is the reason the vocabulary above keeps hashes and vectors separate 
 | Job attempts | 3 work attempts, plus at most 1 recovery-only attempt | `jobs.MAX_ATTEMPTS`, `jobs.MAX_RECOVERY_ATTEMPTS` |
 | Worker batch | 1 to 100 attempts, default 20; a drain also stops after 720 seconds by default | `job_worker.main`, `job_worker.DRAIN_SECONDS` |
 | Database statement, lock and idle-transaction timeouts | 15 s, 5 s, 30 s | `backend/src/space/database_setup.py`, `worker_setup.py` |
+| Original file | 250 MiB in at most 250 parts of 1 MiB, committed within 50 minutes of the parts' upload | `document_files.MAX_FILE_BYTES`, `PART_BYTES`, `STAGED_MINUTES` |
+| Thumbnail | 64 KiB in one part, WebP or JPEG, at most 1,024 pixels a side as stored | `document_files.THUMBNAIL_BYTES`, `THUMBNAIL_SIDE` |
 
 ## Words that are easy to confuse
 

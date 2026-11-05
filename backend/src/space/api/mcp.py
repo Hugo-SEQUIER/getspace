@@ -476,9 +476,13 @@ def create_mcp(
             """Read a document or task, optionally at an immutable historical revision.
 
             A document with a `file` field keeps an original file the person uploaded on the
-            website, such as a PDF, Word document or presentation. Its body holds the text
-            extracted from that file; the file itself is viewed and downloaded on the
-            website and cannot be read through this tool.
+            website, such as a PDF, Word document, presentation, picture or video. Its body
+            holds the text extracted from that file; a picture or video has none, so its
+            title is what describes it. `file` gives the name, media type, size, digest
+            and part count, a picture's or video's dimensions and a recording's duration
+            when the browser read them, and the details of the thumbnail the website shows.
+            The file itself is viewed and downloaded on the website and cannot be read
+            through this tool.
             """
             return await command(
                 workspace.get_resource, space_id, resource_id, revision, agent_id=agent_id

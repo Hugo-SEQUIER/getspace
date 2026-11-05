@@ -39,8 +39,8 @@ def commit(file_id, raw, **values):
     return Commit(
         command_id=values.pop("command_id", uuid4()),
         file_id=file_id,
-        name="Quarterly plan.pdf",
-        type="application/PDF",
+        name=values.pop("name", "Quarterly plan.pdf"),
+        type=values.pop("type", "application/PDF"),
         bytes=len(raw),
         sha256=hashlib.sha256(raw).hexdigest(),
         title="Quarterly plan",
@@ -286,3 +286,124 @@ def test_the_part_number_and_size_limits_follow_the_250_part_cap(commands):
     Commit.model_validate({**valid, "bytes": 250 * PART_BYTES})
     with pytest.raises(ValueError):
         Commit.model_validate({**valid, "bytes": 250 * PART_BYTES + 1})
+
+
+def thumbnail_for(service, owner, space, raw):
+    thumbnail_id = upload(service, owner, space, raw)
+    return {
+        "id": thumbnail_id,
+        "type": "image/webp",
+        "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "width": 480,
+        "height": 320,
+    }
+
+
+def test_a_thumbnail_is_kept_beside_the_file_and_read_on_its_own(commands):
+    service, owner, space, connect = commands
+    raw = b"\x89PNG picture bytes" * 1000
+    small = b"RIFF\x00\x00\x00\x00WEBP thumbnail" * 100
+    thumbnail = thumbnail_for(service, owner, space, small)
+    request = commit(
+        upload(service, owner, space, raw),
+        raw,
+        name="Garden.png",
+        type="image/png",
+        width=3000,
+        height=2000,
+        thumbnail=thumbnail,
+    )
+    saved = document_files.commit(service, owner, space, request)
+    assert saved["file"]["width"] == 3000 and saved["file"]["height"] == 2000
+    assert "duration" not in saved["file"]
+    assert saved["file"]["thumbnail"] == {
+        **thumbnail,
+        "id": str(thumbnail["id"]),
+        "parts": 1,
+    }
+    # Both files belong to the document; each is read under its own ID.
+    rows = stored_parts(connect, space)
+    assert sorted(row[1] for row in rows) == sorted([len(raw), len(small)])
+    assert {row[2] for row in rows} == {UUID(saved["id"])}
+    assert read(service, owner, space, saved) == raw
+    small_read = document_files.read_part(
+        service, owner, space, UUID(saved["id"]), 0, thumbnail=True
+    )
+    assert base64.b64decode(small_read["data"]) == small
+    assert small_read["type"] == "image/webp"
+    with pytest.raises(CommandError, match="not found"):
+        document_files.read_part(service, owner, space, UUID(saved["id"]), 1, thumbnail=True)
+    # Agents and the list see the same details.
+    listed = service.list_resources(owner, space, "document")["items"]
+    assert listed[0]["file"]["thumbnail"]["bytes"] == len(small)
+    # Deleting the document removes the thumbnail's part with the file's.
+    assert delete_resource(service, owner, space, UUID(saved["id"]), 1) == {"deleted": True}
+    assert stored_parts(connect, space) == []
+
+
+def test_a_file_without_a_thumbnail_says_so_and_a_missing_thumbnail_part_fails_the_commit(
+    commands,
+):
+    service, owner, space, _ = commands
+    raw = b"MP4 video bytes" * 500
+    saved = document_files.commit(
+        service,
+        owner,
+        space,
+        commit(
+            upload(service, owner, space, raw),
+            raw,
+            name="Talk.mp4",
+            type="video/mp4",
+            duration=154.5,
+        ),
+    )
+    assert saved["file"]["duration"] == 154.5
+    assert "thumbnail" not in saved["file"]
+    with pytest.raises(CommandError, match="no thumbnail") as error:
+        document_files.read_part(service, owner, space, UUID(saved["id"]), 0, thumbnail=True)
+    assert error.value.status == 404
+    # A thumbnail whose part was never uploaded rolls the whole commit back.
+    orphan = {
+        "id": uuid4(),
+        "type": "image/jpeg",
+        "bytes": 10,
+        "sha256": hashlib.sha256(b"x").hexdigest(),
+        "width": 10,
+        "height": 10,
+    }
+    with pytest.raises(CommandError, match="incomplete or expired"):
+        document_files.commit(
+            service,
+            owner,
+            space,
+            commit(upload(service, owner, space, raw), raw, thumbnail=orphan),
+        )
+    assert len(service.list_resources(owner, space, "document")["items"]) == 1
+
+
+def test_thumbnails_and_media_details_are_validated():
+    valid = commit(uuid4(), b"x").model_dump(mode="json")
+    thumbnail = {
+        "id": str(uuid4()),
+        "type": "image/webp",
+        "bytes": 1000,
+        "sha256": "a" * 64,
+        "width": 480,
+        "height": 320,
+    }
+    Commit.model_validate({**valid, "thumbnail": thumbnail})
+    for bad in (
+        {**thumbnail, "id": valid["file_id"]},
+        {**thumbnail, "type": "image/png"},
+        {**thumbnail, "bytes": document_files.THUMBNAIL_BYTES + 1},
+        {**thumbnail, "width": 0},
+        {**thumbnail, "height": document_files.THUMBNAIL_SIDE + 1},
+    ):
+        with pytest.raises(ValueError):
+            Commit.model_validate({**valid, "thumbnail": bad})
+    for detail, value in (("width", 0), ("height", -1), ("duration", 0), ("width", 1.5)):
+        with pytest.raises(ValueError):
+            Commit.model_validate({**valid, detail: value})
+    assert Commit.model_validate({**valid, "duration": 0.5}).duration == 0.5

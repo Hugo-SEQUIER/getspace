@@ -6355,6 +6355,53 @@
             "minimum": 1.0,
             "title": "Parts",
             "description": "How many parts of up to 1 MiB store the file."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "A picture's or video's width in pixels, when the browser read it."
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "Its height in pixels."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration",
+            "description": "A video's or recording's length in seconds, when the browser read it."
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileThumbnail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A small picture of a picture, video or PDF the browser made at upload, which the website's file grid shows. Its bytes are stored like the file's parts and are shown on the website only."
           }
         },
         "additionalProperties": false,
@@ -6561,6 +6608,62 @@
           "next_cursor"
         ],
         "title": "ExportPage"
+      },
+      "FileThumbnail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image/webp",
+              "image/jpeg"
+            ],
+            "title": "Type"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Bytes",
+            "description": "The thumbnail's size in bytes, at most 64 KiB."
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "The SHA-256 digest of the thumbnail, in hexadecimal."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Height"
+          },
+          "parts": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Parts",
+            "description": "Always 1: a thumbnail is one part."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "bytes",
+          "sha256",
+          "width",
+          "height",
+          "parts"
+        ],
+        "title": "FileThumbnail"
       },
       "ImportOrigin": {
         "properties": {},
@@ -7350,7 +7453,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF, a presentation, a picture or a video. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           },
           "body": {
             "type": "string",
@@ -7496,7 +7599,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF, a presentation, a picture or a video. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           },
           "stale": {
             "type": "boolean",
@@ -8617,7 +8720,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF, a presentation, a picture or a video. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           },
           "body": {
             "type": "string",
@@ -8802,7 +8905,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF or a presentation. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
+            "description": "Present on a document that keeps an original file uploaded on the website, such as a PDF, a presentation, a picture or a video. The body holds the text extracted from it; the file itself is viewed and downloaded on the website."
           }
         },
         "additionalProperties": false,

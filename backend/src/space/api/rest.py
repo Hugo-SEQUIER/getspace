@@ -183,8 +183,9 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     def save(space_id: UUID, body: SaveResource, session=write):
         return workspace.save(session[0], space_id, body)
 
-    # A document's original file: the website uploads it in parts, then commits the document
-    # that holds it, and reads it back part by part. Agents read its text from the body.
+    # A document's original file: the website uploads it in parts, with a thumbnail of a
+    # picture, video or PDF as a one-part file of its own, then commits the document that
+    # holds them, and reads them back part by part. Agents read the file's text from the body.
     @router.post("/spaces/{space_id}/files/{file_id}/parts/{part}")
     def upload_file_part(
         space_id: UUID, file_id: UUID, part: int, body: document_files.Part, session=auth
@@ -198,6 +199,18 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     @router.delete("/spaces/{space_id}/files/{file_id}")
     def discard_file(space_id: UUID, file_id: UUID, session=auth):
         return document_files.discard(workspace, session[0], space_id, file_id)
+
+    # Declared before the part route: a path segment of "thumbnail" is not a part number.
+    @router.get("/spaces/{space_id}/resources/{resource_id}/file/thumbnail")
+    def file_thumbnail(
+        space_id: UUID,
+        resource_id: UUID,
+        revision: Annotated[int | None, Query(ge=1)] = None,
+        session=auth,
+    ):
+        return document_files.read_part(
+            workspace, session[0], space_id, resource_id, 0, revision, thumbnail=True
+        )
 
     @router.get("/spaces/{space_id}/resources/{resource_id}/file/{part}")
     def file_part(

@@ -10,6 +10,12 @@ STAGED_MINUTES. The website discards the staged parts of an upload that failed; 
 retention sweep removes any left an hour after their upload. The document's body holds the
 text the browser extracted from the file, so search, recall and agents read the file
 through it. Only a signed-in person uploads; agents see the file's details and its text.
+
+A picture, a video or a PDF may bring a thumbnail the browser made from it: a WebP or JPEG of
+at most THUMBNAIL_BYTES, uploaded as a one-part file under its own ID and attached to the
+same document, so the website's file grid shows it without downloading the original.
+The file's details may also carry the picture's dimensions or the recording's duration, read
+on the device at upload.
 """
 
 import base64
@@ -18,6 +24,7 @@ import hashlib
 import hmac
 import math
 import re
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field, ValidationError, field_validator
@@ -32,6 +39,10 @@ MAX_FILE_BYTES = PART_BYTES * MAX_PARTS
 # Staged parts must be attached well inside the retention sweep's one-hour grace.
 STAGED_MINUTES = 50
 RETENTION_MINUTES = 60
+# A thumbnail is one small part: large enough for a sharp 480-pixel picture, small enough that
+# a grid of them costs little.
+THUMBNAIL_BYTES = 64 * 1024
+THUMBNAIL_SIDE = 1024
 _NAME = re.compile(r"[^/\\\x00-\x1f\x7f]+")
 # A media type and subtype made of RFC 6838 name characters, without parameters.
 _TYPE = re.compile(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+")
@@ -41,6 +52,18 @@ class Part(Input):
     """One part as standard base64; the decoded bytes are checked against PART_BYTES."""
 
     data: str = Field(min_length=4, max_length=4 * math.ceil(PART_BYTES / 3))
+
+
+class Thumbnail(Input):
+    """A small picture of the file, made in the browser and uploaded as part 0 of its own
+    file ID before the commit."""
+
+    id: UUID
+    type: Literal["image/webp", "image/jpeg"]
+    bytes: int = Field(ge=1, le=THUMBNAIL_BYTES, strict=True)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    width: int = Field(ge=1, le=THUMBNAIL_SIDE, strict=True)
+    height: int = Field(ge=1, le=THUMBNAIL_SIDE, strict=True)
 
 
 class Commit(Input):
@@ -54,6 +77,18 @@ class Commit(Input):
     body: str = Field(default="", max_length=700_000)
     project: UUID | None = None
     folder: UUID | None = None
+    # What the browser could read about a picture or a recording; absent for other files.
+    width: int | None = Field(default=None, ge=1, le=100_000, strict=True)
+    height: int | None = Field(default=None, ge=1, le=100_000, strict=True)
+    duration: float | None = Field(default=None, gt=0, le=10_000_000)
+    thumbnail: Thumbnail | None = None
+
+    @field_validator("thumbnail")
+    @classmethod
+    def own_id(cls, value, info):
+        if value is not None and value.id == info.data.get("file_id"):
+            raise ValueError("A thumbnail needs its own file ID")
+        return value
 
     @field_validator("name")
     @classmethod
@@ -145,8 +180,8 @@ def commit(workspace, identity, space_id, request: Commit):
     """Parameters: a signed-in writer, the Space and the file's details with the document's
     title, extracted text and placement.
     What it does: creates a document that holds the file, attaching every staged part in the
-    same transaction as the document's first revision. A retry with the same command ID
-    and request returns that document.
+    same transaction as the document's first revision, the thumbnail's part included when
+    the browser made one. A retry with the same command ID and request returns that document.
     Output: the saved document, including its `file` details.
     """
     with workspace.db.transaction(identity) as connection:
@@ -174,13 +209,19 @@ def commit(workspace, identity, space_id, request: Commit):
         "sha256": request.sha256,
         "parts": parts_for(request.bytes),
     }
+    for detail in ("width", "height", "duration"):
+        if getattr(request, detail) is not None:
+            file[detail] = getattr(request, detail)
+    if request.thumbnail:
+        file["thumbnail"] = {**request.thumbnail.model_dump(mode="json"), "parts": 1}
     return workspace.save_file(identity, space_id, document, file)
 
 
 def attach(connection, resource_id, file):
     """Attach a new document's staged parts inside its commit transaction.
 
-    Parameters: the transaction, the new document's ID and its file details.
+    Parameters: the transaction, the new document's ID and its file details, or those of
+    the file's thumbnail.
     What it does: claims every staged part of the file uploaded within STAGED_MINUTES and
     checks they are exactly the parts the declared size needs.
     Output: none; a missing, extra or expired part raises and rolls the commit back.
@@ -227,12 +268,15 @@ def discard(workspace, identity, space_id, file_id: UUID):
     return {"discarded": discarded}
 
 
-def read_part(workspace, identity, space_id, resource_id: UUID, part: int, revision=None):
-    """Parameters: a reader of the Space, the document, the part number and optionally
-    an earlier revision.
+def read_part(
+    workspace, identity, space_id, resource_id: UUID, part: int, revision=None, thumbnail=False
+):
+    """Parameters: a reader of the Space, the document, the part number, optionally an
+    earlier revision, and whether to read the file's thumbnail instead of the file.
     What it does: finds the file the revision holds, reads that one part, and rechecks access
     before returning it.
-    Output: {"data": base64 of the part's bytes}.
+    Output: {"data": base64 of the part's bytes}, with the thumbnail's media "type" when it
+    is the thumbnail.
     """
     with read_stage("db_read"), workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id)
@@ -272,8 +316,15 @@ def read_part(workspace, identity, space_id, resource_id: UUID, part: int, revis
     file = metadata.get("file")
     if not file:
         raise CommandError("This document has no original file", 404)
+    if thumbnail:
+        file = file.get("thumbnail")
+        if not file:
+            raise CommandError("This file has no thumbnail", 404)
     if not 0 <= part < file["parts"] or file["id"] not in stored:
         raise CommandError("File part not found", 404)
     with read_stage("db_recheck"):
         workspace._recheck(identity, space_id)
-    return {"data": base64.b64encode(stored[file["id"]]).decode("ascii")}
+    result = {"data": base64.b64encode(stored[file["id"]]).decode("ascii")}
+    if thumbnail:
+        result["type"] = file["type"]
+    return result

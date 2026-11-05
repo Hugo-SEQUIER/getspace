@@ -1122,6 +1122,9 @@ class Workspace:
                         from space import document_files
 
                         document_files.attach(connection, resource_id, file)
+                        # The thumbnail is a second small file under its own ID.
+                        if file.get("thumbnail"):
+                            document_files.attach(connection, resource_id, file["thumbnail"])
                 saved_revision = connection.execute(
                     "INSERT INTO space.resource_revisions(organization_id,"
                     "space_id,resource_id,revision,key_id,encrypted_metadata,"

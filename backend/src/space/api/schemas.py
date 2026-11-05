@@ -71,6 +71,16 @@ class TaskColumn(Closed):
 # Documents and tasks
 
 
+class FileThumbnail(Closed):
+    id: UUID
+    type: Literal["image/webp", "image/jpeg"]
+    bytes: int = Field(ge=1, description="The thumbnail's size in bytes, at most 64 KiB.")
+    sha256: str = Field(description="The SHA-256 digest of the thumbnail, in hexadecimal.")
+    width: int = Field(ge=1)
+    height: int = Field(ge=1)
+    parts: int = Field(ge=1, description="Always 1: a thumbnail is one part.")
+
+
 class DocumentFile(Closed):
     id: UUID
     name: str = Field(description="The original file name.")
@@ -78,6 +88,21 @@ class DocumentFile(Closed):
     bytes: int = Field(ge=1, description="The file's size in bytes.")
     sha256: str = Field(description="The SHA-256 digest of the file, in hexadecimal.")
     parts: int = Field(ge=1, description="How many parts of up to 1 MiB store the file.")
+    width: int | None = Field(
+        default=None,
+        description="A picture's or video's width in pixels, when the browser read it.",
+    )
+    height: int | None = Field(default=None, description="Its height in pixels.")
+    duration: float | None = Field(
+        default=None,
+        description="A video's or recording's length in seconds, when the browser read it.",
+    )
+    thumbnail: FileThumbnail | None = Field(
+        default=None,
+        description="A small picture of a picture, video or PDF the browser made at upload, "
+        "which the website's file grid shows. Its bytes are stored like the file's parts and "
+        "are shown on the website only.",
+    )
 
 
 class ResourceSummary(Closed):
@@ -101,8 +126,8 @@ class ResourceSummary(Closed):
     file: DocumentFile | None = Field(
         default=None,
         description="Present on a document that keeps an original file uploaded on the website, "
-        "such as a PDF or a presentation. The body holds the text extracted from it; the file "
-        "itself is viewed and downloaded on the website.",
+        "such as a PDF, a presentation, a picture or a video. The body holds the text extracted "
+        "from it; the file itself is viewed and downloaded on the website.",
     )
 
 

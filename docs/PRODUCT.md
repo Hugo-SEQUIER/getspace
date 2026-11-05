@@ -41,7 +41,7 @@ No account, billing, team or cloud service is needed for this workflow. A model 
 
 | Area | Current capability | Later expansion |
 |---|---|---|
-| Documents | MCP read and write, website reader and basic manual editor, links, uploads that keep the original file with a preview, retained revisions | Richer blocks, comments, simultaneous editing, offline synchronization |
+| Documents | MCP read and write, website reader and basic manual editor, links, uploads that keep the original file with a preview, pictures and videos kept as files with thumbnails, retained revisions | Richer blocks, comments, simultaneous editing, offline synchronization |
 | Tasks | Title, status, priority, project, source links; list and board | Dependencies, recurring work, cycles, custom automation |
 | Projects | Group related documents and tasks | Portfolios and advanced planning |
 | Memory | Autonomous source-backed and agent-written claims, a claim browser, correction and permanent deletion, historical evidence | Deeper recall, richer consolidation |
