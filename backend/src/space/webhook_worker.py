@@ -66,7 +66,15 @@ def run_attempt(queue_env_file=None):
     try:
         database = Database(settings, pool_size=1)
         keys = LocalKeys()
-        workspace = Workspace(database, keys, None, settings.mcp_resource_url, settings.web_url)
+        workspace = Workspace(
+            database,
+            keys,
+            # A delivery carries rows and text, never a file's bytes, so this process
+            # holds no file store and cannot read one by accident.
+            None,
+            settings.mcp_resource_url,
+            settings.web_url,
+        )
         database.open()
         with psycopg.connect(
             settings.webhook_database_url.get_secret_value(),

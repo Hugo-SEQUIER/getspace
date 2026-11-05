@@ -59,6 +59,24 @@ No command removes these yet; they stay until the Space is reset:
 - the chunks of restore uploads that were never applied or cancelled, in `space.restore_chunks`, which are ignored after they expire at 24 hours;
 - projects, folders, sections, categories and databases in the trash, with their revisions.
 
+## Uploaded files on disk
+
+A document's original file is stored in the `files-data` volume at `/var/lib/space/files`, one object per part, named `{organization}/{space}/{file_id}/{part}`. The database keeps the path, the sizes and a digest. A backup therefore has two halves, as [Self-hosting](SELF_HOSTING.md#backups) describes.
+
+Two commands keep the folder and the rows in step:
+
+```sh
+docker compose run --rm migrate python -m space.files.reconcile
+docker compose run --rm migrate python -m space.files.reconcile --delete-orphans
+docker compose run --rm migrate python -m space.files.move
+```
+
+`reconcile` prints the folder's size, the rows that name an object, the object files no row names and the rows whose file is missing. The last kind is data loss: it exits with status 1 and lists them, so a check in cron or a monitoring call catches it. Staged parts from a failed upload are the usual orphans; the retention sweep removes them an hour after they arrived, and `--delete-orphans` removes any left.
+
+`move` copies a part's bytes out of the database into the folder and only then empties the database's copy, checking each part against the digest the row keeps. An installation upgraded from v0.5.0 needs it once for the files it already holds; `scripts/upgrade.sh` runs it after the migrations. `--dry-run` prints what it would move.
+
+Deleting a document, the staged-part sweep and a Space reset all remove the objects with the rows, so the folder does not grow with deleted content.
+
 ## Usage limits
 
 Each Space still counts its retained bytes, its items (documents, tasks, memories and workspace items such as projects and databases) and its model requests in the current UTC month, and `GET /v1/spaces/{space_id}/usage` reports them. Migration `0035_selfhosted_limits` removed the limits: every limit is stored at its maximum value, which the API reports as `null`. To protect a small server or a provider budget, set a limit for one Space as the superuser:

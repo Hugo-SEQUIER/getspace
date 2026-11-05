@@ -17,6 +17,8 @@ import argparse
 import sys
 
 from space.database_setup import InstallSettings, connect
+from space.local_store import LocalObjectStore
+from space.settings import CONFIG_FILE, Settings
 
 COMMAND_RETENTION_DAYS = 180
 ACTIVITY_RETENTION_DAYS = 90
@@ -79,7 +81,39 @@ WHERE ctid IN (
       AND created_at < now() - make_interval(mins => %s)
     LIMIT %s
 )
+RETURNING object_key
 """
+
+
+def _staged_object_key(row):
+    """The object key of one returned row, or None for a part that holds its bytes in the row."""
+    key = row["object_key"] if isinstance(row, dict) else row[0]
+    return key or None
+
+
+def _delete_staged_parts(connection, batch_size: int, objects=None) -> int:
+    """Runs the staged-part sweep, freeing the objects those rows named after they commit.
+
+    Parameters: an owner-role connection, the batch size and the object store, or None
+        for a database-only run.
+    What it does: deletes a batch of expired staged parts, then removes exactly the
+        objects the removed rows named, so a part of the same file still inside its window
+        keeps its object. Rows go first: a crash leaves an unreferenced object for the
+        reconcile command, never a row without its bytes.
+    Output: the number of part rows deleted.
+    """
+    removed = 0
+    while True:
+        with connection.transaction():
+            rows = connection.execute(
+                STAGED_FILE_PARTS_SQL, (STAGED_FILE_PARTS_MINUTES, batch_size)
+            ).fetchall()
+        removed += len(rows)
+        if objects is not None:
+            keys = {_staged_object_key(row) for row in rows}
+            objects.delete_keys([key for key in keys if key])
+        if len(rows) < batch_size:
+            return removed
 
 
 def _delete_in_batches(connection, statement: str, parameters: tuple, batch_size: int) -> int:
@@ -100,12 +134,20 @@ def _delete_in_batches(connection, statement: str, parameters: tuple, batch_size
             return removed
 
 
-def purge(connection, *, days: int = COMMAND_RETENTION_DAYS, batch_size: int = BATCH_SIZE):
+def purge(
+    connection,
+    *,
+    days: int = COMMAND_RETENTION_DAYS,
+    batch_size: int = BATCH_SIZE,
+    objects=None,
+):
     """Deletes commands and their events older than the retention window.
 
-    Parameters: an owner-role connection, the retention window in days and the batch size.
+    Parameters: an owner-role connection, the retention window in days, the batch size
+        and the object store, or None for a database-only run.
     What it does: removes the events of expired commands, then the commands themselves,
-        each in committed batches, then the staged parts of uploads that never committed.
+        each in committed batches, then the staged parts of uploads that never committed
+        and the objects their rows named.
     Output: a dict with the `events`, `commands`, `activity_events`,
         `retired_claim_vectors` and `staged_file_parts` counts removed. A command ID older
         than the window is forgotten, so a retry that late is applied again.
@@ -120,9 +162,7 @@ def purge(connection, *, days: int = COMMAND_RETENTION_DAYS, batch_size: int = B
     vectors = _delete_in_batches(
         connection, RETIRED_VECTORS_SQL, (RETIRED_VECTOR_RETENTION_DAYS,), batch_size
     )
-    file_parts = _delete_in_batches(
-        connection, STAGED_FILE_PARTS_SQL, (STAGED_FILE_PARTS_MINUTES,), batch_size
-    )
+    file_parts = _delete_staged_parts(connection, batch_size, objects)
     return {
         "events": events,
         "commands": commands,
@@ -148,8 +188,9 @@ def main(argv=None) -> int:
         print("Set SPACE_MIGRATION_DATABASE_URL first", file=sys.stderr)
         return 2
     connection = connect(settings)
+    store = LocalObjectStore(Settings(_env_file=CONFIG_FILE).file_dir)
     try:
-        counts = purge(connection, days=args.days, batch_size=args.batch_size)
+        counts = purge(connection, days=args.days, batch_size=args.batch_size, objects=store)
     finally:
         connection.close()
     print(

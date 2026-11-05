@@ -14,7 +14,9 @@ from uuid import UUID
 
 from psycopg.pq import TransactionStatus
 
-from space import content_changes
+from space import content_changes, local_store
+from space.local_store import LocalObjectStore
+from space.settings import CONFIG_FILE, Settings
 
 # Referential order: children first, one entry per Space-owned table. Every statement is
 # written out rather than built: this module deletes rows, and a constructed query string
@@ -221,8 +223,8 @@ def _scalar(row) -> object:
 
 
 def object_prefix(organization_id: UUID, space_id: UUID) -> str:
-    """The key prefix every object of one Space lives under, where objects exist."""
-    return f"spaces/{organization_id}/{space_id}/"
+    """The key prefix every object of one Space lives under."""
+    return local_store.space_prefix(organization_id, space_id)
 
 
 def cleanup_objects(connection, organization_id, space_id, objects):
@@ -337,8 +339,10 @@ def purge_space(
                         "ON CONFLICT DO NOTHING",
                         (subject_hash(issuer, subject),),
                     )
-                # Object cleanup is recorded only when an object store holds bodies;
-                # a self-hosted installation keeps every body inline in PostgreSQL.
+                # Object cleanup is recorded before the rows go, so a crash mid-purge can
+                # still finish it. An account takes the whole Space prefix; a content
+                # reset takes only the objects of the revisions and file parts it removes,
+                # so writes that follow the reset keep their own objects.
                 if objects is not None and account:
                     connection.execute(
                         "INSERT INTO space.purge_cleanup "
@@ -358,6 +362,16 @@ def purge_space(
                         "INSERT INTO space.purge_cleanup (organization_id,space_id,object_key) "
                         "SELECT organization_id,space_id,object_key FROM space.restore_objects "
                         "WHERE organization_id=%s AND space_id=%s ON CONFLICT DO NOTHING",
+                        parameters,
+                    )
+                    # A document's original file is a folder of parts, one prefix per file.
+                    connection.execute(
+                        "INSERT INTO space.purge_cleanup "
+                        "(organization_id,space_id,object_key,is_prefix) "
+                        "SELECT DISTINCT organization_id,space_id,"
+                        "organization_id::text||'/'||space_id::text||'/'||file_id::text||'/',true "
+                        "FROM space.file_parts WHERE organization_id=%s AND space_id=%s "
+                        "AND object_key IS NOT NULL ON CONFLICT DO NOTHING",
                         parameters,
                     )
                 if not account:
@@ -435,8 +449,11 @@ def main(argv=None) -> int:
     # Only a content reset: deleting the account would erase the installation's single
     # owner for good, and the API could not start again. To remove everything, delete
     # the database volume instead (docker compose down -v).
+    store = LocalObjectStore(Settings(_env_file=CONFIG_FILE).file_dir)
     with connect(InstallSettings()) as connection:
-        counts = purge_space(connection, args.organization_id, args.space_id, dry_run=args.dry_run)
+        counts = purge_space(
+            connection, args.organization_id, args.space_id, objects=store, dry_run=args.dry_run
+        )
     for key in sorted(counts):
         print(f"{key}={counts[key]}")
     return 0

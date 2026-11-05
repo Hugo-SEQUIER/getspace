@@ -70,6 +70,9 @@ main() {
   fi
 
   step "Starting Space"
+  # The folder holding uploaded file bytes is a volume; give it the owner the containers
+  # run as before anything starts writing to it.
+  scripts/files-dir.sh
   docker compose up -d --wait
 
   summary

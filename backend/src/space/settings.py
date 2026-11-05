@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # no cookies, so "*" is safe; an empty list turns cross-origin access off.
     api_cors_origins: list[str] = Field(default_factory=lambda: ["*"], max_length=50)
     database_url: SecretStr | None = None
+    # Uploaded file bytes live in this folder on the server's disk, so a large file never
+    # enters PostgreSQL. A relative path resolves against the process's working directory,
+    # which is the backend directory under `uv run --directory backend` and in the
+    # container. The store creates the folder on the first write, so a read-only boot
+    # needs nothing, and the first upload reports the folder when it cannot be used.
+    file_dir: Path = Path("data/files")
     job_database_url: SecretStr | None = None
     webhook_database_url: SecretStr | None = None
     # A compose network reaches PostgreSQL privately, so TLS is optional by default.

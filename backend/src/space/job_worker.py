@@ -63,7 +63,14 @@ def run_attempt(queue_env_file=None):
     database = Database(settings, pool_size=1)
     keys = LocalKeys()
     workspace = Workspace(
-        database, keys, None, settings.mcp_resource_url, settings.web_url, MemoryModels(settings)
+        database,
+        keys,
+        # Memory jobs read rows and text, never a file's bytes, so this process holds no
+        # file store.
+        None,
+        settings.mcp_resource_url,
+        settings.web_url,
+        MemoryModels(settings),
     )
     try:
         database.open()

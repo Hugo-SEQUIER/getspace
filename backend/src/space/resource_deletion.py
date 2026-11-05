@@ -8,6 +8,7 @@ from space import content_changes, document_files
 def delete_resource(workspace, identity, space_id, resource_id, expected_revision):
     from space.workspace import CommandError
 
+    prefixes = []
     with workspace.db.transaction(identity) as connection:
         # Removal policy: the owner's website session or API key with write access may remove a
         # source document or a task. A delegated agent grant with write access may
@@ -53,8 +54,8 @@ def delete_resource(workspace, identity, space_id, resource_id, expected_revisio
             "ON CONFLICT DO NOTHING",
             (cleanup_id, cleanup_id, resource_id),
         )
-        # A document's original file goes with it; its parts hold the stored bytes.
-        document_files.detach(connection, resource_id)
+        # A document's original file goes with it; its parts hold the object keys.
+        prefixes = document_files.detach(connection, resource_id)
         connection.execute(
             "DELETE FROM space.events WHERE command_id IN "
             "(SELECT id FROM space.commands WHERE resource_id=%s)",
@@ -68,6 +69,10 @@ def delete_resource(workspace, identity, space_id, resource_id, expected_revisio
         content_changes.changed(
             connection, content_changes.resource_kinds(row["kind"], row["memory_kind"])
         )
+    # The rows are gone; the bytes go now, never before the commit. A failure here leaves
+    # an unreferenced object for the reconcile command, not a row without its file.
+    for prefix in prefixes:
+        workspace.objects.delete_prefix(prefix)
     return {"deleted": True}
 
 

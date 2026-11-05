@@ -2,24 +2,41 @@
 
 import base64
 import hashlib
+import time
 from uuid import UUID, uuid4
 
 import pytest
 from test_database_setup import database as database_fixture
-from test_workspace import change, delegated
+from test_workspace import TestKeys, change, delegated
 from test_workspace import command_database as command_database_fixture
-from test_workspace import commands as commands_fixture
 
 from space import document_files
 from space.document_files import MAX_PARTS, PART_BYTES, Commit, Part
+from space.local_store import LocalObjectStore
 from space.resource_deletion import delete_resource
 from space.retention import purge as retention_purge
-from space.security.auth import Unauthenticated
-from space.workspace import CommandError
+from space.security.auth import Identity, Unauthenticated
+from space.workspace import CommandError, Workspace
 
 database = database_fixture
 command_database = command_database_fixture
-commands = commands_fixture
+
+RESOURCE_URL = "http://127.0.0.1:8000/mcp/"
+
+
+@pytest.fixture
+def commands(command_database, database, tmp_path):
+    """A Workspace whose file parts go to a folder in the test's temporary directory."""
+    service = Workspace(
+        command_database,
+        TestKeys(),
+        LocalObjectStore(tmp_path / "files"),
+        RESOURCE_URL,
+        memory_models=None,
+    )
+    identity = Identity("https://identity.invalid", str(uuid4()), int(time.time()) + 600)
+    space = UUID(service.bootstrap(identity)["id"])
+    return service, identity, space, database[0]
 
 
 def parts(raw):
@@ -72,10 +89,21 @@ def retained(connect, space):
 def stored_parts(connect, space):
     with connect() as connection:
         return connection.execute(
-            "SELECT part,plain_bytes,resource_id,content_bytes FROM space.file_parts "
-            "WHERE space_id=%s ORDER BY part",
+            "SELECT part,plain_bytes,resource_id,content_bytes,object_key,content "
+            "FROM space.file_parts WHERE space_id=%s ORDER BY part",
             (space,),
         ).fetchall()
+
+
+def stored_objects(service):
+    """Every file in the store's folder, relative to its root."""
+    if not service.objects.root.exists():
+        return []
+    return sorted(
+        str(path.relative_to(service.objects.root))
+        for path in service.objects.root.rglob("*")
+        if path.is_file()
+    )
 
 
 def test_a_file_round_trips_through_stored_parts_and_lists_with_its_document(commands):
@@ -97,9 +125,7 @@ def test_a_file_round_trips_through_stored_parts_and_lists_with_its_document(com
     listed = service.list_resources(owner, space, "document")["items"]
     assert [item["file"] for item in listed] == [saved["file"]]
     assert service.get_resource(owner, space, UUID(saved["id"]))["file"] == saved["file"]
-    # Parts are kept in the database, so no object is written.
-    assert service.objects.values == {}
-    # A part costs its own size: the stored bytes are exactly the part's bytes.
+    # The bytes live in the file folder; the row keeps only their key and their size.
     rows = stored_parts(connect, space)
     assert [(row[0], row[1]) for row in rows] == [
         (0, PART_BYTES),
@@ -108,6 +134,14 @@ def test_a_file_round_trips_through_stored_parts_and_lists_with_its_document(com
     ]
     assert [row[2] for row in rows] == [UUID(saved["id"])] * 3
     assert [row[3] for row in rows] == [row[1] for row in rows]
+    assert all(row[4] and row[5] is None for row in rows)
+    assert stored_objects(service) == sorted(row[4] for row in rows)
+    sizes = {
+        str(path.relative_to(service.objects.root)): path.stat().st_size
+        for path in service.objects.root.rglob("*")
+        if path.is_file()
+    }
+    assert sizes == {row[4]: row[1] for row in rows}
     assert retained(connect, space) - before >= len(raw)
     # Retrying the commit returns the same document instead of creating another.
     assert document_files.commit(service, owner, space, request)["id"] == saved["id"]
@@ -201,7 +235,48 @@ def test_deleting_the_document_removes_its_parts_and_frees_storage(commands):
     )
     assert delete_resource(service, owner, space, UUID(saved["id"]), 1) == {"deleted": True}
     assert stored_parts(connect, space) == []
+    assert stored_objects(service) == []
     assert retained(connect, space) == before
+
+
+def test_a_part_stored_in_its_row_before_the_move_is_still_read(commands):
+    """A v0.5.0 row keeps its `content`; the reader falls back to it when there is no key."""
+    service, owner, space, connect = commands
+    raw = b"bytes kept in the row before the move"
+    saved = document_files.commit(
+        service, owner, space, commit(upload(service, owner, space, raw), raw)
+    )
+    file_id = UUID(saved["file"]["id"])
+    with connect() as connection:
+        connection.execute(
+            "UPDATE space.file_parts SET content=%s,object_key=NULL WHERE file_id=%s",
+            (raw, file_id),
+        )
+    # The object the row used to name is gone; the inline bytes still answer.
+    for path in service.objects.root.rglob("*"):
+        if path.is_file():
+            path.unlink()
+    assert stored_objects(service) == []
+    assert read(service, owner, space, saved) == raw
+
+
+def test_an_upload_the_database_refuses_leaves_no_bytes_on_disk(commands):
+    service, owner, space, connect = commands
+    kept = document_files.commit(
+        service, owner, space, commit(upload(service, owner, space, b"kept"), b"kept")
+    )
+    before = stored_objects(service)
+    with connect() as connection:
+        connection.execute(
+            "UPDATE space.usage_limits SET storage_limit_bytes=retained_bytes WHERE space_id=%s",
+            (space,),
+        )
+    with pytest.raises(CommandError, match="storage limit") as error:
+        upload(service, owner, space, b"refused bytes")
+    assert error.value.status == 429
+    # The bytes were written first, so the failed insert must take them away again.
+    assert stored_objects(service) == before
+    assert read(service, owner, space, kept) == b"kept"
 
 
 def test_retention_removes_parts_no_document_committed(commands):
@@ -211,7 +286,7 @@ def test_retention_removes_parts_no_document_committed(commands):
     kept = document_files.commit(
         service, owner, space, commit(upload(service, owner, space, raw), raw)
     )
-    upload(service, owner, space, raw)
+    abandoned = upload(service, owner, space, raw)
     with connect() as connection:
         connection.execute(
             "UPDATE space.file_parts SET created_at=now()-interval '2 hours' "
@@ -219,10 +294,16 @@ def test_retention_removes_parts_no_document_committed(commands):
             (space,),
         )
     with connect(admin=True) as connection:
-        assert retention_purge(connection)["staged_file_parts"] >= 1
+        assert retention_purge(connection, objects=service.objects)["staged_file_parts"] >= 1
     assert [row[2] for row in stored_parts(connect, space)] == [UUID(kept["id"])]
     assert read(service, owner, space, kept) == raw
     assert retained(connect, space) > before
+    # The sweep takes the abandoned upload's bytes with its rows and keeps the committed one.
+    assert len(stored_objects(service)) == 1
+    scope, _ = service._key(owner, space)
+    assert not (
+        service.objects.root / str(scope["organization_id"]) / str(space) / str(abandoned)
+    ).exists()
 
 
 def test_only_a_signed_in_writer_uploads_files(commands):
@@ -259,6 +340,7 @@ def test_a_failed_upload_is_discarded_at_once_and_committed_files_are_untouched(
     assert retained(connect, space) - before >= len(raw)
     assert document_files.discard(service, owner, space, abandoned) == {"discarded": 2}
     assert stored_parts(connect, space) == []
+    assert stored_objects(service) == []
     assert retained(connect, space) == before
     with pytest.raises(CommandError, match="incomplete or expired"):
         document_files.commit(service, owner, space, commit(abandoned, raw))
@@ -340,6 +422,7 @@ def test_a_thumbnail_is_kept_beside_the_file_and_read_on_its_own(commands):
     # Deleting the document removes the thumbnail's part with the file's.
     assert delete_resource(service, owner, space, UUID(saved["id"]), 1) == {"deleted": True}
     assert stored_parts(connect, space) == []
+    assert stored_objects(service) == []
 
 
 def test_a_file_without_a_thumbnail_says_so_and_a_missing_thumbnail_part_fails_the_commit(

@@ -58,6 +58,7 @@ The runtime runs each transaction in Psycopg pipeline mode, which batches the sc
 | `0041_document_files` | `file_parts`, one row per part of a document's original file: the stored bytes, their sizes and a digest, staged until the document commits; a thumbnail is one more such row under its own file ID |
 | `0042_database_records` | `database_records`, `database_record_revisions`: one row per database record with its own history, counted toward retained storage; see [SQL access](DATABASE_SQL.md#storage) |
 | `0043_systems` | No new table: the `system` and `lab_entry` item kinds of the Systems area; see [Systems](SYSTEMS.md) |
+| `0044_file_objects` | No new table: `file_parts` gains `object_key` and `content` becomes nullable, so a part's bytes live in the server's file folder and the row keeps the path, with a check that exactly one of the two is set |
 
 Migration `0003` installs the `vector` extension in the `space` schema, because the restricted logins resolve types through `search_path = pg_catalog, space`; it stops if `vector` is already installed in another schema. The claim index is created with 1,536 dimensions. When `SPACE_MEMORY_EMBEDDING_DIMENSIONS` asks for another width (16 to 2000), the installer rebuilds the column and its index while the table is empty, and refuses to change the width once embeddings are stored.
 
