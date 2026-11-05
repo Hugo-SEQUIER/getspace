@@ -12,7 +12,6 @@ import psycopg
 from psycopg.rows import dict_row
 
 from space.jobs import LEASE_SECONDS, YIELDED, claim, process
-from space.local_store import LocalObjectStore
 from space.model_provider import MemoryModels
 from space.providers import LocalKeys
 from space.queue_watch import QueueWatch, wait
@@ -66,7 +65,9 @@ def run_attempt(queue_env_file=None):
     workspace = Workspace(
         database,
         keys,
-        LocalObjectStore(settings.file_dir),
+        # Memory jobs read rows and text, never a file's bytes, so this process holds no
+        # file store.
+        None,
         settings.mcp_resource_url,
         settings.web_url,
         MemoryModels(settings),

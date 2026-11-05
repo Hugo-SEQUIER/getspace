@@ -14,7 +14,6 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-from space.local_store import LocalObjectStore
 from space.providers import LocalKeys
 from space.queue_watch import QueueWatch, wait
 from space.settings import CONFIG_FILE, Settings, database_connection_options
@@ -70,7 +69,9 @@ def run_attempt(queue_env_file=None):
         workspace = Workspace(
             database,
             keys,
-            LocalObjectStore(settings.file_dir),
+            # A delivery carries rows and text, never a file's bytes, so this process
+            # holds no file store and cannot read one by accident.
+            None,
             settings.mcp_resource_url,
             settings.web_url,
         )
