@@ -75,13 +75,14 @@ export function recordCount(database: WorkspaceDatabase): number {
 
 /** The schema and metadata a save sends, without the rows. */
 export function databaseSchema(database: WorkspaceDatabase) {
-  const { name, description, fields, view, groupBy, tasks = null, project_id = null, section_id = null } = database;
+  const { name, description, fields, view, groupBy, tasks = null, project_id, section_id } = database;
   return {
     name, description, fields, view, groupBy,
     ...(tasks ? { tasks } : {}),
-    // Agents place databases; a website edit must not clear that placement.
-    ...(project_id ? { project_id } : {}),
-    ...(section_id ? { section_id } : {}),
+    // Placement travels only when the caller knows it: a value places the database, and an
+    // explicit null clears it (the project page's Unlink). Absent leaves the placement alone.
+    ...(project_id !== undefined ? { project_id } : {}),
+    ...(section_id !== undefined ? { section_id } : {}),
   };
 }
 
