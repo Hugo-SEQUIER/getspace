@@ -76,6 +76,21 @@ def _is_part_segment(value: str) -> bool:
     )
 
 
+def is_key(value) -> bool:
+    """True only for a key this store built: three canonical UUIDs and a part number.
+
+    Parameters: any value, usually a path found in the folder or a row's `object_key`.
+    What it does: splits it on the only separator the store writes and checks each segment.
+    Output: whether the value names one object of this store. Nothing is read from disk.
+    """
+    segments = value.split("/") if isinstance(value, str) else []
+    return (
+        len(segments) == 4
+        and all(_is_uuid_segment(segment) for segment in segments[:3])
+        and _is_part_segment(segments[3])
+    )
+
+
 class LocalObjectStore:
     """The ObjectStore protocol over one folder on the server's disk.
 
@@ -93,16 +108,11 @@ class LocalObjectStore:
     # Keys are parsed here, so a caller cannot describe a path: no `..`, no separator
     # beyond the three joins, no absolute name, no canonicalization surprise.
     def _key_segments(self, key) -> list[str]:
-        segments = key.split("/") if isinstance(key, str) else []
-        if (
-            len(segments) != 4
-            or not all(_is_uuid_segment(segment) for segment in segments[:3])
-            or not _is_part_segment(segments[3])
-        ):
+        if not is_key(key):
             raise ObjectKeyError(
                 "An object key is an organization ID, a Space ID, a file ID and a part number"
             )
-        return segments
+        return key.split("/")
 
     def _prefix_segments(self, prefix) -> list[str]:
         text = prefix[:-1] if isinstance(prefix, str) and prefix.endswith("/") else prefix

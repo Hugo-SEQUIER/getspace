@@ -115,8 +115,14 @@ def parts_for(size):
     return math.ceil(size / PART_BYTES)
 
 
-def _fingerprint(file_id, part, raw):
-    """A digest bound to the file and part, so a retry can be recognized without a key."""
+def fingerprint(file_id, part, raw):
+    """A digest bound to the file and part, so a retry can be recognized without a key.
+
+    Parameters: the file's ID, the part number and the bytes the part holds.
+    What it does: hashes a fixed label, the two identifiers and the bytes.
+    Output: the 32 bytes `space.file_parts.fingerprint` stores; a moved part is checked
+    against it before the database gives up its copy of the bytes.
+    """
     return hashlib.sha256(
         b"space.file.v1\0" + str(file_id).encode() + b"\0" + str(part).encode() + b"\0" + raw
     ).digest()
@@ -140,7 +146,7 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
         raise CommandError("A file part cannot be empty", 422)
     if len(raw) > PART_BYTES:
         raise CommandError("A file part holds at most 1 MiB", 413)
-    fingerprint = _fingerprint(file_id, part, raw)
+    digest = fingerprint(file_id, part, raw)
     with workspace.db.transaction(identity) as connection:
         scope = workspace._scope(connection, identity, space_id, write=True, human=True)
         # One writer per part: a retry writes the same object key, so two uploads with
@@ -153,7 +159,7 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
             "SELECT resource_id,fingerprint FROM space.file_parts WHERE file_id=%s AND part=%s",
             (file_id, part),
         ).fetchone()
-        if existing and not hmac.compare_digest(bytes(existing["fingerprint"]), fingerprint):
+        if existing and not hmac.compare_digest(bytes(existing["fingerprint"]), digest):
             raise CommandError("This file part was already uploaded with different content", 409)
         if existing:
             # Either already committed, or a staged retry that already holds these bytes;
@@ -181,7 +187,7 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
                     file_id,
                     part,
                     key,
-                    fingerprint,
+                    digest,
                     len(raw),
                     len(raw),
                 ),
@@ -199,7 +205,7 @@ def upload_part(workspace, identity, space_id, file_id: UUID, part: int, request
                 "SELECT fingerprint FROM space.file_parts WHERE file_id=%s AND part=%s",
                 (file_id, part),
             ).fetchone()
-            if winner is None or not hmac.compare_digest(bytes(winner["fingerprint"]), fingerprint):
+            if winner is None or not hmac.compare_digest(bytes(winner["fingerprint"]), digest):
                 raise CommandError(
                     "This file part was already uploaded with different content", 409
                 )
