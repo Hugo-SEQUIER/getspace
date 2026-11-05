@@ -40,6 +40,22 @@ test('a chosen picture shows everywhere, and removing it goes back to the initia
   expect(space.profileImageCommands).toEqual(['POST', 'DELETE']);
 });
 
+test('on a wide window the settings panel fills the page and its fields keep a readable width', async ({ app, screen, browser }) => {
+  await browser.setViewport({ width: 2000, height: 1000 });
+  await app.open('/app/settings/account');
+  await expect(screen.getByRole('button', 'Change picture')).toBeVisible();
+  const [view, panel, actions] = await browser.evaluate(() =>
+    ['.sp-settings-view', '.sp-settings-page', '.sp-profile-actions'].map(selector => document.querySelector(selector)!.getBoundingClientRect().right));
+  // The panel runs to the page's 40px padding, and the profile buttons to its right edge.
+  expect(view - panel).toBeLessThanOrEqual(41);
+  expect(panel - actions).toBeLessThanOrEqual(33);
+
+  await app.open('/app/settings/webhooks');
+  const field = screen.getByLabel('Deliver to');
+  await expect(field).toBeVisible();
+  expect((await field.boundingBox())!.width).toBeLessThanOrEqual(600);
+});
+
 test('the data page warns that export takes time and restores through a labelled picker', async ({ app, screen }) => {
   await app.open('/app/settings/data');
   await expect(screen.getByText('A large Space can take several minutes to export.', { exact: false })).toBeVisible();

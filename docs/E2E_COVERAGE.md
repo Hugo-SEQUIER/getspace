@@ -40,7 +40,7 @@ What the browser suites check, by surface, and which tier checks it. Keep this t
 | App sign-in (OAuth): consent, return to the app, refusal, finish by hand | `oauth` | `oauth-consent` | The real stack registers a client, exchanges the code with PKCE and calls MCP with the token; after Allow access the Return button is on the first screen of a small laptop and phone, above the memory setup |
 | Memory page renders, extraction status only while a job runs | `surfaces` | `settings` | Memory needs a model provider; browsing and editing memory are not covered |
 | Overview renders | `surfaces` | | |
-| Settings: account profile, picture upload and removal | | `settings` | The name comes from `SPACE_OWNER_NAME` |
+| Settings: account profile, picture upload and removal; on a wide window the panel fills the page and a field stays within 600px | | `settings` | The name comes from `SPACE_OWNER_NAME` |
 | Settings: API keys create, copy, revoke | `attention` (create) | `api-keys` | |
 | Settings: security, processing, data render | `surfaces` | `settings` (processing loads by itself, export hint, restore picker) | Export download and restore: not yet |
 | Workspace polish: Home waits for agents and seen marks, dialog widths on valley pages, agents connected never created, search close button, project overview columns, wide categories dialog, Needs you always a column | | `workspace-polish` | |
