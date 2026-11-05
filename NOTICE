@@ -1,10 +1,10 @@
 Space
 Copyright (c) 2026 Hugo SEQUIER
 
-Space is free software: you can redistribute it and/or modify it under the terms of
-the GNU Affero General Public License, version 3, as published by the Free Software
-Foundation. The full terms are in LICENSE. If you run a modified version for other
-people over a network, the license requires you to offer them its source code.
+Space is free software under the MIT License. You can use, change, share and sell it,
+including as part of a closed product, provided the copyright notice and the
+permission notice stay with copies or substantial portions of the software. The full
+terms are in LICENSE.
 
 This repository also contains third-party components under their own licenses.
 See THIRD-PARTY.md for the dependency inventory and the asset attributions.

@@ -9,7 +9,7 @@ test('a locked Space refuses a wrong access key and opens with the right one', a
   await app.open('/app/tasks');
   await expect(screen.getByRole('heading', 'Unlock this Space')).toBeVisible();
   await expect(screen.getByText('SPACE_ACCESS_KEY')).toBeVisible();
-  await expect(screen.getByRole('link', 'Source code (AGPL-3.0)')).toHaveAttribute('href', 'https://github.com/Hugo-SEQUIER/getspace');
+  await expect(screen.getByRole('link', 'Source code (MIT)')).toHaveAttribute('href', 'https://github.com/Hugo-SEQUIER/getspace');
   await expect(screen.getByRole('navigation', 'Main navigation')).toHaveCount(0);
 
   const key = screen.getByLabel('Access key');
@@ -64,7 +64,7 @@ test('a private Space opens without a key and offers nothing to lock', async ({ 
   await screen.getByRole('button', 'Account menu').tap();
   await expect(screen.getByText('Open on a private network')).toBeVisible();
   await expect(screen.getByRole('button', 'Lock')).toHaveCount(0);
-  await expect(screen.getByRole('link', 'Source code (AGPL-3.0)')).toHaveAttribute('href', 'https://github.com/Hugo-SEQUIER/getspace');
+  await expect(screen.getByRole('link', 'Source code (MIT)')).toHaveAttribute('href', 'https://github.com/Hugo-SEQUIER/getspace');
   await expect(screen.getByRole('button', 'Account menu')).toContainText('Ada Lovelace');
   expect(space.unlockAttempts).toEqual([]);
 });

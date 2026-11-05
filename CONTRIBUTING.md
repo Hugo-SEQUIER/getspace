@@ -1,6 +1,6 @@
 # Contributing to Space
 
-Space is free software under the [GNU Affero General Public License v3.0](LICENSE). Bug reports, fixes, documentation and features are welcome.
+Space is free software under the [MIT License](LICENSE). Bug reports, fixes, documentation and features are welcome.
 
 ## Before your first pull request
 
