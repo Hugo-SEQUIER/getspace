@@ -109,8 +109,9 @@ class DirectConnection(BaseModel):
         return value if value in HARNESSES else "other"
 
 
-def begin(workspace, body: DeviceStart) -> dict:
-    """Parameters: the agent's self-description. What it does: registers a pending
+def begin(workspace, body: DeviceStart, *, capped: bool = True) -> dict:
+    """Parameters: the agent's self-description, and whether the pending cap applies (only
+    the owner's direct connection passes False). What it does: registers a pending
     request. Output: the secret for polling, the code to show the person, where to
     enter it, and the polling contract."""
     device_code = secrets.token_urlsafe(32)
@@ -119,13 +120,14 @@ def begin(workspace, body: DeviceStart) -> dict:
         try:
             with workspace.db.system_transaction() as connection:
                 connection.execute(
-                    "SELECT space.device_begin(%s,%s,%s,%s,%s)",
+                    "SELECT space.device_begin(%s,%s,%s,%s,%s,%s)",
                     (
                         _digest(device_code),
                         user_code,
                         body.client_name,
                         body.harness,
                         CODE_LIFETIME,
+                        capped,
                     ),
                 )
         except UniqueViolation:
@@ -267,7 +269,10 @@ def issue(workspace, identity: Identity, body: DirectConnection) -> dict:
     connection is listed, attributed and revoked exactly like one an agent requested.
     Output: the token and MCP settings, shown once, in the device poll's shape."""
     identity.check(human=True)
-    started = begin(workspace, DeviceStart(client_name=body.name, harness=body.harness))
+    # The owner is already authenticated: a queue anyone can fill must not keep them out.
+    started = begin(
+        workspace, DeviceStart(client_name=body.name, harness=body.harness), capped=False
+    )
     claimed = claim(workspace, identity, DeviceClaim(user_code=started["user_code"]))
     decide(
         workspace,

@@ -25,6 +25,7 @@ from space.oauth_server import OAuthTokens
 from space.observability import RequestMetrics, database_health, database_pool_stats
 from space.operational_errors import operation_unavailable
 from space.providers import LocalKeys
+from space.rate_limits import PreAuthLimits
 from space.read_timing import collect_read_timings
 from space.security.auth import TokenVerifier, Unauthenticated, owner_identity
 from space.settings import CONFIG_FILE, Settings
@@ -132,6 +133,8 @@ def create_app(
         lifespan=lifespan,
     )
     app.add_middleware(HealthCheckedHostMiddleware, allowed_hosts=configuration.allowed_hosts)
+    # What needs no credentials is counted per client address (space.rate_limits).
+    app.add_middleware(PreAuthLimits)
     metrics = RequestMetrics()
 
     @app.get(
