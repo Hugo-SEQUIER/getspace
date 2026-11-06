@@ -457,27 +457,34 @@ class ModelSession:
                 if effort
                 else ({"temperature": temperature} if temperature is not None else {})
             )
-            result = self._post(
-                "/chat/completions",
-                {
-                    "model": text_model,
-                    "messages": messages,
-                    "response_format": {
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": response_format.__name__,
-                            "strict": True,
-                            "schema": strict_schema(schema),
-                        },
-                    }
-                    if schema
-                    else {"type": "json_object"},
-                    "store": False,
-                    "max_completion_tokens": 6000,
-                    **generation,
-                },
-                timing_stage=timing_stage,
-            )
+            request = {
+                "model": text_model,
+                "messages": messages,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_format.__name__,
+                        "strict": True,
+                        "schema": strict_schema(schema),
+                    },
+                }
+                if schema
+                else {"type": "json_object"},
+                "store": False,
+                "max_completion_tokens": 6000,
+                **generation,
+            }
+            try:
+                result = self._post("/chat/completions", request, timing_stage=timing_stage)
+            except ModelError as error:
+                # gpt-5 and the o-series accept only the default temperature, and a
+                # deployment that leaves the effort unset sends the caller's value.
+                # Retrying once without it keeps the choice in configuration instead of
+                # tying behaviour to a model name; anything else re-raises unchanged.
+                if error.status != 400 or "temperature" not in request:
+                    raise
+                request.pop("temperature")
+                result = self._post("/chat/completions", request, timing_stage=timing_stage)
             try:
                 content = result["choices"][0]["message"]["content"]
             except (KeyError, IndexError, TypeError):
