@@ -24,7 +24,7 @@ import unicodedata
 from dataclasses import replace
 from datetime import timedelta
 from typing import Literal
-from urllib.parse import unquote, urlencode, urlsplit
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit
 from uuid import UUID
 
 from mcp.server.auth.handlers.authorize import AuthorizationHandler
@@ -56,6 +56,7 @@ from psycopg.types.json import Jsonb
 from pydantic import AnyHttpUrl, AnyUrl, BaseModel, ConfigDict, Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Route, request_response
 
 from space.security.auth import OAUTH_TOKEN_PREFIX, Identity
@@ -565,6 +566,27 @@ def _cors(handler, methods: list[str]) -> CORSMiddleware:
     )
 
 
+def _errors_stay_here(handle):
+    """Parameters: the authorization endpoint. What it does: answers an error itself, as the
+    SDK does for an unknown client, instead of redirecting to the client's callback. Anyone can
+    register a client with any HTTPS callback, so redirecting errors there would make this
+    origin an open redirect (RFC 9700, section 4.11.2); a client the owner approved gets the
+    same error on its next attempt. Output: the endpoint."""
+
+    async def endpoint(request: Request):
+        response = await handle(request)
+        location = response.headers.get("location") if 300 <= response.status_code < 400 else None
+        query = parse_qs(urlsplit(location).query) if location else {}
+        if "error" not in query or "code" in query:
+            return response
+        error = {"error": query["error"][0]}
+        if "error_description" in query:
+            error["error_description"] = query["error_description"][0]
+        return JSONResponse(error, 400, headers={"Cache-Control": "no-store"})
+
+    return endpoint
+
+
 def routes(workspace, settings: Settings) -> list[Route]:
     """Parameters: the workspace and settings. Output: the discovery documents and the
     OAuth endpoints, served at the root of the public address next to /mcp/."""
@@ -608,7 +630,11 @@ def routes(workspace, settings: Settings) -> list[Route]:
                 "/.well-known/oauth-protected-resource/mcp/",
             )
         ),
-        Route("/oauth/authorize", AuthorizationHandler(provider).handle, methods=["GET", "POST"]),
+        Route(
+            "/oauth/authorize",
+            _errors_stay_here(AuthorizationHandler(provider).handle),
+            methods=["GET", "POST"],
+        ),
         Route(
             "/oauth/token",
             _cors(TokenHandler(provider, clients).handle, endpoint),
