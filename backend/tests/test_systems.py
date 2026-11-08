@@ -1,7 +1,8 @@
 """The Systems area: only promoted lab entries reach recall, and demotion takes them out."""
 
 import json
-from uuid import UUID, uuid4
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4, uuid5
 
 import pytest
 from test_database_setup import database as database_fixture
@@ -529,3 +530,229 @@ def test_a_retried_create_answers_with_the_entry_after_its_system_is_archived(la
         systems.SaveLabEntry(command_id=command_id, expected_revision=0, data=data),
     )
     assert again["id"] == created["id"] and again["name"] == "Third idea"
+
+
+def reading(service, actor, space, system, day, value, command_id=None, **fields):
+    return systems.record_reading(
+        service,
+        actor,
+        space,
+        UUID(system["id"]),
+        systems.RecordReading(
+            command_id=command_id or uuid4(),
+            date=day,
+            value=value,
+            source=fields.pop("source", "Search Console"),
+            **fields,
+        ),
+    )
+
+
+def listed(service, owner, space, system, **query):
+    return systems.readings(
+        service, owner, space, UUID(system["id"]), systems.ReadingQuery(**query)
+    )
+
+
+def month_log(system, day):
+    return uuid5(UUID(system["id"]), f"readings:{day:%Y-%m}")
+
+
+def test_readings_replace_a_date_list_newest_first_and_show_their_age(lab):
+    service, owner, space, system, _ = lab
+    [summary] = systems.overview(service, owner, space)["systems"]
+    assert summary["latest_reading"] is None and summary["reading_age_days"] is None
+    today = datetime.now(UTC).date()
+    days = [today - timedelta(days=n) for n in (40, 14, 7, 1)]
+    agent = delegated(service, owner, write=True)
+    for day, value in zip(days, (8, 10, 12, 15), strict=True):
+        saved = reading(service, agent, space, system, day, value, unit=" clicks ")
+    assert saved == {
+        "system_id": system["id"],
+        "date": days[-1].isoformat(),
+        "value": 15.0,
+        "unit": "clicks",
+        "note": "",
+        "source": "Search Console",
+        "recorded_by": saved["recorded_by"],
+    }
+    assert saved["recorded_by"].startswith("Test ")
+    replaced = reading(service, owner, space, system, days[2], 13, note="Recounted")
+    assert replaced["recorded_by"] is None
+
+    result = listed(service, owner, space, system)
+    assert [(r["date"], r["value"]) for r in result["readings"]] == [
+        (days[3].isoformat(), 15.0),
+        (days[2].isoformat(), 13.0),
+        (days[1].isoformat(), 10.0),
+        (days[0].isoformat(), 8.0),
+    ]
+    assert result["more"] is False and result["readings"][1]["note"] == "Recounted"
+    since = listed(service, owner, space, system, since=days[1], limit=2)
+    assert [r["date"] for r in since["readings"]] == [days[3].isoformat(), days[2].isoformat()]
+    assert since["more"] is True
+    # The month's revisions keep the replaced number.
+    log = workspace_items.get(service, owner, space, month_log(system, days[2]))
+    earlier = workspace_items.get(
+        service, owner, space, month_log(system, days[2]), log["revision"] - 1
+    )
+    assert days[2].isoformat() in {r["date"] for r in earlier["readings"]}
+    assert 12.0 in {r["value"] for r in earlier["readings"]}
+
+    latest = {"date": days[3].isoformat(), "value": 15.0, "unit": "clicks"}
+    [summary] = systems.overview(service, owner, space)["systems"]
+    assert summary["latest_reading"] == latest and summary["reading_age_days"] == 1
+    [summary] = systems.verdicts(service, owner, space, systems.VerdictQuery())["systems"]
+    assert summary["latest_reading"] == latest and summary["reading_age_days"] == 1
+    assert set(summary) >= {"id", "name", "status", "goal_metric", "stats"}
+
+
+def test_a_retried_reading_lands_once_and_a_reused_command_id_is_refused(lab):
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    command_id = uuid4()
+    first = reading(service, owner, space, system, today, 42, command_id=command_id)
+    reading(service, owner, space, system, today - timedelta(days=1), 41)
+    # The month log moved on, and the retry still answers with what it wrote.
+    again = reading(service, owner, space, system, today, 42, command_id=command_id)
+    assert again == first
+    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [42, 41]
+    for changed in ({"value": 43}, {"day": today - timedelta(days=2)}, {"source": "Gmail"}):
+        args = {"day": today, "value": 42} | changed
+        with pytest.raises(CommandError, match="already used"):
+            reading(service, owner, space, system, command_id=command_id, **args)
+    other = uuid4()
+    systems.save_system(
+        service,
+        owner,
+        space,
+        systems.SaveSystem(
+            command_id=other, expected_revision=0, data=systems.SystemData(name="Outreach")
+        ),
+    )
+    with pytest.raises(CommandError, match="already used"):
+        reading(service, owner, space, system, today, 1, command_id=other)
+
+
+def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab):
+    from pydantic import ValidationError
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    base = {"command_id": uuid4(), "date": today.isoformat(), "value": 1, "source": "Gmail"}
+    for bad in (
+        {"value": "12"},
+        {"value": True},
+        {"value": float("nan")},
+        {"value": float("inf")},
+        {"source": "  "},
+        {"source": None},
+        {"date": "2026-13-01"},
+        {"note": "x" * 501},
+        {"unit": "x" * 41},
+        {"recorded_by": "Me"},
+    ):
+        with pytest.raises(ValidationError):
+            systems.RecordReading.model_validate(base | bad)
+    with pytest.raises(ValidationError):
+        systems.ReadingQuery(limit=systems.MAX_READINGS + 1)
+    with pytest.raises(CommandError, match="after tomorrow") as error:
+        reading(service, owner, space, system, today + timedelta(days=3), 1)
+    assert error.value.status == 422
+    with pytest.raises(CommandError) as error:
+        reading(service, owner, space, {"id": str(uuid4())}, today, 1)
+    assert error.value.status == 404
+
+    reading(service, owner, space, system, today, 5)
+    log = workspace_items.get(service, owner, space, month_log(system, today))
+    with pytest.raises(CommandError, match="archived with their system"):
+        workspace_items.visibility(
+            service,
+            owner,
+            space,
+            UUID(log["id"]),
+            workspace_items.ChangeVisibility(
+                command_id=uuid4(), expected_revision=log["revision"], deleted=True
+            ),
+        )
+    with pytest.raises(ValueError):
+        workspace_items.SaveItem(
+            command_id=uuid4(),
+            item_id=UUID(log["id"]),
+            expected_revision=log["revision"],
+            kind="system_readings",
+            data={"name": "Bypass"},
+        )
+    assert "Search Console" not in json.dumps(
+        space_map.build(service, owner, space, space_map.MapRequest())
+    )
+    current = workspace_items.get(service, owner, space, UUID(system["id"]))
+    workspace_items.visibility(
+        service,
+        owner,
+        space,
+        UUID(system["id"]),
+        workspace_items.ChangeVisibility(
+            command_id=uuid4(), expected_revision=current["revision"], deleted=True
+        ),
+    )
+    with pytest.raises(CommandError, match="active system"):
+        reading(service, owner, space, system, today, 6)
+    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [5]
+
+
+def test_readings_survive_export_and_a_copy_records_into_its_own_month(lab):
+    from dataclasses import replace
+
+    from test_restore_staging import stage
+    from test_workspace_archive import read_archive
+
+    from space import restore_merge as merge
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    reading(service, owner, space, system, today, 7, unit="replies")
+    archive = read_archive(service, owner, space)
+    log_id = str(month_log(system, today))
+    assert archive_schema.validate_archive(archive)
+
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    upload = stage(service, target, target_space, archive)
+    review = merge.review(service, target, target_space, upload.id, merge.Review())
+    merge.commit(
+        service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
+    )
+    [summary] = systems.overview(service, target, target_space)["systems"]
+    assert summary["latest_reading"] == {"date": today.isoformat(), "value": 7.0, "unit": "replies"}
+
+    choices = dict.fromkeys(["item:" + system["id"], "item:" + log_id], "copy")
+    upload = stage(service, owner, space, archive)
+    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices))
+    target_ids = {item["key"]: item["target_id"] for item in review["items"]}
+    merge.commit(
+        service, owner, space, upload.id, merge.Commit(snapshot=review["snapshot"], choices=choices)
+    )
+    copy = {"id": target_ids["item:" + system["id"]]}
+    reading(service, owner, space, copy, today, 9)
+    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [9]
+    if today.day > 1:
+        reading(service, owner, space, copy, today - timedelta(days=1), 8)
+        values = [r["value"] for r in listed(service, owner, space, copy)["readings"]]
+        assert values == [9, 8]
+    logs = systems._items(service, owner, space, (systems.READINGS,))
+    assert sorted(log["system_id"] for log in logs) == sorted([system["id"], copy["id"]])
+    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [7]
+
+    broken = read_archive(service, owner, space)
+    for record in broken["entries"]:
+        if record["value"]["id"] == log_id:
+            record["value"]["readings"][0]["date"] = "1999-01-01"
+    with pytest.raises(ValueError):
+        archive_schema.validate_archive(broken)
+    broken = read_archive(service, owner, space)
+    for record in broken["entries"]:
+        if record["value"]["id"] == log_id:
+            record["value"]["system_id"] = str(uuid4())
+    with pytest.raises(ValueError, match="linked system"):
+        archive_schema.validate_archive(broken)

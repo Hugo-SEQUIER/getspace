@@ -252,7 +252,7 @@ def validate_archive(raw):
                     "record_count",
                 }
             }
-            if value["kind"] in {"system", "lab_entry"}:
+            if value["kind"] in {"system", "lab_entry", "system_readings"}:
                 workspace_items.item_model(value["kind"]).model_validate(data)
             else:
                 workspace_items.SaveItem.model_validate(

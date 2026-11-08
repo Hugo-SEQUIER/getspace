@@ -4,7 +4,11 @@ playbook) and their lab entries (hypotheses and lessons under test) as packed wo
 items. A lab entry reaches recall only when someone promotes it to a verdict: promotion
 writes a memory carrying the verdict, and demotion keeps that memory out of recall while
 both histories stay.
-Output: systems with their lab statistics, lab entries, their revision history and verdicts.
+Readings are the dated numbers a sensor script records for a system. Each system keeps one
+`system_readings` item per calendar month holding at most one reading per date, so a second
+write for a date replaces it and the month's revisions keep what it replaced.
+Output: systems with their lab statistics and latest reading, lab entries, their revision
+history, verdicts and readings.
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -45,6 +49,9 @@ MAX_ITEMS = 5000
 MAX_HISTORY = 200
 MAX_USES = 500
 KINDS = ("system", "lab_entry")
+READINGS = "system_readings"
+# A list call returns at most this many readings; the month logs it reads share MAX_ITEMS.
+MAX_READINGS = 1000
 
 Domain = Literal[DOMAINS]
 Evidence = Literal[tuple(EVIDENCE_LABELS)]
@@ -184,6 +191,61 @@ class VerdictQuery(Input):
     domain: Domain | None = None
 
 
+class ReadingFields(Input):
+    """One dated number: what a sensor measured, never an opinion."""
+
+    date: date
+    # A JSON number; a string, a boolean, NaN or infinity is refused.
+    value: float = Field(strict=True, allow_inf_nan=False)
+    unit: str = _text(40)
+    note: str = _text(500)
+    # Where the number came from, such as Search Console or Gmail.
+    source: str = Field(min_length=1, max_length=200)
+
+    @field_validator("unit", "note")
+    @classmethod
+    def trimmed(cls, value):
+        return value.strip()
+
+    @field_validator("source")
+    @classmethod
+    def named_source(cls, value):
+        if not value.strip():
+            raise ValueError("Name where the number came from")
+        return value.strip()
+
+
+class Reading(ReadingFields):
+    # The agent that recorded it; None when the person did.
+    recorded_by: str | None = Field(default=None, max_length=200)
+
+
+class ReadingLog(Input):
+    """One system's readings in one calendar month, oldest first, one per date."""
+
+    system_id: UUID
+    month: str = Field(pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+    readings: list[Reading] = Field(default_factory=list, max_length=31)
+
+    @model_validator(mode="after")
+    def one_per_date(self):
+        dates = [reading.date for reading in self.readings]
+        if any(f"{day:%Y-%m}" != self.month for day in dates):
+            raise ValueError("A reading belongs to the month of its date")
+        if dates != sorted(set(dates)):
+            raise ValueError("Readings are one per date, oldest first")
+        return self
+
+
+class RecordReading(ReadingFields):
+    command_id: UUID
+
+
+class ReadingQuery(Input):
+    since: date | None = None
+    limit: int = Field(default=100, ge=1, le=MAX_READINGS)
+
+
 def _error(message, status=409):
     from space.workspace import CommandError
 
@@ -204,7 +266,8 @@ def _items(workspace, identity, space_id, kinds=KINDS):
         ).fetchall()
         key_rows = workspace_items.item_keys(workspace, connection, scope, rows)
     if len(rows) > MAX_ITEMS:
-        raise _error(f"The Systems area holds at most {MAX_ITEMS:,} systems and entries", 413)
+        held = "months of readings" if READINGS in kinds else "systems and entries"
+        raise _error(f"The Systems area holds at most {MAX_ITEMS:,} {held}", 413)
     if not rows:
         return []
     return workspace_items.decode(workspace, identity, space_id, scope, rows, key_rows)
@@ -251,7 +314,8 @@ def stats(entries):
 
 def overview(workspace, identity, space_id):
     """Parameters: Space.
-    What it does: reads every active system and lab entry and adds each system's statistics.
+    What it does: reads every active system and lab entry and adds each system's statistics
+    and latest reading.
     Output: {systems, entries, domains}; entries newest first.
     """
     items = _items(workspace, identity, space_id)
@@ -259,9 +323,13 @@ def overview(workspace, identity, space_id):
     by_system = {}
     for entry in entries:
         by_system.setdefault(entry["system_id"], []).append(entry)
+    latest = _latest(_items(workspace, identity, space_id, (READINGS,)))
+    today = datetime.now(UTC).date()
     systems = sorted(
         (
-            item | {"stats": stats(by_system.get(item["id"], []))}
+            item
+            | {"stats": stats(by_system.get(item["id"], []))}
+            | freshness(latest.get(item["id"]), today)
             for item in items
             if item["kind"] == "system"
         ),
@@ -332,7 +400,7 @@ def _active_system(workspace, identity, space_id, system_id):
 
 
 def _commit(workspace, identity, space_id, kind, item_id, command_id, expected_revision, data):
-    model = SystemData if kind == "system" else LabEntryData
+    model = {"system": SystemData, "lab_entry": LabEntryData, READINGS: ReadingLog}[kind]
     data = model.model_validate(data).model_dump(mode="json")
     workspace_items.check_item_size(data)
     workspace_items._commit(
@@ -779,8 +847,164 @@ def verdicts(workspace, identity, space_id, query: VerdictQuery):
         and (query.domain is None or entry["domain"] == query.domain)
     ]
     systems = [
-        {key: system[key] for key in ("id", "name", "status", "goal_metric", "stats")}
+        {
+            key: system[key]
+            for key in (
+                "id",
+                "name",
+                "status",
+                "goal_metric",
+                "stats",
+                "latest_reading",
+                "reading_age_days",
+            )
+        }
         for system in area["systems"]
         if query.system_id is None or system["id"] == str(query.system_id)
     ]
     return {"systems": systems, "verdicts": selected}
+
+
+def _latest(logs):
+    """Parameters: decoded month logs. Output: each system ID's latest reading by date."""
+    latest = {}
+    for log in logs:
+        for reading in log["readings"]:
+            current = latest.get(log["system_id"])
+            if current is None or reading["date"] > current["date"]:
+                latest[log["system_id"]] = reading
+    return latest
+
+
+def freshness(reading, today):
+    """Parameters: a system's latest reading or None, and today's date.
+    What it does: shows how old the latest number is, so a sensor that stopped is visible.
+    Output: {latest_reading: {date, value, unit} or None, reading_age_days: int or None}.
+    """
+    if reading is None:
+        return {"latest_reading": None, "reading_age_days": None}
+    age = (today - date.fromisoformat(reading["date"])).days
+    return {
+        "latest_reading": {key: reading[key] for key in ("date", "value", "unit")},
+        "reading_age_days": max(age, 0),
+    }
+
+
+def _saved_reading(system_id, reading):
+    return {"system_id": str(system_id), **reading}
+
+
+def _reading_replayed(workspace, identity, space_id, system_id, request):
+    """Parameters: Space, system and a reading command.
+    What it does: finds what this command ID already wrote. A retry of the same reading
+    returns it; the ID reused for another system, date or number is refused.
+    Output: the committed reading, or None when the command is new.
+    """
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        row = connection.execute(
+            "SELECT i.kind,c.item_id,c.revision FROM space.workspace_item_commands c "
+            "JOIN space.workspace_items i ON i.id=c.item_id WHERE c.id=%s",
+            (request.command_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    if row["kind"] == READINGS:
+        log = _get(workspace, identity, space_id, row["item_id"], READINGS, row["revision"])
+        wanted = request.model_dump(mode="json", exclude={"command_id"})
+        for reading in log["readings"] if log["system_id"] == str(system_id) else []:
+            if {key: reading[key] for key in wanted} == wanted:
+                return _saved_reading(system_id, reading)
+    raise _error("This command ID was already used for another operation")
+
+
+def _month_log(workspace, identity, space_id, system_id, day):
+    """Parameters: Space, system and a reading date.
+    What it does: finds the system's log for that month. Its ID comes from the system and
+    the month; a restored copy keeps the log under another ID, so that one is looked up.
+    Output: (log ID, the log or None when the month has no reading yet).
+    """
+    from space.workspace import CommandError
+
+    month = f"{day:%Y-%m}"
+    log_id = uuid5(system_id, f"readings:{month}")
+    try:
+        return log_id, _get(workspace, identity, space_id, log_id, READINGS)
+    except CommandError as error:
+        if error.status != 404:
+            raise
+    for log in _items(workspace, identity, space_id, (READINGS,)):
+        if log["system_id"] == str(system_id) and log["month"] == month:
+            return UUID(log["id"]), log
+    return log_id, None
+
+
+def record_reading(workspace, identity, space_id, system_id, request: RecordReading):
+    """Parameters: Space, an active system and one dated number with where it came from.
+    What it does: writes the reading into the system's month log with who recorded it; a
+    reading already on that date is replaced, and the log's revisions keep the old one.
+    Output: {system_id, date, value, unit, note, source, recorded_by}.
+    """
+    from space.workspace import CommandError
+
+    system_id = UUID(str(system_id))
+    if replayed := _reading_replayed(workspace, identity, space_id, system_id, request):
+        return replayed
+    _active_system(workspace, identity, space_id, system_id)
+    if request.date > datetime.now(UTC).date() + timedelta(days=1):
+        raise _error("A reading cannot be dated after tomorrow", 422)
+    reading = Reading(
+        **request.model_dump(exclude={"command_id"}), recorded_by=_actor(workspace, identity)
+    ).model_dump(mode="json")
+    # One retry absorbs a concurrent reading written to the same month.
+    for attempt in range(2):
+        log_id, log = _month_log(workspace, identity, space_id, system_id, request.date)
+        kept = [item for item in (log or {}).get("readings", []) if item["date"] != reading["date"]]
+        data = {
+            "system_id": str(system_id),
+            "month": f"{request.date:%Y-%m}",
+            "readings": sorted([*kept, reading], key=lambda item: item["date"]),
+        }
+        try:
+            _commit(
+                workspace,
+                identity,
+                space_id,
+                READINGS,
+                log_id,
+                request.command_id,
+                log["revision"] if log else 0,
+                data,
+            )
+        except CommandError as error:
+            if error.status != 409 or attempt:
+                raise
+            if replayed := _reading_replayed(workspace, identity, space_id, system_id, request):
+                return replayed
+            continue
+        return _saved_reading(system_id, reading)
+
+
+def readings(workspace, identity, space_id, system_id, query: ReadingQuery):
+    """Parameters: Space, system (active or archived), an optional first date and a limit.
+    What it does: reads the system's month logs.
+    Output: {system_id, readings, more}; readings newest first, more when the limit cut some.
+    """
+    _get(workspace, identity, space_id, system_id, "system")
+    since = query.since.isoformat() if query.since else ""
+    found = sorted(
+        (
+            reading
+            for log in _items(workspace, identity, space_id, (READINGS,))
+            if log["system_id"] == str(system_id)
+            for reading in log["readings"]
+            if reading["date"] >= since
+        ),
+        key=lambda reading: reading["date"],
+        reverse=True,
+    )
+    return {
+        "system_id": str(system_id),
+        "readings": found[: query.limit],
+        "more": len(found) > query.limit,
+    }

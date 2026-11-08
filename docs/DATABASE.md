@@ -60,6 +60,7 @@ The runtime runs each transaction in Psycopg pipeline mode, which batches the sc
 | `0043_systems` | No new table: the `system` and `lab_entry` item kinds of the Systems area; see [Systems](SYSTEMS.md) |
 | `0044_file_objects` | No new table: `file_parts` gains `object_key` and `content` becomes nullable, so a part's bytes live in the server's file folder and the row keeps the path, with a check that exactly one of the two is set |
 | `0045_pending_caps` | No new table: only requests that can still be answered count toward the 10,000 pending OAuth and device requests, and the owner's direct agent connection is not held by the device cap |
+| `0046_system_readings` | No new table: the `system_readings` item kind, one system's dated readings for one calendar month; see [Systems](SYSTEMS.md) |
 
 Migration `0003` installs the `vector` extension in the `space` schema, because the restricted logins resolve types through `search_path = pg_catalog, space`; it stops if `vector` is already installed in another schema. The claim index is created with 1,536 dimensions. When `SPACE_MEMORY_EMBEDDING_DIMENSIONS` asks for another width (16 to 2000), the installer rebuilds the column and its index while the table is empty, and refuses to change the width once embeddings are stored.
 

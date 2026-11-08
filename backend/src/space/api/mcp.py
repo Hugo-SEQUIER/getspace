@@ -1,6 +1,7 @@
 """Official MCP SDK adapter for protected, shared Private Space commands."""
 
 import asyncio
+from datetime import date
 from time import perf_counter
 from typing import Any, Literal
 from uuid import UUID
@@ -744,7 +745,9 @@ def create_mcp(
             verdicts (validated = works, invalidated = does not work) reach get_context;
             testing entries are ideas, never rules. Read this before adding an entry, so
             you do not duplicate one. Output: systems with stats (entries, verdicts,
-            reused_30d, reuse_share), entries newest first, and the domain names.
+            reused_30d, reuse_share), latest_reading ({date, value, unit} or null) and
+            reading_age_days (null when the system has no reading), entries newest
+            first, and the domain names.
             """
             return await command(
                 lambda actor: systems.overview(workspace, actor, space_id), agent_id=agent_id
@@ -762,7 +765,8 @@ def create_mcp(
             evidence level, system, domain, how to apply and a link to the lab entry, plus
             each system's statistics. Read the verdicts of your system or domain before
             doing that work, and call record_verdict_use when you apply one.
-            Output: {systems, verdicts}.
+            Output: {systems, verdicts}; each system carries its stats, latest_reading
+            and reading_age_days.
             """
             return await command(
                 lambda actor: systems.verdicts(
@@ -942,6 +946,57 @@ def create_mcp(
             """
             return await command(
                 lambda actor: systems.record_use(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Record a system reading",
+            # A second reading for the same date replaces the first.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def record_system_reading(
+            space_id: UUID,
+            system_id: UUID,
+            request: systems.RecordReading,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, an active system and command_id, date (ISO, at most
+            tomorrow), value (a number), optional unit and note, and source: where the
+            number came from, such as Search Console or Gmail.
+            What it does: records one dated measurement for the system, credited to you.
+            One reading is kept per system and date, so a second one for that date
+            replaces it. Record numbers a script or tool measured, never an estimate or
+            an opinion. Reuse command_id unchanged on retry.
+            Output: {system_id, date, value, unit, note, source, recorded_by}.
+            """
+            return await command(
+                lambda actor: systems.record_reading(
+                    workspace, actor, space_id, system_id, request
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="List system readings", annotations=read)
+        async def list_system_readings(
+            space_id: UUID,
+            system_id: UUID,
+            since: date | None = None,
+            limit: int = 100,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, system, an optional first date (ISO) and a limit from 1
+            to 1000 (default 100).
+            What it does: lists the system's dated readings, newest first, to compare a
+            metric week over week. list_systems already shows each system's
+            latest_reading and reading_age_days.
+            Output: {system_id, readings: [{date, value, unit, note, source,
+            recorded_by}], more}; more is true when the limit left older readings out.
+            """
+            query = systems.ReadingQuery(since=since, limit=limit)
+            return await command(
+                lambda actor: systems.readings(workspace, actor, space_id, system_id, query),
                 agent_id=agent_id,
             )
 
