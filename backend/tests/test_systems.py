@@ -574,6 +574,7 @@ def test_readings_replace_a_date_list_newest_first_and_show_their_age(lab):
         "unit": "clicks",
         "note": "",
         "source": "Search Console",
+        "metric": "goal",
         "recorded_by": saved["recorded_by"],
     }
     assert saved["recorded_by"].startswith("Test ")
@@ -599,7 +600,7 @@ def test_readings_replace_a_date_list_newest_first_and_show_their_age(lab):
     assert days[2].isoformat() in {r["date"] for r in earlier["readings"]}
     assert 12.0 in {r["value"] for r in earlier["readings"]}
 
-    latest = {"date": days[3].isoformat(), "value": 15.0, "unit": "clicks"}
+    latest = {"date": days[3].isoformat(), "value": 15.0, "unit": "clicks", "metric": "goal"}
     [summary] = systems.overview(service, owner, space)["systems"]
     assert summary["latest_reading"] == latest and summary["reading_age_days"] == 1
     [summary] = systems.verdicts(service, owner, space, systems.VerdictQuery())["systems"]
@@ -729,7 +730,12 @@ def test_readings_survive_export_and_a_copy_records_into_its_own_month(lab):
         service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
     )
     [summary] = systems.overview(service, target, target_space)["systems"]
-    assert summary["latest_reading"] == {"date": today.isoformat(), "value": 7.0, "unit": "replies"}
+    assert summary["latest_reading"] == {
+        "date": today.isoformat(),
+        "value": 7.0,
+        "unit": "replies",
+        "metric": "goal",
+    }
 
     choices = dict.fromkeys(["item:" + system["id"], "item:" + log_id], "copy")
     upload = stage(service, owner, space, archive)
@@ -794,3 +800,91 @@ def test_a_log_restored_onto_a_copy_is_not_taken_back_by_the_original(lab):
     assert workspace_items.get(service, owner, space, UUID(log_id))["system_id"] == copy["id"]
     logs = systems._items(service, owner, space, (systems.READINGS,))
     assert sorted(log["system_id"] for log in logs) == sorted([system["id"], copy["id"]])
+
+
+def test_metrics_share_a_date_replace_one_another_only_per_metric_and_filter(lab):
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    yesterday = today - timedelta(days=1)
+    reading(service, owner, space, system, today, 120, metric="replies")
+    [summary] = systems.overview(service, owner, space)["systems"]
+    # Only a goal reading is the system's latest; an input alone leaves it unmeasured.
+    assert summary["latest_reading"] is None and summary["reading_age_days"] is None
+    goal = reading(service, owner, space, system, yesterday, 30)
+    assert goal["metric"] == "goal"
+    reading(service, owner, space, system, today, 2, metric="counter.unsubscribes")
+    reading(service, owner, space, system, today, 31, metric="goal")
+    replaced = reading(service, owner, space, system, today, 125, metric="replies", note="Late")
+    assert replaced["metric"] == "replies" and replaced["value"] == 125.0
+
+    result = listed(service, owner, space, system)
+    assert [(r["date"], r["metric"], r["value"]) for r in result["readings"]] == [
+        (today.isoformat(), "counter.unsubscribes", 2.0),
+        (today.isoformat(), "goal", 31.0),
+        (today.isoformat(), "replies", 125.0),
+        (yesterday.isoformat(), "goal", 30.0),
+    ]
+    only = listed(service, owner, space, system, metric="replies")["readings"]
+    assert [(r["value"], r["note"]) for r in only] == [(125.0, "Late")]
+    goals = listed(service, owner, space, system, metric="goal", limit=1)
+    assert [r["value"] for r in goals["readings"]] == [31.0] and goals["more"] is True
+    assert listed(service, owner, space, system, metric="absent")["readings"] == []
+
+    latest = {"date": today.isoformat(), "value": 31.0, "unit": "", "metric": "goal"}
+    [summary] = systems.overview(service, owner, space)["systems"]
+    assert summary["latest_reading"] == latest and summary["reading_age_days"] == 0
+    [summary] = systems.verdicts(service, owner, space, systems.VerdictQuery())["systems"]
+    assert summary["latest_reading"] == latest
+
+    # A command ID belongs to one metric: reusing it for another is refused.
+    command_id = uuid4()
+    first = reading(service, owner, space, system, today, 3, command_id=command_id, metric="a")
+    assert reading(service, owner, space, system, today, 3, command_id=command_id, metric="a") == (
+        first
+    )
+    with pytest.raises(CommandError, match="already used"):
+        reading(service, owner, space, system, today, 3, command_id=command_id, metric="b")
+
+
+def test_a_metric_is_a_slug_and_an_omitted_one_is_the_goal(lab, monkeypatch):
+    from pydantic import ValidationError
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    base = {"command_id": uuid4(), "date": today.isoformat(), "value": 1, "source": "Gmail"}
+    assert systems.RecordReading.model_validate(base).metric == "goal"
+    assert systems.RecordReading.model_validate(base | {"metric": None}).metric == "goal"
+    for good in ("replies", "counter.unsubscribes", "input_2", "a-b", "9", "x" * 64):
+        assert systems.RecordReading.model_validate(base | {"metric": good}).metric == good
+    for bad in ("", "Goal", "-x", ".x", "a b", "x" * 65, "réponses", 3):
+        with pytest.raises(ValidationError):
+            systems.RecordReading.model_validate(base | {"metric": bad})
+        with pytest.raises(ValidationError):
+            systems.ReadingQuery.model_validate({"metric": bad})
+
+    day = today.isoformat()
+    month = f"{today:%Y-%m}"
+
+    def entry(metric=None):
+        value = {"date": day, "value": 1.0, "source": "Gmail"}
+        return value if metric is None else value | {"metric": metric}
+
+    log = {"system_id": system["id"], "month": month}
+    # A month log written before metrics existed reads as goal readings.
+    [old] = systems.ReadingLog.model_validate(log | {"readings": [entry()]}).readings
+    assert old.metric == "goal"
+    systems.ReadingLog.model_validate(log | {"readings": [entry("goal"), entry("replies")]})
+    for readings in ([entry(), entry("goal")], [entry("replies"), entry("goal")]):
+        with pytest.raises(ValidationError, match="one per date and metric"):
+            systems.ReadingLog.model_validate(log | {"readings": readings})
+
+    # A full month refuses a new date and metric and still replaces one it holds.
+    monkeypatch.setattr(systems, "MAX_MONTH_READINGS", 2)
+    reading(service, owner, space, system, today, 1)
+    reading(service, owner, space, system, today, 2, metric="replies")
+    with pytest.raises(CommandError, match="at most 2 readings") as error:
+        reading(service, owner, space, system, today, 3, metric="clicks")
+    assert error.value.status == 413
+    reading(service, owner, space, system, today, 4, metric="replies")
+    values = {r["metric"]: r["value"] for r in listed(service, owner, space, system)["readings"]}
+    assert values == {"goal": 1.0, "replies": 4.0}

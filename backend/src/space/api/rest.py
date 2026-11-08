@@ -420,9 +420,12 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
         system_id: UUID,
         since: date | None = None,
         limit: Annotated[int, Query(ge=1, le=systems.MAX_READINGS)] = 100,
+        metric: Annotated[
+            str | None, Query(min_length=1, max_length=64, pattern=systems.METRIC_PATTERN)
+        ] = None,
         session=auth,
     ):
-        query = systems.ReadingQuery(since=since, limit=limit)
+        query = systems.ReadingQuery(since=since, limit=limit, metric=metric)
         return systems.readings(workspace, session[0], space_id, system_id, query)
 
     @router.get("/spaces/{space_id}/systems/activity")

@@ -745,9 +745,9 @@ def create_mcp(
             verdicts (validated = works, invalidated = does not work) reach get_context;
             testing entries are ideas, never rules. Read this before adding an entry, so
             you do not duplicate one. Output: systems with stats (entries, verdicts,
-            reused_30d, reuse_share), latest_reading ({date, value, unit} or null) and
-            reading_age_days (null when the system has no reading), entries newest
-            first, and the domain names.
+            reused_30d, reuse_share), latest_reading (the latest goal reading as {date,
+            value, unit, metric}, or null) and reading_age_days (null when the system has
+            no goal reading), entries newest first, and the domain names.
             """
             return await command(
                 lambda actor: systems.overview(workspace, actor, space_id), agent_id=agent_id
@@ -951,7 +951,7 @@ def create_mcp(
 
         @server.tool(
             title="Record a system reading",
-            # A second reading for the same date replaces the first.
+            # A second reading for the same date and metric replaces the first.
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
             ),
@@ -963,13 +963,17 @@ def create_mcp(
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
             """Parameters: Space, an active system and command_id, date (ISO, at most
-            tomorrow), value (a number), optional unit and note, and source: where the
-            number came from, such as Search Console or Gmail.
+            tomorrow), value (a number), optional unit and note, source: where the
+            number came from, such as Search Console or Gmail, and optional metric: a
+            slug of lowercase letters, digits, `_`, `.` and `-` (at most 64, default
+            "goal") naming what the number measures, such as "replies" for an input or
+            "unsubscribes" for the counter-metric.
             What it does: records one dated measurement for the system, credited to you.
-            One reading is kept per system and date, so a second one for that date
-            replaces it. Record numbers a script or tool measured, never an estimate or
-            an opinion. Reuse command_id unchanged on retry.
-            Output: {system_id, date, value, unit, note, source, recorded_by}.
+            One reading is kept per system, date and metric, so a second one for that
+            date and metric replaces it and other metrics stay. Record numbers a script
+            or tool measured, never an estimate or an opinion. Reuse command_id
+            unchanged on retry.
+            Output: {system_id, date, value, unit, note, source, metric, recorded_by}.
             """
             return await command(
                 lambda actor: systems.record_reading(
@@ -984,17 +988,18 @@ def create_mcp(
             system_id: UUID,
             since: date | None = None,
             limit: int = 100,
+            metric: str | None = None,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
-            """Parameters: Space, system, an optional first date (ISO) and a limit from 1
-            to 1000 (default 100).
+            """Parameters: Space, system, an optional first date (ISO), a limit from 1
+            to 1000 (default 100) and an optional metric to list only its readings.
             What it does: lists the system's dated readings, newest first, to compare a
-            metric week over week. list_systems already shows each system's
-            latest_reading and reading_age_days.
-            Output: {system_id, readings: [{date, value, unit, note, source,
+            metric week over week. list_systems already shows each system's latest goal
+            reading and reading_age_days.
+            Output: {system_id, readings: [{date, value, unit, note, source, metric,
             recorded_by}], more}; more is true when the limit left older readings out.
             """
-            query = systems.ReadingQuery(since=since, limit=limit)
+            query = systems.ReadingQuery(since=since, limit=limit, metric=metric)
             return await command(
                 lambda actor: systems.readings(workspace, actor, space_id, system_id, query),
                 agent_id=agent_id,

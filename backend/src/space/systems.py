@@ -4,9 +4,10 @@ playbook) and their lab entries (hypotheses and lessons under test) as packed wo
 items. A lab entry reaches recall only when someone promotes it to a verdict: promotion
 writes a memory carrying the verdict, and demotion keeps that memory out of recall while
 both histories stay.
-Readings are the dated numbers a sensor script records for a system. Each system keeps one
-`system_readings` item per calendar month holding at most one reading per date, so a second
-write for a date replaces it and the month's revisions keep what it replaced.
+Readings are the dated numbers a sensor script records for a system, each under a metric
+(`goal` unless named). Each system keeps one `system_readings` item per calendar month
+holding at most one reading per date and metric, so a second write for that date and metric
+replaces it and the month's revisions keep what it replaced.
 Output: systems with their lab statistics and latest reading, lab entries, their revision
 history, verdicts and readings.
 """
@@ -52,6 +53,11 @@ KINDS = ("system", "lab_entry")
 READINGS = "system_readings"
 # A list call returns at most this many readings; the month logs it reads share MAX_ITEMS.
 MAX_READINGS = 1000
+# One month log holds at most this many readings: ten metrics a day on average.
+MAX_MONTH_READINGS = 310
+# The metric a reading counts toward when none is named; the summaries report this one.
+GOAL_METRIC = "goal"
+METRIC_PATTERN = r"^[a-z0-9][a-z0-9_.-]*$"
 
 Domain = Literal[DOMAINS]
 Evidence = Literal[tuple(EVIDENCE_LABELS)]
@@ -201,6 +207,14 @@ class ReadingFields(Input):
     note: str = _text(500)
     # Where the number came from, such as Search Console or Gmail.
     source: str = Field(min_length=1, max_length=200)
+    # What the number measures: `goal` for the system's goal metric, or a short slug such as
+    # `replies` or `counter.unsubscribes` for an input or the counter-metric.
+    metric: str = Field(default=GOAL_METRIC, min_length=1, max_length=64, pattern=METRIC_PATTERN)
+
+    @field_validator("metric", mode="before")
+    @classmethod
+    def default_metric(cls, value):
+        return GOAL_METRIC if value is None else value
 
     @field_validator("unit", "note")
     @classmethod
@@ -221,19 +235,19 @@ class Reading(ReadingFields):
 
 
 class ReadingLog(Input):
-    """One system's readings in one calendar month, oldest first, one per date."""
+    """One system's readings in one calendar month, oldest first, one per date and metric."""
 
     system_id: UUID
     month: str = Field(pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
-    readings: list[Reading] = Field(default_factory=list, max_length=31)
+    readings: list[Reading] = Field(default_factory=list, max_length=MAX_MONTH_READINGS)
 
     @model_validator(mode="after")
-    def one_per_date(self):
-        dates = [reading.date for reading in self.readings]
-        if any(f"{day:%Y-%m}" != self.month for day in dates):
+    def one_per_date_and_metric(self):
+        keys = [(reading.date, reading.metric) for reading in self.readings]
+        if any(f"{day:%Y-%m}" != self.month for day, _ in keys):
             raise ValueError("A reading belongs to the month of its date")
-        if dates != sorted(set(dates)):
-            raise ValueError("Readings are one per date, oldest first")
+        if keys != sorted(set(keys)):
+            raise ValueError("Readings are one per date and metric, oldest first")
         return self
 
 
@@ -243,6 +257,8 @@ class RecordReading(ReadingFields):
 
 class ReadingQuery(Input):
     since: date | None = None
+    # Only this metric's readings; None lists every metric.
+    metric: str | None = Field(default=None, min_length=1, max_length=64, pattern=METRIC_PATTERN)
     limit: int = Field(default=100, ge=1, le=MAX_READINGS)
 
 
@@ -865,11 +881,20 @@ def verdicts(workspace, identity, space_id, query: VerdictQuery):
     return {"systems": systems, "verdicts": selected}
 
 
+def _metric(reading):
+    """A stored reading with its metric; one written before metrics existed counts as goal."""
+    return reading if "metric" in reading else reading | {"metric": GOAL_METRIC}
+
+
 def _latest(logs):
-    """Parameters: decoded month logs. Output: each system ID's latest reading by date."""
+    """Parameters: decoded month logs.
+    Output: each system ID's latest goal reading by date; other metrics are left out.
+    """
     latest = {}
     for log in logs:
-        for reading in log["readings"]:
+        for reading in map(_metric, log["readings"]):
+            if reading["metric"] != GOAL_METRIC:
+                continue
             current = latest.get(log["system_id"])
             if current is None or reading["date"] > current["date"]:
                 latest[log["system_id"]] = reading
@@ -877,15 +902,16 @@ def _latest(logs):
 
 
 def freshness(reading, today):
-    """Parameters: a system's latest reading or None, and today's date.
+    """Parameters: a system's latest goal reading or None, and today's date.
     What it does: shows how old the latest number is, so a sensor that stopped is visible.
-    Output: {latest_reading: {date, value, unit} or None, reading_age_days: int or None}.
+    Output: {latest_reading: {date, value, unit, metric} or None, reading_age_days: int or
+    None}.
     """
     if reading is None:
         return {"latest_reading": None, "reading_age_days": None}
     age = (today - date.fromisoformat(reading["date"])).days
     return {
-        "latest_reading": {key: reading[key] for key in ("date", "value", "unit")},
+        "latest_reading": {key: reading[key] for key in ("date", "value", "unit", "metric")},
         "reading_age_days": max(age, 0),
     }
 
@@ -897,7 +923,7 @@ def _saved_reading(system_id, reading):
 def _reading_replayed(workspace, identity, space_id, system_id, request):
     """Parameters: Space, system and a reading command.
     What it does: finds what this command ID already wrote. A retry of the same reading
-    returns it; the ID reused for another system, date or number is refused.
+    returns it; the ID reused for another system, date, metric or number is refused.
     Output: the committed reading, or None when the command is new.
     """
     with workspace.db.transaction(identity) as connection:
@@ -912,7 +938,7 @@ def _reading_replayed(workspace, identity, space_id, system_id, request):
     if row["kind"] == READINGS:
         log = _get(workspace, identity, space_id, row["item_id"], READINGS, row["revision"])
         wanted = request.model_dump(mode="json", exclude={"command_id"})
-        for reading in log["readings"] if log["system_id"] == str(system_id) else []:
+        for reading in map(_metric, log["readings"] if log["system_id"] == str(system_id) else []):
             if {key: reading[key] for key in wanted} == wanted:
                 return _saved_reading(system_id, reading)
     raise _error("This command ID was already used for another operation")
@@ -947,8 +973,9 @@ def _month_log(workspace, identity, space_id, system_id, day):
 def record_reading(workspace, identity, space_id, system_id, request: RecordReading):
     """Parameters: Space, an active system and one dated number with where it came from.
     What it does: writes the reading into the system's month log with who recorded it; a
-    reading already on that date is replaced, and the log's revisions keep the old one.
-    Output: {system_id, date, value, unit, note, source, recorded_by}.
+    reading already on that date for the same metric is replaced, and the log's revisions
+    keep the old one. Readings of other metrics on that date stay.
+    Output: {system_id, date, value, unit, note, source, metric, recorded_by}.
     """
     from space.workspace import CommandError
 
@@ -963,11 +990,18 @@ def record_reading(workspace, identity, space_id, system_id, request: RecordRead
     # One retry absorbs a concurrent reading written to the same month.
     for attempt in range(2):
         log_id, log = _month_log(workspace, identity, space_id, system_id, request.date)
-        kept = [item for item in (log or {}).get("readings", []) if item["date"] != reading["date"]]
+        key = (reading["date"], reading["metric"])
+        kept = [
+            item
+            for item in map(_metric, (log or {}).get("readings", []))
+            if (item["date"], item["metric"]) != key
+        ]
+        if len(kept) >= MAX_MONTH_READINGS:
+            raise _error(f"A system keeps at most {MAX_MONTH_READINGS} readings a month", 413)
         data = {
             "system_id": str(system_id),
             "month": f"{request.date:%Y-%m}",
-            "readings": sorted([*kept, reading], key=lambda item: item["date"]),
+            "readings": sorted([*kept, reading], key=lambda item: (item["date"], item["metric"])),
         }
         try:
             _commit(
@@ -990,9 +1024,11 @@ def record_reading(workspace, identity, space_id, system_id, request: RecordRead
 
 
 def readings(workspace, identity, space_id, system_id, query: ReadingQuery):
-    """Parameters: Space, system (active or archived), an optional first date and a limit.
+    """Parameters: Space, system (active or archived), an optional first date, an optional
+    metric and a limit.
     What it does: reads the system's month logs.
-    Output: {system_id, readings, more}; readings newest first, more when the limit cut some.
+    Output: {system_id, readings, more}; readings newest first (metrics of one date in name
+    order), more when the limit cut some.
     """
     _get(workspace, identity, space_id, system_id, "system")
     since = query.since.isoformat() if query.since else ""
@@ -1001,12 +1037,12 @@ def readings(workspace, identity, space_id, system_id, query: ReadingQuery):
             reading
             for log in _items(workspace, identity, space_id, (READINGS,))
             if log["system_id"] == str(system_id)
-            for reading in log["readings"]
-            if reading["date"] >= since
+            for reading in map(_metric, log["readings"])
+            if reading["date"] >= since and query.metric in (None, reading["metric"])
         ),
-        key=lambda reading: reading["date"],
-        reverse=True,
+        key=lambda reading: reading["metric"],
     )
+    found.sort(key=lambda reading: reading["date"], reverse=True)
     return {
         "system_id": str(system_id),
         "readings": found[: query.limit],
