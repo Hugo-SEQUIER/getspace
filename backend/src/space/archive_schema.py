@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic_core import from_json
 
-from space import agents, brain, memory_pipeline, tasks, workspace_items
+from space import agents, brain, memory_pipeline, systems, tasks, workspace_items
 from space._vendor.memora.core.memory_entry import MemoryEntry
 from space.memory import RecallMetadata
 from space.workspace import SaveResource
@@ -16,11 +16,14 @@ from space.workspace_archive import FORMAT
 
 MAX_ARCHIVE_BYTES = 200 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 10000
+# System readings keep no revisions: each stored reading is one entry beside the revisions.
+MAX_ARCHIVE_READINGS = systems.MAX_SPACE_READINGS
 MAX_ARCHIVE_DEPTH = 32
 # Databases dominate large archives, at about 2,000 containers and 21,000 separators per
-# MiB: every retained database revision holds all of its records.
-MAX_ARCHIVE_CONTAINERS = 500_000
-MAX_ARCHIVE_SEPARATORS = 5_000_000
+# MiB: every retained database revision holds all of its records. A reading entry adds two
+# containers and 24 separators on top of that budget.
+MAX_ARCHIVE_CONTAINERS = 500_000 + 2 * MAX_ARCHIVE_READINGS
+MAX_ARCHIVE_SEPARATORS = 5_000_000 + 24 * MAX_ARCHIVE_READINGS
 # pgvector's widest vector; archived recall vectors of any width up to it are accepted.
 MAX_EMBEDDING_DIM = 16000
 _STRUCTURE = re.compile(rb'["{}\[\],:]')
@@ -221,11 +224,21 @@ def validate_archive(raw):
     _id(archive["source_space"])
     datetime.fromisoformat(archive["exported_at"].replace("Z", "+00:00"))
     entries = archive["entries"]
-    if not isinstance(entries, list) or len(entries) > MAX_ARCHIVE_ENTRIES:
+    if not isinstance(entries, list) or len(entries) > MAX_ARCHIVE_ENTRIES + MAX_ARCHIVE_READINGS:
         raise ValueError("Archive exceeds the 10,000 revision limit")
     groups = defaultdict(list)
+    readings = set()
     for entry in entries:
         entity, value = entry["entity"], entry["value"]
+        if entity == "reading":
+            if entry["current"] is not True:
+                raise ValueError("Invalid archive entry")
+            reading = systems.ArchivedReading.model_validate(value)
+            key = (str(reading.system_id), reading.date, reading.metric)
+            if key in readings:
+                raise ValueError("Archive has a duplicate reading")
+            readings.add(key)
+            continue
         if entity not in {"agent", "resource", "item"} or type(entry["current"]) is not bool:
             raise ValueError("Invalid archive entry")
         id_, revision = _id(value["id"]), _revision(value["revision"])
@@ -252,7 +265,7 @@ def validate_archive(raw):
                     "record_count",
                 }
             }
-            if value["kind"] in {"system", "lab_entry", "system_readings"}:
+            if value["kind"] in {"system", "lab_entry"}:
                 workspace_items.item_model(value["kind"]).model_validate(data)
             else:
                 workspace_items.SaveItem.model_validate(
@@ -311,6 +324,14 @@ def validate_archive(raw):
             if timestamp.tzinfo is None:
                 raise ValueError("Content timestamps require a timezone")
         groups[(entity, id_)].append(entry)
+    if len(entries) - len(readings) > MAX_ARCHIVE_ENTRIES:
+        raise ValueError("Archive exceeds the 10,000 revision limit")
+    if len(readings) > MAX_ARCHIVE_READINGS:
+        raise ValueError(f"Archive exceeds the {MAX_ARCHIVE_READINGS:,} reading limit")
+    for system_id in {key[0] for key in readings}:
+        linked = groups.get(("item", system_id))
+        if not linked or linked[-1]["value"]["kind"] != "system":
+            raise ValueError("Archive is missing a reading's system")
     for (entity, id_), versions in groups.items():
         versions.sort(key=lambda entry: entry["value"]["revision"])
         if entity == "agent":

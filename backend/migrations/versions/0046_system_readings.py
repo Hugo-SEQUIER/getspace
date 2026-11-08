@@ -1,6 +1,7 @@
-"""Parameters: the workspace item kinds from `0043_systems` and the head
+"""Parameters: the workspace items and systems from `0043_systems` and the head
 `0045_pending_caps` left.
-What it does: adds the month-of-readings kind of the Systems area.
+What it does: adds the readings table of the Systems area, one row per system, date and
+metric, without revision history.
 Output: a system can carry the dated numbers its sensor scripts record.
 """
 

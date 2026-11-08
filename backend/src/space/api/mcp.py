@@ -982,6 +982,34 @@ def create_mcp(
                 agent_id=agent_id,
             )
 
+        @server.tool(
+            title="Record several system readings",
+            # Each reading replaces one already on its date and metric.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def record_system_readings(
+            space_id: UUID,
+            system_id: UUID,
+            request: systems.RecordReadings,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, an active system and command_id plus readings: 1 to 20
+            of {date, value, unit?, note?, source, metric?}, one per date and metric, with
+            the same rules as record_system_reading.
+            What it does: records a sensor's whole run for one system in one call, all or
+            none, credited to you. Each reading replaces one already on its date and
+            metric. Reuse command_id unchanged on retry.
+            Output: {system_id, readings} in request order.
+            """
+            return await command(
+                lambda actor: systems.record_readings(
+                    workspace, actor, space_id, system_id, request
+                ),
+                agent_id=agent_id,
+            )
+
         @server.tool(title="List system readings", annotations=read)
         async def list_system_readings(
             space_id: UUID,

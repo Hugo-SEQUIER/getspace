@@ -226,7 +226,8 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "evidence contradicts a verdict, demote_lab_entry moves it back to testing. A "
             "script that measures a system records its number with record_system_reading "
             "(date, value, unit, source, and a metric slug for an input or counter-metric; the "
-            "goal metric is the default); list_systems shows each system's latest goal "
+            "goal metric is the default), or a whole run of up to 20 numbers with "
+            "record_system_readings; list_systems shows each system's latest goal "
             "reading and reading_age_days, and list_system_readings the history. Record "
             "measured numbers only, never estimates.",
             "Connect contextual nodes with explicit links on remember/remember_claims, or "

@@ -25,7 +25,7 @@ INDEX_TEXT = 100_000
 CORPUS = (
     "SELECT * FROM (SELECT 'r:'||id::text AS cursor,id,current_revision AS revision "
     "FROM space.resources UNION ALL SELECT 'i:'||id::text,id,current_revision "
-    "FROM space.workspace_items WHERE NOT deleted AND kind<>'system_readings') corpus "
+    "FROM space.workspace_items WHERE NOT deleted) corpus "
     "WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT %s"
 )
 # Revisions are immutable, so pinning the listed ones keeps the page consistent.

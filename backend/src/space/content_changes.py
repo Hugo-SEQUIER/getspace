@@ -3,16 +3,7 @@
 Browsers compare these per kind, so a write reloads only the lists showing that kind.
 """
 
-ITEM_KINDS = (
-    "project",
-    "folder",
-    "database",
-    "category",
-    "section",
-    "system",
-    "lab_entry",
-    "system_readings",
-)
+ITEM_KINDS = ("project", "folder", "database", "category", "section", "system", "lab_entry")
 RESOURCE_KINDS = ("document", "task", "memory")
 KINDS = (*RESOURCE_KINDS, *ITEM_KINDS, "columns")
 

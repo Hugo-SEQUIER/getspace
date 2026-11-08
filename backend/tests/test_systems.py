@@ -1,10 +1,12 @@
 """The Systems area: only promoted lab entries reach recall, and demotion takes them out."""
 
 import json
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4, uuid5
+from uuid import UUID, uuid4
 
 import pytest
+from test_auth import signing as signing_fixture
 from test_database_setup import database as database_fixture
 from test_memora_pipeline import Models
 from test_workspace import command_database as command_database_fixture
@@ -16,6 +18,7 @@ from space.memory import RecallRequest
 from space.workspace import CommandError
 
 database = database_fixture
+signing = signing_fixture
 command_database = command_database_fixture
 commands = commands_fixture
 
@@ -554,14 +557,21 @@ def listed(service, owner, space, system, **query):
     )
 
 
-def month_log(system, day):
-    return uuid5(UUID(system["id"]), f"readings:{day:%Y-%m}")
+def item_revisions(archive):
+    return [entry for entry in archive["entries"] if entry["entity"] == "item"]
+
+
+def archived_readings(archive):
+    return [entry["value"] for entry in archive["entries"] if entry["entity"] == "reading"]
 
 
 def test_readings_replace_a_date_list_newest_first_and_show_their_age(lab):
+    from test_workspace_archive import read_archive
+
     service, owner, space, system, _ = lab
     [summary] = systems.overview(service, owner, space)["systems"]
     assert summary["latest_reading"] is None and summary["reading_age_days"] is None
+    revisions = len(item_revisions(read_archive(service, owner, space)))
     today = datetime.now(UTC).date()
     days = [today - timedelta(days=n) for n in (40, 14, 7, 1)]
     agent = delegated(service, owner, write=True)
@@ -592,13 +602,10 @@ def test_readings_replace_a_date_list_newest_first_and_show_their_age(lab):
     since = listed(service, owner, space, system, since=days[1], limit=2)
     assert [r["date"] for r in since["readings"]] == [days[3].isoformat(), days[2].isoformat()]
     assert since["more"] is True
-    # The month's revisions keep the replaced number.
-    log = workspace_items.get(service, owner, space, month_log(system, days[2]))
-    earlier = workspace_items.get(
-        service, owner, space, month_log(system, days[2]), log["revision"] - 1
-    )
-    assert days[2].isoformat() in {r["date"] for r in earlier["readings"]}
-    assert 12.0 in {r["value"] for r in earlier["readings"]}
+    # Readings keep no revisions: five writes add four archive entries and no revision.
+    archive = read_archive(service, owner, space)
+    assert len(item_revisions(archive)) == revisions
+    assert sorted(r["value"] for r in archived_readings(archive)) == [8, 10, 13, 15]
 
     latest = {"date": days[3].isoformat(), "value": 15.0, "unit": "clicks", "metric": "goal"}
     [summary] = systems.overview(service, owner, space)["systems"]
@@ -614,7 +621,7 @@ def test_a_retried_reading_lands_once_and_a_reused_command_id_is_refused(lab):
     command_id = uuid4()
     first = reading(service, owner, space, system, today, 42, command_id=command_id)
     reading(service, owner, space, system, today - timedelta(days=1), 41)
-    # The month log moved on, and the retry still answers with what it wrote.
+    # Later readings landed, and the retry still answers with what it wrote.
     again = reading(service, owner, space, system, today, 42, command_id=command_id)
     assert again == first
     assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [42, 41]
@@ -633,10 +640,19 @@ def test_a_retried_reading_lands_once_and_a_reused_command_id_is_refused(lab):
     )
     with pytest.raises(CommandError, match="already used"):
         reading(service, owner, space, system, today, 1, command_id=other)
+    outreach = next(
+        item
+        for item in systems.overview(service, owner, space)["systems"]
+        if item["name"] == "Outreach"
+    )
+    with pytest.raises(CommandError, match="already used"):
+        reading(service, owner, space, outreach, today, 42, command_id=command_id)
 
 
 def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab):
     from pydantic import ValidationError
+
+    from space import workspace_search
 
     service, owner, space, system, _ = lab
     today = datetime.now(UTC).date()
@@ -663,35 +679,21 @@ def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab)
     with pytest.raises(CommandError) as error:
         reading(service, owner, space, {"id": str(uuid4())}, today, 1)
     assert error.value.status == 404
+    with pytest.raises(CommandError) as error:
+        listed(service, owner, space, {"id": str(uuid4())})
+    assert error.value.status == 404
 
     reading(service, owner, space, system, today, 5)
-    log = workspace_items.get(service, owner, space, month_log(system, today))
-    with pytest.raises(CommandError, match="not archived on their own"):
-        workspace_items.visibility(
-            service,
-            owner,
-            space,
-            UUID(log["id"]),
-            workspace_items.ChangeVisibility(
-                command_id=uuid4(), expected_revision=log["revision"], deleted=True
-            ),
-        )
-    with pytest.raises(ValueError):
-        workspace_items.SaveItem(
-            command_id=uuid4(),
-            item_id=UUID(log["id"]),
-            expected_revision=log["revision"],
-            kind="system_readings",
-            data={"name": "Bypass"},
-        )
+    viewer = delegated(service, owner, write=False)
+    with pytest.raises(CommandError) as error:
+        reading(service, viewer, space, system, today, 6)
+    assert error.value.status == 403
+    # Readings are neither items nor content: the map and search leave them out.
     assert "Search Console" not in json.dumps(
         space_map.build(service, owner, space, space_map.MapRequest())
     )
-    # A month of readings has no name, so search must not list it.
-    from space import workspace_search
-
-    indexed = workspace_search.index(service, owner, space)
-    assert log["id"] not in json.dumps(indexed) and system["id"] in json.dumps(indexed)
+    indexed = json.dumps(workspace_search.index(service, owner, space))
+    assert "Search Console" not in indexed and system["id"] in indexed
     current = workspace_items.get(service, owner, space, UUID(system["id"]))
     workspace_items.visibility(
         service,
@@ -707,28 +709,62 @@ def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab)
     assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [5]
 
 
-def test_readings_survive_export_and_a_copy_records_into_its_own_month(lab):
-    from dataclasses import replace
-
+def restore(service, owner, space, archive, choices=None):
     from test_restore_staging import stage
-    from test_workspace_archive import read_archive
 
     from space import restore_merge as merge
 
+    upload = stage(service, owner, space, archive)
+    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices or {}))
+    result = merge.commit(
+        service,
+        owner,
+        space,
+        upload.id,
+        merge.Commit(snapshot=review["snapshot"], choices=choices or {}),
+    )
+    return {item["key"]: item["target_id"] for item in review["items"]}, result, upload.id
+
+
+def test_readings_survive_export_and_restore_as_rows_beside_the_revisions(lab, monkeypatch):
+    from dataclasses import replace
+
+    from test_workspace_archive import read_archive
+
+    from space import workspace_archive
+
     service, owner, space, system, _ = lab
     today = datetime.now(UTC).date()
+    yesterday = today - timedelta(days=1)
     reading(service, owner, space, system, today, 7, unit="replies")
+    reading(service, owner, space, system, today, 3, metric="counter.unsubscribes")
+    reading(service, owner, space, system, yesterday, 6)
+    # Small pages: readings continue from their own cursor after the revisions.
+    monkeypatch.setattr(workspace_archive, "PAGE_READINGS", 2)
     archive = read_archive(service, owner, space)
-    log_id = str(month_log(system, today))
+    assert [(r["date"], r["metric"], r["value"]) for r in archived_readings(archive)] == [
+        (yesterday.isoformat(), "goal", 6.0),
+        (today.isoformat(), "counter.unsubscribes", 3.0),
+        (today.isoformat(), "goal", 7.0),
+    ]
     assert archive_schema.validate_archive(archive)
+    # Readings do not count toward the revision limit.
+    monkeypatch.setattr(
+        archive_schema,
+        "MAX_ARCHIVE_ENTRIES",
+        len(archive["entries"]) - len(archived_readings(archive)),
+    )
+    archive_schema.validate_archive(archive)
+    monkeypatch.undo()
+    monkeypatch.setattr(archive_schema, "MAX_ARCHIVE_READINGS", 2)
+    with pytest.raises(ValueError, match="2 reading limit"):
+        archive_schema.validate_archive(archive)
+    monkeypatch.undo()
 
     target = replace(owner, subject=str(uuid4()))
     target_space = UUID(service.bootstrap(target)["id"])
-    upload = stage(service, target, target_space, archive)
-    review = merge.review(service, target, target_space, upload.id, merge.Review())
-    merge.commit(
-        service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
-    )
+    _, result, _ = restore(service, target, target_space, archive)
+    assert result["result"]["readings"] == 3
     [summary] = systems.overview(service, target, target_space)["systems"]
     assert summary["latest_reading"] == {
         "date": today.isoformat(),
@@ -736,70 +772,124 @@ def test_readings_survive_export_and_a_copy_records_into_its_own_month(lab):
         "unit": "replies",
         "metric": "goal",
     }
+    assert [r["value"] for r in listed(service, target, target_space, system)["readings"]] == [
+        3,
+        7,
+        6,
+    ]
 
-    choices = dict.fromkeys(["item:" + system["id"], "item:" + log_id], "copy")
-    upload = stage(service, owner, space, archive)
-    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices))
-    target_ids = {item["key"]: item["target_id"] for item in review["items"]}
-    merge.commit(
-        service, owner, space, upload.id, merge.Commit(snapshot=review["snapshot"], choices=choices)
-    )
-    copy = {"id": target_ids["item:" + system["id"]]}
+    # Keep: the Space's own number stays and a missing reading comes back.
+    reading(service, owner, space, system, today, 70, unit="replies")
+    reading(service, owner, space, system, today - timedelta(days=2), 5)
+    restore(service, owner, space, archive)
+    values = {
+        (r["date"], r["metric"]): r["value"]
+        for r in listed(service, owner, space, system)["readings"]
+    }
+    assert values[(today.isoformat(), "goal")] == 70
+    assert values[(yesterday.isoformat(), "goal")] == 6
+    # Replace: the archived number wins on a shared date and metric; others stay.
+    restore(service, owner, space, archive, {"item:" + system["id"]: "replace"})
+    values = {
+        (r["date"], r["metric"]): r["value"]
+        for r in listed(service, owner, space, system)["readings"]
+    }
+    assert values[(today.isoformat(), "goal")] == 7
+    assert values[((today - timedelta(days=2)).isoformat(), "goal")] == 5
+    # Copy: the copy takes the readings, and each records on its own.
+    targets, _, _ = restore(service, owner, space, archive, {"item:" + system["id"]: "copy"})
+    copy = {"id": targets["item:" + system["id"]]}
+    assert len(listed(service, owner, space, copy)["readings"]) == 3
     reading(service, owner, space, copy, today, 9)
-    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [9]
-    if today.day > 1:
-        reading(service, owner, space, copy, today - timedelta(days=1), 8)
-        values = [r["value"] for r in listed(service, owner, space, copy)["readings"]]
-        assert values == [9, 8]
-    logs = systems._items(service, owner, space, (systems.READINGS,))
-    assert sorted(log["system_id"] for log in logs) == sorted([system["id"], copy["id"]])
-    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [7]
-
-    broken = read_archive(service, owner, space)
-    for record in broken["entries"]:
-        if record["value"]["id"] == log_id:
-            record["value"]["readings"][0]["date"] = "1999-01-01"
-    with pytest.raises(ValueError):
-        archive_schema.validate_archive(broken)
-    broken = read_archive(service, owner, space)
-    for record in broken["entries"]:
-        if record["value"]["id"] == log_id:
-            record["value"]["system_id"] = str(uuid4())
-    with pytest.raises(ValueError, match="linked system"):
-        archive_schema.validate_archive(broken)
+    assert listed(service, owner, space, copy, metric="goal", limit=1)["readings"][0]["value"] == 9
+    assert (
+        listed(service, owner, space, system, metric="goal", limit=1)["readings"][0]["value"] == 7
+    )
 
 
-def test_a_log_restored_onto_a_copy_is_not_taken_back_by_the_original(lab):
-    from test_restore_staging import stage
+def test_a_restore_over_the_reading_limit_changes_nothing(lab, monkeypatch):
+    from dataclasses import replace
+
     from test_workspace_archive import read_archive
 
     from space import restore_merge as merge
 
     service, owner, space, system, _ = lab
     today = datetime.now(UTC).date()
-    reading(service, owner, space, system, today, 7)
+    for days in range(3):
+        reading(service, owner, space, system, today - timedelta(days=days), days)
     archive = read_archive(service, owner, space)
-    log_id = str(month_log(system, today))
-    # The copy's month log replaces the original's under the original's derived ID.
-    choices = {"item:" + system["id"]: "copy", "item:" + log_id: "replace"}
-    upload = stage(service, owner, space, archive)
-    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices))
-    target_ids = {item["key"]: item["target_id"] for item in review["items"]}
-    merge.commit(
-        service, owner, space, upload.id, merge.Commit(snapshot=review["snapshot"], choices=choices)
-    )
-    copy = {"id": target_ids["item:" + system["id"]]}
-    assert workspace_items.get(service, owner, space, UUID(log_id))["system_id"] == copy["id"]
-    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [7]
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    monkeypatch.setattr(systems, "MAX_SPACE_READINGS", 2)
+    with pytest.raises(CommandError, match="limit of 2 readings") as error:
+        restore(service, target, target_space, archive)
+    assert error.value.status == 413
+    assert systems.overview(service, target, target_space)["systems"] == []
+    [session] = merge.restore_staging.listing(service, target, target_space)["items"]
+    assert session["state"] == "staged"
 
-    reading(service, owner, space, system, today, 11)
-    reading(service, owner, space, system, today, 12)
-    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [12]
-    reading(service, owner, space, copy, today, 8)
-    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [8]
-    assert workspace_items.get(service, owner, space, UUID(log_id))["system_id"] == copy["id"]
-    logs = systems._items(service, owner, space, (systems.READINGS,))
-    assert sorted(log["system_id"] for log in logs) == sorted([system["id"], copy["id"]])
+
+def test_an_archive_reading_needs_its_system_and_a_valid_number(lab):
+    from test_workspace_archive import read_archive
+
+    service, owner, space, system, entry = lab
+    reading(service, owner, space, system, datetime.now(UTC).date(), 7)
+    archive = read_archive(service, owner, space)
+
+    def broken(change):
+        copy = json.loads(json.dumps(archive))
+        [value] = archived_readings(copy)
+        change(copy, value)
+        return copy
+
+    cases = [
+        (lambda a, v: v.update(system_id=str(uuid4())), "reading's system"),
+        (lambda a, v: v.update(system_id=entry["id"]), "reading's system"),
+        (lambda a, v: a["entries"].append({**a["entries"][-1]}), "duplicate reading"),
+        (lambda a, v: v.update(value="7"), None),
+        (lambda a, v: v.update(metric="Goal"), None),
+        (lambda a, v: v.update(extra=1), None),
+        (lambda a, v: v.pop("recorded_at"), None),
+        (lambda a, v: a["entries"][-1].update(current=False), "Invalid archive entry"),
+    ]
+    for change, message in cases:
+        with pytest.raises(ValueError, match=message):
+            archive_schema.validate_archive(broken(change))
+    # The structural budget grows by two containers and 24 separators per reading: one
+    # entry's keys need a colon each and a comma between them and after the entry.
+    [entry] = [e for e in archive["entries"] if e["entity"] == "reading"]
+    assert 2 * (len(entry) + len(entry["value"])) - 1 <= 24
+
+
+def test_an_export_leaves_out_readings_of_a_system_created_after_its_snapshot(lab):
+    from space import workspace_archive
+    from space.workspace_archive import ExportPage, export_page
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    reading(service, owner, space, system, today, 1)
+    first = export_page(service, owner, space, ExportPage())
+    later = systems.save_system(
+        service,
+        owner,
+        space,
+        systems.SaveSystem(
+            command_id=uuid4(), expected_revision=0, data=systems.SystemData(name="Later")
+        ),
+    )
+    reading(service, owner, space, later, today, 2)
+    entries, page = list(first["entries"]), first
+    while page["next_cursor"]:
+        page = export_page(
+            service, owner, space, ExportPage(after=page["next_cursor"], snapshot=first["snapshot"])
+        )
+        entries.extend(page["entries"])
+    values = [e["value"]["value"] for e in entries if e["entity"] == "reading"]
+    assert values == [1.0]
+    with pytest.raises(ValueError, match="Unknown export cursor"):
+        ExportPage(after="s:nonsense", snapshot=0)
+    assert workspace_archive.READING_CURSOR.match("s:")
 
 
 def test_metrics_share_a_date_replace_one_another_only_per_metric_and_filter(lab):
@@ -862,24 +952,8 @@ def test_a_metric_is_a_slug_and_an_omitted_one_is_the_goal(lab, monkeypatch):
         with pytest.raises(ValidationError):
             systems.ReadingQuery.model_validate({"metric": bad})
 
-    day = today.isoformat()
-    month = f"{today:%Y-%m}"
-
-    def entry(metric=None):
-        value = {"date": day, "value": 1.0, "source": "Gmail"}
-        return value if metric is None else value | {"metric": metric}
-
-    log = {"system_id": system["id"], "month": month}
-    # A month log written before metrics existed reads as goal readings.
-    [old] = systems.ReadingLog.model_validate(log | {"readings": [entry()]}).readings
-    assert old.metric == "goal"
-    systems.ReadingLog.model_validate(log | {"readings": [entry("goal"), entry("replies")]})
-    for readings in ([entry(), entry("goal")], [entry("replies"), entry("goal")]):
-        with pytest.raises(ValidationError, match="one per date and metric"):
-            systems.ReadingLog.model_validate(log | {"readings": readings})
-
-    # A full month refuses a new date and metric and still replaces one it holds.
-    monkeypatch.setattr(systems, "MAX_MONTH_READINGS", 2)
+    # A full Space refuses a new date and metric and still replaces one it holds.
+    monkeypatch.setattr(systems, "MAX_SPACE_READINGS", 2)
     reading(service, owner, space, system, today, 1)
     reading(service, owner, space, system, today, 2, metric="replies")
     with pytest.raises(CommandError, match="at most 2 readings") as error:
@@ -888,3 +962,154 @@ def test_a_metric_is_a_slug_and_an_omitted_one_is_the_goal(lab, monkeypatch):
     reading(service, owner, space, system, today, 4, metric="replies")
     values = {r["metric"]: r["value"] for r in listed(service, owner, space, system)["readings"]}
     assert values == {"goal": 1.0, "replies": 4.0}
+
+
+def batch(service, actor, space, system, readings, command_id=None):
+    return systems.record_readings(
+        service,
+        actor,
+        space,
+        UUID(system["id"]),
+        systems.RecordReadings.model_validate(
+            {"command_id": str(command_id or uuid4()), "readings": readings}
+        ),
+    )
+
+
+def test_a_batch_records_a_sensor_run_all_or_none_and_retries_once(lab, monkeypatch):
+    from pydantic import ValidationError
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date().isoformat()
+    run = [
+        {"date": today, "value": 40, "source": "Gmail", "metric": "replies"},
+        {"date": today, "value": 12, "source": "Gmail"},
+        {"date": today, "value": 1, "source": "Gmail", "metric": "counter.unsubscribes"},
+    ]
+    command_id = uuid4()
+    agent = delegated(service, owner, write=True)
+    saved = batch(service, agent, space, system, run, command_id)
+    assert saved["system_id"] == system["id"]
+    assert [(r["metric"], r["value"]) for r in saved["readings"]] == [
+        ("replies", 40.0),
+        ("goal", 12.0),
+        ("counter.unsubscribes", 1.0),
+    ]
+    assert {r["recorded_by"] for r in saved["readings"]} == {saved["readings"][0]["recorded_by"]}
+    assert batch(service, agent, space, system, run, command_id) == saved
+    # One of its readings replaced later: the retry still answers with what it wrote.
+    reading(service, owner, space, system, datetime.now(UTC).date(), 13)
+    assert batch(service, agent, space, system, run, command_id) == saved
+    assert listed(service, owner, space, system, metric="goal")["readings"][0]["value"] == 13
+    with pytest.raises(CommandError, match="already used"):
+        batch(service, agent, space, system, [run[0] | {"value": 41}, *run[1:]], command_id)
+    with pytest.raises(CommandError, match="already used"):
+        batch(service, agent, space, system, run[1:], command_id)
+
+    for bad in ([], [run[0]] * 2, [run[0] | {"metric": f"m{n}"} for n in range(21)]):
+        with pytest.raises(ValidationError):
+            systems.RecordReadings.model_validate({"command_id": str(uuid4()), "readings": bad})
+    late = (datetime.now(UTC).date() + timedelta(days=3)).isoformat()
+    with pytest.raises(CommandError, match="after tomorrow"):
+        batch(service, owner, space, system, [run[0] | {"value": 99}, run[1] | {"date": late}])
+    monkeypatch.setattr(systems, "MAX_SPACE_READINGS", 4)
+    new = [run[0] | {"value": 99}, run[0] | {"metric": "a"}, run[0] | {"metric": "b"}]
+    with pytest.raises(CommandError, match="at most 4 readings"):
+        batch(service, owner, space, system, new)
+    values = {r["metric"]: r["value"] for r in listed(service, owner, space, system)["readings"]}
+    assert values == {"replies": 40.0, "goal": 13.0, "counter.unsubscribes": 1.0}
+
+
+@contextmanager
+def mcp_client(service, signing):
+    """Parameters: the command service and the signing fixture.
+    What it does: starts the app with a person and a writing agent of a new Space.
+    Output: (owner, space, rpc(name, arguments), rest(method, path, json)).
+    """
+    from fastapi.testclient import TestClient
+
+    from space.app import create_app
+    from space.settings import Settings
+
+    verifier, token = signing
+    browser_token = token()
+    owner = verifier.verify(browser_token)
+    space = UUID(service.bootstrap(owner)["id"])
+    writer = delegated(service, owner, write=True)
+    agent_token = token(
+        aud=verifier.resource, client_id=writer.client_id, space_grant_id=writer.grant_id
+    )
+    settings = Settings(environment="test", allowed_hosts=["testserver"])
+    with TestClient(create_app(settings, workspace=service, verifier=verifier)) as http:
+        headers = {
+            "Authorization": "Bearer " + agent_token,
+            "X-Space-Agent-ID": writer.agent_id,
+            "Accept": "application/json, text/event-stream",
+        }
+
+        def rpc(name, arguments):
+            response = http.post(
+                "/mcp/",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": {"space_id": str(space), **arguments}},
+                },
+            )
+            assert response.status_code == 200
+            result = response.json()["result"]
+            assert not result.get("isError"), result
+            return result["structuredContent"]
+
+        def rest(method, path, body=None):
+            response = http.request(
+                method,
+                f"/v1/spaces/{space}{path}",
+                headers={"Authorization": "Bearer " + browser_token},
+                json=body,
+            )
+            assert response.status_code == 200, response.text
+            return response.json()
+
+        yield owner, space, rpc, rest
+
+
+def test_mcp_and_rest_record_a_batch_and_list_it(commands, signing):
+    service = commands[0]
+    today = datetime.now(UTC).date().isoformat()
+    with mcp_client(service, signing) as (owner, space, rpc, rest):
+        system = rpc("create_system", {"command_id": str(uuid4()), "data": {"name": "SEO"}})
+        run = [
+            {"date": today, "value": 120, "source": "Search Console", "unit": "clicks"},
+            {"date": today, "value": 9, "source": "Search Console", "metric": "pages"},
+        ]
+        request = {"command_id": str(uuid4()), "readings": run}
+        saved = rpc("record_system_readings", {"system_id": system["id"], "request": request})
+        assert [(r["metric"], r["value"]) for r in saved["readings"]] == [
+            ("goal", 120),
+            ("pages", 9),
+        ]
+        assert (
+            rpc("record_system_readings", {"system_id": system["id"], "request": request}) == saved
+        )
+        path = f"/systems/{system['id']}/readings"
+        again = rest("POST", path + "/batch", request)
+        assert again == saved
+        single = rpc(
+            "record_system_reading",
+            {
+                "system_id": system["id"],
+                "request": {"command_id": str(uuid4()), **run[1], "value": 10},
+            },
+        )
+        assert (
+            single["metric"] == "pages"
+            and single["recorded_by"] == saved["readings"][0]["recorded_by"]
+        )
+        listed_mcp = rpc("list_system_readings", {"system_id": system["id"], "metric": "pages"})
+        assert [r["value"] for r in listed_mcp["readings"]] == [10]
+        assert rest("GET", path + "?metric=pages") == listed_mcp
+        [summary] = rpc("list_systems", {})["systems"]
+        assert summary["latest_reading"]["value"] == 120 and summary["reading_age_days"] == 0

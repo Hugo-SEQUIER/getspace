@@ -414,6 +414,12 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     ):
         return systems.record_reading(workspace, session[0], space_id, system_id, body)
 
+    @router.post("/spaces/{space_id}/systems/{system_id}/readings/batch")
+    def record_system_readings(
+        space_id: UUID, system_id: UUID, body: systems.RecordReadings, session=auth
+    ):
+        return systems.record_readings(workspace, session[0], space_id, system_id, body)
+
     @router.get("/spaces/{space_id}/systems/{system_id}/readings")
     def system_readings(
         space_id: UUID,

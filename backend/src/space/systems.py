@@ -5,16 +5,16 @@ items. A lab entry reaches recall only when someone promotes it to a verdict: pr
 writes a memory carrying the verdict, and demotion keeps that memory out of recall while
 both histories stay.
 Readings are the dated numbers a sensor script records for a system, each under a metric
-(`goal` unless named). Each system keeps one `system_readings` item per calendar month
-holding at most one reading per date and metric, so a second write for that date and metric
-replaces it and the month's revisions keep what it replaced.
+(`goal` unless named). They are rows of `space.system_readings`, one per system, date and
+metric, without revision history: a second write for that date and metric replaces the row,
+so the owner archive carries one entry per stored reading rather than a revision per write.
 Output: systems with their lab statistics and latest reading, lab entries, their revision
 history, verdicts and readings.
 """
 
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
-from uuid import UUID, uuid4, uuid5
+from uuid import UUID, uuid5
 
 from pydantic import Field, field_validator, model_validator
 
@@ -50,11 +50,13 @@ MAX_ITEMS = 5000
 MAX_HISTORY = 200
 MAX_USES = 500
 KINDS = ("system", "lab_entry")
-READINGS = "system_readings"
-# A list call returns at most this many readings; the month logs it reads share MAX_ITEMS.
+# A list call returns at most this many readings.
 MAX_READINGS = 1000
-# One month log holds at most this many readings: ten metrics a day on average.
-MAX_MONTH_READINGS = 310
+# A Space keeps at most this many readings, fifteen systems with six metrics a day for three
+# years. Each one is an entry of the owner archive, which restore bounds by this number too.
+MAX_SPACE_READINGS = 100_000
+# One record_system_readings call writes at most this many readings of one system.
+MAX_BATCH_READINGS = 20
 # The metric a reading counts toward when none is named; the summaries report this one.
 GOAL_METRIC = "goal"
 METRIC_PATTERN = r"^[a-z0-9][a-z0-9_.-]*$"
@@ -234,25 +236,29 @@ class Reading(ReadingFields):
     recorded_by: str | None = Field(default=None, max_length=200)
 
 
-class ReadingLog(Input):
-    """One system's readings in one calendar month, oldest first, one per date and metric."""
+class ArchivedReading(Reading):
+    """One reading as the owner archive carries it."""
 
     system_id: UUID
-    month: str = Field(pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
-    readings: list[Reading] = Field(default_factory=list, max_length=MAX_MONTH_READINGS)
-
-    @model_validator(mode="after")
-    def one_per_date_and_metric(self):
-        keys = [(reading.date, reading.metric) for reading in self.readings]
-        if any(f"{day:%Y-%m}" != self.month for day, _ in keys):
-            raise ValueError("A reading belongs to the month of its date")
-        if keys != sorted(set(keys)):
-            raise ValueError("Readings are one per date and metric, oldest first")
-        return self
+    recorded_at: datetime
 
 
 class RecordReading(ReadingFields):
     command_id: UUID
+
+
+class RecordReadings(Input):
+    """Several readings of one system in one call, such as a sensor's whole daily run."""
+
+    command_id: UUID
+    readings: list[ReadingFields] = Field(min_length=1, max_length=MAX_BATCH_READINGS)
+
+    @model_validator(mode="after")
+    def one_per_date_and_metric(self):
+        keys = [(reading.date, reading.metric) for reading in self.readings]
+        if len(set(keys)) != len(keys):
+            raise ValueError("A call records one reading per date and metric")
+        return self
 
 
 class ReadingQuery(Input):
@@ -282,8 +288,7 @@ def _items(workspace, identity, space_id, kinds=KINDS):
         ).fetchall()
         key_rows = workspace_items.item_keys(workspace, connection, scope, rows)
     if len(rows) > MAX_ITEMS:
-        held = "months of readings" if READINGS in kinds else "systems and entries"
-        raise _error(f"The Systems area holds at most {MAX_ITEMS:,} {held}", 413)
+        raise _error(f"The Systems area holds at most {MAX_ITEMS:,} systems and entries", 413)
     if not rows:
         return []
     return workspace_items.decode(workspace, identity, space_id, scope, rows, key_rows)
@@ -339,7 +344,7 @@ def overview(workspace, identity, space_id):
     by_system = {}
     for entry in entries:
         by_system.setdefault(entry["system_id"], []).append(entry)
-    latest = _latest(_items(workspace, identity, space_id, (READINGS,)))
+    latest = _latest(workspace, identity, space_id)
     today = datetime.now(UTC).date()
     systems = sorted(
         (
@@ -416,7 +421,7 @@ def _active_system(workspace, identity, space_id, system_id):
 
 
 def _commit(workspace, identity, space_id, kind, item_id, command_id, expected_revision, data):
-    model = {"system": SystemData, "lab_entry": LabEntryData, READINGS: ReadingLog}[kind]
+    model = SystemData if kind == "system" else LabEntryData
     data = model.model_validate(data).model_dump(mode="json")
     workspace_items.check_item_size(data)
     workspace_items._commit(
@@ -881,24 +886,33 @@ def verdicts(workspace, identity, space_id, query: VerdictQuery):
     return {"systems": systems, "verdicts": selected}
 
 
-def _metric(reading):
-    """A stored reading with its metric; one written before metrics existed counts as goal."""
-    return reading if "metric" in reading else reading | {"metric": GOAL_METRIC}
+def _reading(row):
+    """A stored row as the tools show it."""
+    return {
+        "system_id": str(row["system_id"]),
+        "date": row["day"].isoformat(),
+        "value": row["value"],
+        "unit": row["unit"],
+        "note": row["note"],
+        "source": row["source"],
+        "metric": row["metric"],
+        "recorded_by": row["recorded_by"],
+    }
 
 
-def _latest(logs):
-    """Parameters: decoded month logs.
+def _latest(workspace, identity, space_id):
+    """Parameters: Space.
     Output: each system ID's latest goal reading by date; other metrics are left out.
     """
-    latest = {}
-    for log in logs:
-        for reading in map(_metric, log["readings"]):
-            if reading["metric"] != GOAL_METRIC:
-                continue
-            current = latest.get(log["system_id"])
-            if current is None or reading["date"] > current["date"]:
-                latest[log["system_id"]] = reading
-    return latest
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        rows = connection.execute(
+            "SELECT DISTINCT ON (system_id) system_id,day,metric,value,unit,note,source,"
+            "recorded_by FROM space.system_readings "
+            "WHERE metric=%s ORDER BY system_id,day DESC",
+            (GOAL_METRIC,),
+        ).fetchall()
+    return {str(row["system_id"]): _reading(row) for row in rows}
 
 
 def freshness(reading, today):
@@ -916,135 +930,189 @@ def freshness(reading, today):
     }
 
 
-def _saved_reading(system_id, reading):
-    return {"system_id": str(system_id), **reading}
-
-
-def _reading_replayed(workspace, identity, space_id, system_id, request):
-    """Parameters: Space, system and a reading command.
-    What it does: finds what this command ID already wrote. A retry of the same reading
-    returns it; the ID reused for another system, date, metric or number is refused.
-    Output: the committed reading, or None when the command is new.
+def _readings_replayed(connection, system_id, command_id, wanted):
+    """Parameters: a scoped connection, the system, the command ID and the readings the
+    command carries by (date, metric).
+    What it does: finds what this command ID already wrote. A retry answers with what it
+    wrote while any of its rows still holds it; the ID reused for another system, date,
+    metric, number or operation is refused.
+    Output: the committed readings in request order, or None when the command is new.
     """
+    if connection.execute(
+        "SELECT 1 FROM space.workspace_item_commands WHERE id=%s", (command_id,)
+    ).fetchone():
+        raise _error("This command ID was already used for another operation")
+    rows = connection.execute(
+        "SELECT system_id,day,metric,value,unit,note,source,recorded_by "
+        "FROM space.system_readings WHERE command_id=%s",
+        (command_id,),
+    ).fetchall()
+    if not rows:
+        return None
+    stored = {(row["day"].isoformat(), row["metric"]): _reading(row) for row in rows}
+    for key, reading in stored.items():
+        mine = wanted.get(key)
+        if (
+            reading["system_id"] != str(system_id)
+            or mine is None
+            or any(reading[field] != value for field, value in mine.items())
+        ):
+            raise _error("This command ID was already used for another operation")
+    recorded_by = next(iter(stored.values()))["recorded_by"]
+    return [stored.get(key) or _saved(system_id, mine, recorded_by) for key, mine in wanted.items()]
+
+
+def _saved(system_id, reading, recorded_by):
+    return {"system_id": str(system_id), **reading, "recorded_by": recorded_by}
+
+
+def lock_readings(connection, space_id):
+    """Parameters: a scoped connection and its Space.
+    What it does: admits one reading writer per Space until the transaction ends, so the
+    reading count stays exact and a concurrent retry of a command sees what it wrote.
+    Output: none.
+    """
+    connection.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+        ("space.system_readings:" + str(space_id),),
+    )
+
+
+UPSERT = (
+    "INSERT INTO space.system_readings(organization_id,space_id,system_id,day,metric,value,"
+    "unit,note,source,recorded_by,command_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+    "ON CONFLICT (organization_id,space_id,system_id,day,metric) DO UPDATE SET "
+    "value=EXCLUDED.value,unit=EXCLUDED.unit,note=EXCLUDED.note,source=EXCLUDED.source,"
+    "recorded_by=EXCLUDED.recorded_by,command_id=EXCLUDED.command_id,recorded_at=now() "
+    "RETURNING (xmax=0) AS inserted"
+)
+
+
+def _record(workspace, identity, space_id, system_id, command_id, readings):
+    """Parameters: Space, an active system, the command ID and its readings.
+    What it does: upserts one row per date and metric with who recorded it, in one
+    transaction; a reading already on that date for the same metric is replaced.
+    Output: the stored readings in request order.
+    """
+    wanted = {
+        (reading.date.isoformat(), reading.metric): reading.model_dump(
+            mode="json", include=set(ReadingFields.model_fields)
+        )
+        for reading in readings
+    }
     with workspace.db.transaction(identity) as connection:
         workspace._scope(connection, identity, space_id)
-        row = connection.execute(
-            "SELECT i.kind,c.item_id,c.revision FROM space.workspace_item_commands c "
-            "JOIN space.workspace_items i ON i.id=c.item_id WHERE c.id=%s",
-            (request.command_id,),
-        ).fetchone()
-    if row is None:
-        return None
-    if row["kind"] == READINGS:
-        log = _get(workspace, identity, space_id, row["item_id"], READINGS, row["revision"])
-        wanted = request.model_dump(mode="json", exclude={"command_id"})
-        for reading in map(_metric, log["readings"] if log["system_id"] == str(system_id) else []):
-            if {key: reading[key] for key in wanted} == wanted:
-                return _saved_reading(system_id, reading)
-    raise _error("This command ID was already used for another operation")
-
-
-def _month_log(workspace, identity, space_id, system_id, day):
-    """Parameters: Space, system and a reading date.
-    What it does: finds the system's log for that month. Its ID comes from the system and
-    the month; a restored copy keeps the log under another ID, so that one is looked up.
-    A restore can also leave another system's log under the derived ID: that log is never
-    reused, and a new month gets a fresh ID instead.
-    Output: (log ID, the log or None when the month has no reading yet).
-    """
-    from space.workspace import CommandError
-
-    month = f"{day:%Y-%m}"
-    log_id = uuid5(system_id, f"readings:{month}")
-    try:
-        derived = _get(workspace, identity, space_id, log_id, READINGS)
-    except CommandError as error:
-        if error.status != 404:
-            raise
-        derived = None
-    if derived and derived["system_id"] == str(system_id) and derived["month"] == month:
-        return log_id, derived
-    for log in _items(workspace, identity, space_id, (READINGS,)):
-        if log["system_id"] == str(system_id) and log["month"] == month:
-            return UUID(log["id"]), log
-    return (uuid4() if derived else log_id), None
+        if replayed := _readings_replayed(connection, system_id, command_id, wanted):
+            return replayed
+    _active_system(workspace, identity, space_id, system_id)
+    if max(reading.date for reading in readings) > datetime.now(UTC).date() + timedelta(days=1):
+        raise _error("A reading cannot be dated after tomorrow", 422)
+    recorded_by = _actor(workspace, identity)
+    with workspace.db.transaction(identity) as connection:
+        scope = workspace._scope(connection, identity, space_id, write=True)
+        lock_readings(connection, scope["space_id"])
+        if replayed := _readings_replayed(connection, system_id, command_id, wanted):
+            return replayed
+        inserted = False
+        for (day, metric), reading in wanted.items():
+            row = connection.execute(
+                UPSERT,
+                (
+                    scope["organization_id"],
+                    scope["space_id"],
+                    system_id,
+                    day,
+                    metric,
+                    reading["value"],
+                    reading["unit"],
+                    reading["note"],
+                    reading["source"],
+                    recorded_by,
+                    command_id,
+                ),
+            ).fetchone()
+            inserted = inserted or row["inserted"]
+        if inserted:
+            held = connection.execute("SELECT count(*) AS n FROM space.system_readings").fetchone()[
+                "n"
+            ]
+            if held > MAX_SPACE_READINGS:
+                raise _error(f"A Space keeps at most {MAX_SPACE_READINGS:,} readings", 413)
+    return [_saved(system_id, reading, recorded_by) for reading in wanted.values()]
 
 
 def record_reading(workspace, identity, space_id, system_id, request: RecordReading):
     """Parameters: Space, an active system and one dated number with where it came from.
-    What it does: writes the reading into the system's month log with who recorded it; a
-    reading already on that date for the same metric is replaced, and the log's revisions
-    keep the old one. Readings of other metrics on that date stay.
+    What it does: stores the reading with who recorded it; a reading already on that date
+    for the same metric is replaced. Readings of other metrics on that date stay.
     Output: {system_id, date, value, unit, note, source, metric, recorded_by}.
     """
-    from space.workspace import CommandError
+    [saved] = _record(workspace, identity, space_id, system_id, request.command_id, [request])
+    return saved
 
-    if replayed := _reading_replayed(workspace, identity, space_id, system_id, request):
-        return replayed
-    _active_system(workspace, identity, space_id, system_id)
-    if request.date > datetime.now(UTC).date() + timedelta(days=1):
-        raise _error("A reading cannot be dated after tomorrow", 422)
-    reading = Reading(
-        **request.model_dump(exclude={"command_id"}), recorded_by=_actor(workspace, identity)
-    ).model_dump(mode="json")
-    # One retry absorbs a concurrent reading written to the same month.
-    for attempt in range(2):
-        log_id, log = _month_log(workspace, identity, space_id, system_id, request.date)
-        key = (reading["date"], reading["metric"])
-        kept = [
-            item
-            for item in map(_metric, (log or {}).get("readings", []))
-            if (item["date"], item["metric"]) != key
-        ]
-        if len(kept) >= MAX_MONTH_READINGS:
-            raise _error(f"A system keeps at most {MAX_MONTH_READINGS} readings a month", 413)
-        data = {
-            "system_id": str(system_id),
-            "month": f"{request.date:%Y-%m}",
-            "readings": sorted([*kept, reading], key=lambda item: (item["date"], item["metric"])),
-        }
-        try:
-            _commit(
-                workspace,
-                identity,
-                space_id,
-                READINGS,
-                log_id,
-                request.command_id,
-                log["revision"] if log else 0,
-                data,
-            )
-        except CommandError as error:
-            if error.status != 409 or attempt:
-                raise
-            if replayed := _reading_replayed(workspace, identity, space_id, system_id, request):
-                return replayed
-            continue
-        return _saved_reading(system_id, reading)
+
+def record_readings(workspace, identity, space_id, system_id, request: RecordReadings):
+    """Parameters: Space, an active system and up to 20 readings, one per date and metric.
+    What it does: stores them all or none, like record_reading for each.
+    Output: {system_id, readings} in request order.
+    """
+    saved = _record(workspace, identity, space_id, system_id, request.command_id, request.readings)
+    return {"system_id": str(system_id), "readings": saved}
 
 
 def readings(workspace, identity, space_id, system_id, query: ReadingQuery):
     """Parameters: Space, system (active or archived), an optional first date, an optional
     metric and a limit.
-    What it does: reads the system's month logs.
+    What it does: reads the system's readings.
     Output: {system_id, readings, more}; readings newest first (metrics of one date in name
     order), more when the limit cut some.
     """
     _get(workspace, identity, space_id, system_id, "system")
-    since = query.since.isoformat() if query.since else ""
-    found = sorted(
-        (
-            reading
-            for log in _items(workspace, identity, space_id, (READINGS,))
-            if log["system_id"] == str(system_id)
-            for reading in map(_metric, log["readings"])
-            if reading["date"] >= since and query.metric in (None, reading["metric"])
-        ),
-        key=lambda reading: reading["metric"],
-    )
-    found.sort(key=lambda reading: reading["date"], reverse=True)
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        rows = connection.execute(
+            "SELECT system_id,day,metric,value,unit,note,source,recorded_by "
+            "FROM space.system_readings WHERE system_id=%s "
+            "AND (%s::date IS NULL OR day>=%s) AND (%s::text IS NULL OR metric=%s) "
+            'ORDER BY day DESC,metric COLLATE "C" LIMIT %s',
+            (system_id, query.since, query.since, query.metric, query.metric, query.limit + 1),
+        ).fetchall()
     return {
         "system_id": str(system_id),
-        "readings": found[: query.limit],
-        "more": len(found) > query.limit,
+        "readings": [_reading(row) for row in rows[: query.limit]],
+        "more": len(rows) > query.limit,
     }
+
+
+def restore_readings(entries, decisions, restore_id):
+    """Parameters: validated archive entries, the restore decisions and the restore ID.
+    What it does: points each archived reading at its system's restore target. A kept
+    system keeps the readings it has and gains the missing ones; a replaced, copied or new
+    one takes the archived readings.
+    Output: rows for restore_publish, as (replace, row parameters).
+    """
+    rows = []
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("entity") != "reading":
+            continue
+        reading = ArchivedReading.model_validate(entry["value"])
+        decision = decisions["item:" + str(reading.system_id)]
+        key = f"{reading.system_id}:{reading.date}:{reading.metric}"
+        rows.append(
+            (
+                decision["action"] != "keep",
+                (
+                    UUID(decision["target_id"]),
+                    reading.date,
+                    reading.metric,
+                    reading.value,
+                    reading.unit,
+                    reading.note,
+                    reading.source,
+                    reading.recorded_by,
+                    uuid5(restore_id, "reading:" + key),
+                    reading.recorded_at,
+                ),
+            )
+        )
+    return rows

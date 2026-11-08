@@ -270,14 +270,10 @@ class ChangeVisibility(Input):
 
 
 def item_model(kind):
-    if kind in {"system", "lab_entry", "system_readings"}:
+    if kind in {"system", "lab_entry"}:
         from space import systems
 
-        return {
-            "system": systems.SystemData,
-            "lab_entry": systems.LabEntryData,
-            "system_readings": systems.ReadingLog,
-        }[kind]
+        return systems.SystemData if kind == "system" else systems.LabEntryData
     return {
         "project": ProjectData,
         "folder": FolderData,
@@ -725,9 +721,6 @@ def visibility(workspace, identity, space_id, item_id, change: ChangeVisibility)
     from space.workspace import CommandError
 
     item = get(workspace, identity, space_id, item_id, change.expected_revision, records=False)
-    if item["kind"] == "system_readings":
-        # A month of readings follows its system and is never archived on its own.
-        raise CommandError("Readings follow their system and are not archived on their own", 409)
     if item["kind"] == "lab_entry" and item.get("verdict") and change.deleted:
         # An archived entry would leave its verdict in recall with no entry to review.
         raise CommandError("Move this verdict back to Testing or retire it first", 409)

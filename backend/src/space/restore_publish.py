@@ -10,6 +10,7 @@ from space import (
     database_records,
     memory_link_index,
     memory_routing,
+    systems,
     tasks,
     workspace_items,
 )
@@ -30,6 +31,7 @@ def publish(
     fingerprint,
     *,
     task_columns=(),
+    readings=(),
 ):
     org = scope["organization_id"]
     restored_columns = tasks.prepare_restore(
@@ -126,6 +128,7 @@ def publish(
         "items": sum(e["entity"] == "item" and e["current"] for e in entries),
         "agents": sum(e["entity"] == "agent" for e in entries),
         "revisions": len(entries),
+        "readings": len(readings),
         "source_space": source_space,
         "request_fingerprint": fingerprint,
     }
@@ -373,6 +376,7 @@ def publish(
                         row["revision"],
                         row["value"].get("_memory", {}).get("claims", []),
                     )
+            _publish_readings(connection, org, space_id, readings)
             content_changes.changed(connection)
             connection.execute(
                 "UPDATE space.restore_sessions SET state='committed',encrypted_result=%s,"
@@ -395,6 +399,46 @@ def publish(
         raise
     workspace._recheck(identity, space_id)
     return {"id": str(restore_id), "state": "committed", "result": result}
+
+
+# A reading lands only on a system: a kept item of another kind takes none.
+READING_INSERT = (
+    "INSERT INTO space.system_readings(organization_id,space_id,system_id,day,metric,value,"
+    "unit,note,source,recorded_by,command_id,recorded_at) SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,"
+    "%s,%s,%s WHERE EXISTS (SELECT 1 FROM space.workspace_items WHERE id=%s AND kind='system') "
+    "ON CONFLICT (organization_id,space_id,system_id,day,metric) DO "
+)
+READING_REPLACE = (
+    "UPDATE SET value=EXCLUDED.value,unit=EXCLUDED.unit,note=EXCLUDED.note,"
+    "source=EXCLUDED.source,recorded_by=EXCLUDED.recorded_by,command_id=EXCLUDED.command_id,"
+    "recorded_at=EXCLUDED.recorded_at"
+)
+
+
+def _publish_readings(connection, org, space_id, readings):
+    """Parameters: the publishing connection, the Space and systems.restore_readings rows.
+    What it does: writes the archived readings after the systems they belong to. A
+    replaced, copied or new system takes the archived number on a shared date and metric;
+    a kept one keeps its own. Refuses a Space left above the reading limit.
+    Output: none.
+    """
+    if not readings:
+        return
+    systems.lock_readings(connection, space_id)
+    with connection.cursor() as cursor:
+        for replace, statement in ((True, READING_REPLACE), (False, "NOTHING")):
+            rows = [
+                (org, space_id, *row, row[0]) for replaces, row in readings if replaces == replace
+            ]
+            if rows:
+                cursor.executemany(READING_INSERT + statement, rows)
+    held = connection.execute("SELECT count(*) AS n FROM space.system_readings").fetchone()["n"]
+    if held > systems.MAX_SPACE_READINGS:
+        raise CommandError(
+            f"This merge would exceed the Space's limit of {systems.MAX_SPACE_READINGS:,} "
+            "readings.",
+            413,
+        )
 
 
 def _current_database(workspace, connection, scope, key, database_id):
