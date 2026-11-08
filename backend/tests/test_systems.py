@@ -665,7 +665,7 @@ def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab)
 
     reading(service, owner, space, system, today, 5)
     log = workspace_items.get(service, owner, space, month_log(system, today))
-    with pytest.raises(CommandError, match="archived with their system"):
+    with pytest.raises(CommandError, match="not archived on their own"):
         workspace_items.visibility(
             service,
             owner,
@@ -686,6 +686,11 @@ def test_a_reading_is_refused_without_a_number_a_source_or_an_active_system(lab)
     assert "Search Console" not in json.dumps(
         space_map.build(service, owner, space, space_map.MapRequest())
     )
+    # A month of readings has no name, so search must not list it.
+    from space import workspace_search
+
+    indexed = workspace_search.index(service, owner, space)
+    assert log["id"] not in json.dumps(indexed) and system["id"] in json.dumps(indexed)
     current = workspace_items.get(service, owner, space, UUID(system["id"]))
     workspace_items.visibility(
         service,
