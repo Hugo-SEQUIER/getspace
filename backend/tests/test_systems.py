@@ -761,3 +761,36 @@ def test_readings_survive_export_and_a_copy_records_into_its_own_month(lab):
             record["value"]["system_id"] = str(uuid4())
     with pytest.raises(ValueError, match="linked system"):
         archive_schema.validate_archive(broken)
+
+
+def test_a_log_restored_onto_a_copy_is_not_taken_back_by_the_original(lab):
+    from test_restore_staging import stage
+    from test_workspace_archive import read_archive
+
+    from space import restore_merge as merge
+
+    service, owner, space, system, _ = lab
+    today = datetime.now(UTC).date()
+    reading(service, owner, space, system, today, 7)
+    archive = read_archive(service, owner, space)
+    log_id = str(month_log(system, today))
+    # The copy's month log replaces the original's under the original's derived ID.
+    choices = {"item:" + system["id"]: "copy", "item:" + log_id: "replace"}
+    upload = stage(service, owner, space, archive)
+    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices))
+    target_ids = {item["key"]: item["target_id"] for item in review["items"]}
+    merge.commit(
+        service, owner, space, upload.id, merge.Commit(snapshot=review["snapshot"], choices=choices)
+    )
+    copy = {"id": target_ids["item:" + system["id"]]}
+    assert workspace_items.get(service, owner, space, UUID(log_id))["system_id"] == copy["id"]
+    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [7]
+
+    reading(service, owner, space, system, today, 11)
+    reading(service, owner, space, system, today, 12)
+    assert [r["value"] for r in listed(service, owner, space, system)["readings"]] == [12]
+    reading(service, owner, space, copy, today, 8)
+    assert [r["value"] for r in listed(service, owner, space, copy)["readings"]] == [8]
+    assert workspace_items.get(service, owner, space, UUID(log_id))["system_id"] == copy["id"]
+    logs = systems._items(service, owner, space, (systems.READINGS,))
+    assert sorted(log["system_id"] for log in logs) == sorted([system["id"], copy["id"]])

@@ -13,7 +13,7 @@ history, verdicts and readings.
 
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
-from uuid import UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
 from pydantic import Field, field_validator, model_validator
 
@@ -922,6 +922,8 @@ def _month_log(workspace, identity, space_id, system_id, day):
     """Parameters: Space, system and a reading date.
     What it does: finds the system's log for that month. Its ID comes from the system and
     the month; a restored copy keeps the log under another ID, so that one is looked up.
+    A restore can also leave another system's log under the derived ID: that log is never
+    reused, and a new month gets a fresh ID instead.
     Output: (log ID, the log or None when the month has no reading yet).
     """
     from space.workspace import CommandError
@@ -929,14 +931,17 @@ def _month_log(workspace, identity, space_id, system_id, day):
     month = f"{day:%Y-%m}"
     log_id = uuid5(system_id, f"readings:{month}")
     try:
-        return log_id, _get(workspace, identity, space_id, log_id, READINGS)
+        derived = _get(workspace, identity, space_id, log_id, READINGS)
     except CommandError as error:
         if error.status != 404:
             raise
+        derived = None
+    if derived and derived["system_id"] == str(system_id) and derived["month"] == month:
+        return log_id, derived
     for log in _items(workspace, identity, space_id, (READINGS,)):
         if log["system_id"] == str(system_id) and log["month"] == month:
             return UUID(log["id"]), log
-    return log_id, None
+    return (uuid4() if derived else log_id), None
 
 
 def record_reading(workspace, identity, space_id, system_id, request: RecordReading):
@@ -947,7 +952,6 @@ def record_reading(workspace, identity, space_id, system_id, request: RecordRead
     """
     from space.workspace import CommandError
 
-    system_id = UUID(str(system_id))
     if replayed := _reading_replayed(workspace, identity, space_id, system_id, request):
         return replayed
     _active_system(workspace, identity, space_id, system_id)
