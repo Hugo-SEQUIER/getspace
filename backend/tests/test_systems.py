@@ -1361,3 +1361,41 @@ def test_structured_fields_survive_export_and_a_copy_points_at_the_copied_projec
             archive_schema.validate_archive(broken(change))
     with pytest.raises(ValueError, match="classification item"):
         archive_schema.validate_archive(broken(lambda value: value.update(project_id=str(uuid4()))))
+
+
+def test_mcp_update_system_keeps_the_fields_it_is_not_sent(commands, signing):
+    service = commands[0]
+    with mcp_client(service, signing) as (owner, space, rpc, rest):
+        data = {
+            "name": "X audience",
+            "goal_metric": "Median views",
+            "counter_metric": "Unfollows",
+            "current_value": "180",
+            "machine": FIELDS["machine"],
+        }
+        created = rpc("create_system", {"command_id": str(uuid4()), "data": data})
+        common = {"system_id": created["id"], "command_id": str(uuid4())}
+        # The tool receives a SystemChange holding only current_value.
+        updated = rpc(
+            "update_system",
+            {**common, "expected_revision": created["revision"], "data": {"current_value": "240"}},
+        )
+        assert updated["current_value"] == "240" and updated["revision"] == created["revision"] + 1
+        for field in ("name", "goal_metric", "counter_metric", "machine"):
+            assert updated[field] == created[field], field
+        assert [job["job_id"] for job in updated["machine"]] == ["x-daily", "x-sensor"]
+        # A field sent as null is cleared; the others still keep their values.
+        cleared = rpc(
+            "update_system",
+            {
+                "system_id": created["id"],
+                "command_id": str(uuid4()),
+                "expected_revision": updated["revision"],
+                "data": {"counter_metric": None},
+            },
+        )
+        assert not cleared["counter_metric"]
+        assert cleared["current_value"] == "240" and cleared["machine"] == created["machine"]
+        [listed_system] = rest("GET", "/systems")["systems"]
+        assert listed_system["goal_metric"] == "Median views"
+        assert listed_system["machine"] == created["machine"]
