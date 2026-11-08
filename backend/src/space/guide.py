@@ -223,7 +223,11 @@ def operating_instructions(models, *, resource_access: bool, mine_documents: boo
             "list_systems shows them so you do not duplicate one. Anyone may promote with "
             "promote_lab_entry once the evidence is measured or owner_call and the source is "
             "named; promote on evidence, never on your own judgement of an idea. When new "
-            "evidence contradicts a verdict, demote_lab_entry moves it back to testing.",
+            "evidence contradicts a verdict, demote_lab_entry moves it back to testing. A "
+            "script that measures a system records its number with record_system_reading "
+            "(date, value, unit, source); list_systems shows each system's latest_reading and "
+            "reading_age_days, and list_system_readings the history. Record measured numbers "
+            "only, never estimates.",
             "Connect contextual nodes with explicit links on remember/remember_claims, or "
             "set_memory_links to replace a node's connections. Supply existing resource IDs; "
             "use expands_on for a detail -> subject connection, such as 'What I like in my "

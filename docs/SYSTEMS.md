@@ -4,14 +4,21 @@ A **system** is a recurring activity, such as a posting routine, an outreach cam
 
 ## Model
 
-Both are packed workspace items (`space.workspace_items`, migration `0043_systems`), so each change is a revision with its author, and the history of an entry is the list of its revisions.
+All three are packed workspace items (`space.workspace_items`, migrations `0043_systems` and `0046_system_readings`), so each change is a revision with its author, and the history of an entry is the list of its revisions.
 
 | Item | Fields |
 |---|---|
 | `system` | `name`, `description`, `status` (`healthy`, `needs_attention`, `broken`, `not_measured`, `paused`), `goal_metric`, `goal_target`, `current_value`, `counter_metric`, `source_of_truth`, `review_cadence` (`weekly`, `per_cohort`, `monthly`, `quarterly`), `last_review`, `next_decision` and `playbook_id`, the ID of a document in the Space |
 | `lab_entry` | `name` (the hypothesis or lesson in one sentence, at most 280 characters), `system_id`, `domain`, `status` (`testing`, `validated`, `invalidated`, `retired`), `evidence` (`untested`, `suggestive`, `measured`, `owner_call`), `why`, `apply`, `applies_to`, `source`, `captured`, `note` (what this revision changed), `uses` (`used_in`, `at`, `by`), `verdict` and `retries` |
+| `system_readings` | `system_id`, `month` (`YYYY-MM`) and `readings`, oldest first and at most one per date: `date`, `value` (a number), `unit`, `note`, `source` (where the number came from) and `recorded_by` (the agent, or null for the person) |
 
-The domains are fixed: Copy & hooks, Social, Outreach & sales, SEO/GEO, Product & positioning, Dev & engineering, Agents & automation, Video and Ops & business. A new entry starts in `testing`. Its status, uses and verdict change only through promotion, demotion and recorded uses; `save_workspace_item` does not accept either kind, and the Space map leaves them out. Full-text search finds them. A Space holds at most 5,000 active systems and entries together, and an entry keeps at most 500 uses.
+The domains are fixed: Copy & hooks, Social, Outreach & sales, SEO/GEO, Product & positioning, Dev & engineering, Agents & automation, Video and Ops & business. A new entry starts in `testing`. Its status, uses and verdict change only through promotion, demotion and recorded uses; `save_workspace_item` does not accept any of the three kinds, and the Space map leaves them out. Full-text search finds systems and entries, not readings. A Space holds at most 5,000 active systems and entries together, and an entry keeps at most 500 uses.
+
+## Readings
+
+`current_value` is one sentence with no history. A **reading** is a dated number a sensor script measured, such as clicks from Search Console or replies from Gmail, so a review can compare week over week and a sensor that stopped reporting shows. `record_system_reading` takes `command_id`, `date` (at most tomorrow), `value` (a JSON number; strings, booleans, NaN and infinity are refused), an optional `unit` (40 characters) and `note` (500), and `source` (required, 200), and credits the agent that called it. A system keeps one reading per date: a second write for that date replaces it, and the month's earlier revision keeps the old number. A retry with the same command ID answers with what it wrote, even after later readings; the ID reused for another system, date, number or operation is refused. An archived system takes no new reading, and its readings stay listable.
+
+Each system keeps one `system_readings` item per calendar month, whose ID derives from the system and the month. One item per reading would make every listing unpack every reading in the Space; one list on the system would add a system revision per reading, so a sensor write would make a person's open edit stale, and every revision would copy the whole history. A month item keeps a revision under 31 readings, and reading the Systems area unpacks one item per system and month. `list_system_readings` returns `{system_id, readings, more}` newest first, from an optional `since` date, at most `limit` (1 to 1,000, default 100); `more` says the limit left older ones out. `list_systems` and `list_verdicts` give each system `latest_reading` (`{date, value, unit}`, the latest by date) and `reading_age_days` (days since that date, never negative), both null when the system has no reading.
 
 ## Promotion and demotion
 
@@ -31,12 +38,12 @@ Recall reads only memory, so a testing or retired entry is never returned by `ge
 
 ## Interfaces
 
-MCP: `list_systems`, `list_verdicts` (by `system_id` or `domain`), `create_system`, `update_system`, `add_lab_entry`, `update_lab_entry`, `promote_lab_entry`, `demote_lab_entry` and `record_verdict_use`. `update_system` and `update_lab_entry` replace every field, so they are marked destructive. The [guide](../backend/src/space/guide.py) tells agents to read verdicts before recurring work, record their use, put untested ideas in the lab rather than in memory, and promote only on evidence.
+MCP: `list_systems`, `list_verdicts` (by `system_id` or `domain`), `create_system`, `update_system`, `add_lab_entry`, `update_lab_entry`, `promote_lab_entry`, `demote_lab_entry`, `record_verdict_use`, `record_system_reading` and `list_system_readings`. `update_system` and `update_lab_entry` replace every field, and `record_system_reading` replaces a reading on the same date, so they are marked destructive. The [guide](../backend/src/space/guide.py) tells agents to read verdicts before recurring work, record their use, put untested ideas in the lab rather than in memory, and promote only on evidence.
 
-The website calls browser-session routes that are not in the published API: `GET /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems/entries`, `GET /v1/spaces/{space_id}/systems/activity` (the 30 latest lab changes, each with the revision it replaced, optionally for one `system_id`), and under `/v1/spaces/{space_id}/systems/entries/{entry_id}` `promote`, `demote`, `uses` and `history`. Archiving uses the item visibility route.
+The website calls browser-session routes that are not in the published API: `GET /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems/entries`, `GET /v1/spaces/{space_id}/systems/activity` (the 30 latest lab changes, each with the revision it replaced, optionally for one `system_id`), under `/v1/spaces/{space_id}/systems/entries/{entry_id}` `promote`, `demote`, `uses` and `history`, and `POST` and `GET /v1/spaces/{space_id}/systems/{system_id}/readings` (the same request and `since` and `limit` query parameters). Archiving uses the item visibility route; a month of readings is not archived on its own, it follows its system.
 
 ## Limits
 
 - A verdict memory is a copy of its entry at promotion. Changing the lesson means moving it back to testing, editing it and promoting it again.
 - A system with live verdicts cannot be archived: move them back to testing or retire them first.
-- Export and restore keep systems, lab entries and verdicts. A restored copy points at the copied system, playbook, verdict memory and entry when they were copied too, and keeps the original IDs otherwise.
+- Export and restore keep systems, lab entries, verdicts and readings; a month whose system is not in the archive, or whose reading is dated outside the month, fails validation. A restored copy points at the copied system, playbook, verdict memory and entry when they were copied too, and keeps the original IDs otherwise.
