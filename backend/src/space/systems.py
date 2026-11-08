@@ -158,6 +158,14 @@ class SystemFields(Input):
             raise ValueError("A skill needs a name")
         return list(dict.fromkeys(names))
 
+    # The subclasses below define the name; a None name is never valid.
+    @field_validator("name", check_fields=False)
+    @classmethod
+    def visible_name(cls, value):
+        if value is None or not value.strip():
+            raise ValueError("A name is required")
+        return value.strip()
+
 
 def system_defaults():
     """Every system field but the name at its default, for a system stored before it."""
@@ -167,21 +175,10 @@ def system_defaults():
     }
 
 
-def _visible_name(value):
-    if value is None or not value.strip():
-        raise ValueError("A name is required")
-    return value.strip()
-
-
 class SystemData(SystemFields):
     """A stored system: a name and the fields above."""
 
     name: str = Field(min_length=1, max_length=200)
-
-    @field_validator("name")
-    @classmethod
-    def visible_name(cls, value):
-        return _visible_name(value)
 
 
 class SystemChange(SystemFields):
@@ -189,11 +186,6 @@ class SystemChange(SystemFields):
     empty value clears that field. The name can be left out of an update, never cleared."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-
-    @field_validator("name")
-    @classmethod
-    def visible_name(cls, value):
-        return _visible_name(value)
 
 
 class Use(Input):
