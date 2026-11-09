@@ -13,7 +13,7 @@ history, verdicts and readings.
 """
 
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid5
 
 from pydantic import Field, field_validator, model_validator
@@ -45,10 +45,22 @@ VERDICT_LABELS = {"validated": "works", "invalidated": "does_not_work"}
 # Only these evidence levels may become a verdict; the rest stay in the lab.
 VERDICT_EVIDENCE = ("measured", "owner_call")
 REUSE_WINDOW = timedelta(days=30)
+# The structured fields list_verdicts repeats in each system summary.
+SUMMARY_FIELDS = (
+    "area",
+    "project_id",
+    "controllable_inputs",
+    "stop_conditions",
+    "outcome_delay",
+    "machine",
+    "skills",
+)
 # One read of the area unpacks every active system and lab entry.
 MAX_ITEMS = 5000
 MAX_HISTORY = 200
 MAX_USES = 500
+MAX_MACHINE = 50
+MAX_SKILLS = 30
 KINDS = ("system", "lab_entry")
 # A list call returns at most this many readings.
 MAX_READINGS = 1000
@@ -69,8 +81,29 @@ def _text(maximum):
     return Field(default="", max_length=maximum)
 
 
-class SystemData(Input):
-    name: str = Field(min_length=1, max_length=200)
+class MachineJob(Input):
+    """A scheduled job that runs part of the system, such as a cron job."""
+
+    job_id: str = Field(min_length=1, max_length=100)
+    label: str = _text(200)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def no_label(cls, value):
+        return "" if value is None else value
+
+    @field_validator("job_id")
+    @classmethod
+    def named_job(cls, value):
+        if not value.strip():
+            raise ValueError("A job ID is required")
+        return value.strip()
+
+
+class SystemFields(Input):
+    """Every system field but its name, each with an empty default, so a system saved
+    before a field existed stays valid. A null resets a field to its default."""
+
     description: str = _text(10000)
     status: Literal[SYSTEM_STATUSES] = "not_measured"
     goal_metric: str = _text(2000)
@@ -83,13 +116,76 @@ class SystemData(Input):
     next_decision: str = _text(2000)
     # The system's playbook: a document in this Space.
     playbook_id: UUID | None = None
+    # The area of the business it serves, such as Growth or Sales.
+    area: str = _text(200)
+    # The project in this Space the system belongs to.
+    project_id: UUID | None = None
+    controllable_inputs: str = _text(2000)
+    # When to stop or pause the system.
+    stop_conditions: str = _text(2000)
+    # How long an input takes to show in the goal metric, such as "2 to 4 weeks".
+    outcome_delay: str = _text(200)
+    # The scheduled jobs that run it.
+    machine: list[MachineJob] = Field(default_factory=list, max_length=MAX_MACHINE)
+    # The names of the agent skills it uses.
+    skills: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        default_factory=list, max_length=MAX_SKILLS
+    )
 
-    @field_validator("name")
+    @model_validator(mode="before")
+    @classmethod
+    def null_resets(cls, data):
+        if not isinstance(data, dict):
+            return data
+        fields = cls.model_fields
+        return {
+            key: (
+                fields[key].get_default(call_default_factory=True)
+                if value is None
+                and key in fields
+                and not fields[key].is_required()
+                and fields[key].get_default(call_default_factory=True) is not None
+                else value
+            )
+            for key, value in data.items()
+        }
+
+    @field_validator("skills")
+    @classmethod
+    def named_skills(cls, value):
+        names = [name.strip() for name in value]
+        if not all(names):
+            raise ValueError("A skill needs a name")
+        return list(dict.fromkeys(names))
+
+    # The subclasses below define the name; a None name is never valid.
+    @field_validator("name", check_fields=False)
     @classmethod
     def visible_name(cls, value):
-        if not value.strip():
+        if value is None or not value.strip():
             raise ValueError("A name is required")
         return value.strip()
+
+
+def system_defaults():
+    """Every system field but the name at its default, for a system stored before it."""
+    return {
+        key: field.get_default(call_default_factory=True)
+        for key, field in SystemFields.model_fields.items()
+    }
+
+
+class SystemData(SystemFields):
+    """A stored system: a name and the fields above."""
+
+    name: str = Field(min_length=1, max_length=200)
+
+
+class SystemChange(SystemFields):
+    """What a create or update sends. An update keeps every field it leaves out; a null or
+    empty value clears that field. The name can be left out of an update, never cleared."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class Use(Input):
@@ -152,12 +248,23 @@ class SaveSystem(Input):
     command_id: UUID
     system_id: UUID | None = None
     expected_revision: int = Field(ge=0, strict=True)
-    data: SystemData
+    data: SystemChange
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def sent_fields(cls, value):
+        # A full SystemData keeps only the fields it was given, so an update built from one
+        # still leaves the others as stored.
+        if isinstance(value, SystemFields) and not isinstance(value, SystemChange):
+            return value.model_dump(exclude_unset=True)
+        return value
 
     @model_validator(mode="after")
     def create_or_update(self):
         if (self.system_id is None) != (self.expected_revision == 0):
             raise ValueError("Create with revision 0; updates require the system ID")
+        if self.system_id is None and self.data.name is None:
+            raise ValueError("A name is required")
         return self
 
 
@@ -348,7 +455,8 @@ def overview(workspace, identity, space_id):
     today = datetime.now(UTC).date()
     systems = sorted(
         (
-            item
+            system_defaults()
+            | item
             | {"stats": stats(by_system.get(item["id"], []))}
             | freshness(latest.get(item["id"]), today)
             for item in items
@@ -446,18 +554,45 @@ def _stored(item, model):
     return {key: item[key] for key in model.model_fields if key in item}
 
 
+def _base(workspace, identity, space_id, system_id, expected_revision):
+    """Parameters: Space, system and the revision the caller read.
+    What it does: reads that revision, so an update keeps what the caller saw for every
+    field it leaves out, and its retry merges the same data again.
+    Output: the stored fields of that revision.
+    """
+    current = _get(workspace, identity, space_id, system_id, "system")
+    if expected_revision > current["revision"]:
+        raise _error("This system changed. Refresh before saving.")
+    read = (
+        current
+        if current["revision"] == expected_revision
+        else _get(workspace, identity, space_id, system_id, "system", expected_revision)
+    )
+    return _stored(read, SystemData)
+
+
 def save_system(workspace, identity, space_id, request: SaveSystem):
     """Parameters: Space and a system create or update.
-    What it does: checks the playbook is a document in this Space and writes one revision.
+    What it does: an update keeps the stored value of every field the request leaves out,
+    and a null or empty value clears it. Checks a playbook or project the request names is
+    a document or an active project in this Space, then writes one revision.
     Output: the system with its lab statistics.
     """
     # A retried create must land on the same item, so its ID comes from the command.
     system_id = request.system_id or uuid5(request.command_id, "system")
+    sent = request.data.model_dump(mode="json", include=request.data.model_fields_set)
     playbook = request.data.playbook_id
     if playbook is not None:
         resource = workspace.get_resource(identity, space_id, playbook)
         if resource["kind"] != "document" or resource["recall"]["category"] != "source":
             raise _error("A playbook must be a document in this Space")
+    if request.data.project_id is not None:
+        project = _get(workspace, identity, space_id, request.data.project_id, "project")
+        if project["deleted"]:
+            raise _error("Choose an active project")
+    data = sent
+    if request.system_id is not None:
+        data = _base(workspace, identity, space_id, system_id, request.expected_revision) | sent
     _commit(
         workspace,
         identity,
@@ -466,7 +601,7 @@ def save_system(workspace, identity, space_id, request: SaveSystem):
         system_id,
         request.command_id,
         request.expected_revision,
-        request.data.model_dump(mode="json"),
+        data,
     )
     return _system(workspace, identity, space_id, system_id)
 
@@ -478,7 +613,7 @@ def _system(workspace, identity, space_id, system_id):
         for item in _items(workspace, identity, space_id, ("lab_entry",))
         if item["system_id"] == str(system_id)
     ]
-    return system | {"stats": stats(entries)}
+    return system_defaults() | system | {"stats": stats(entries)}
 
 
 def save_entry(workspace, identity, space_id, request: SaveLabEntry):
@@ -875,6 +1010,7 @@ def verdicts(workspace, identity, space_id, query: VerdictQuery):
                 "name",
                 "status",
                 "goal_metric",
+                *SUMMARY_FIELDS,
                 "stats",
                 "latest_reading",
                 "reading_age_days",

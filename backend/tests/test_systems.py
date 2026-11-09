@@ -1113,3 +1113,289 @@ def test_mcp_and_rest_record_a_batch_and_list_it(commands, signing):
         assert rest("GET", path + "?metric=pages") == listed_mcp
         [summary] = rpc("list_systems", {})["systems"]
         assert summary["latest_reading"]["value"] == 120 and summary["reading_age_days"] == 0
+
+
+FIELDS = {
+    "area": "Growth",
+    "controllable_inputs": "Posts per week, hook style",
+    "stop_conditions": "Pause when replies drop under 1% for two weeks",
+    "outcome_delay": "2 to 4 weeks",
+    "machine": [{"job_id": "x-daily", "label": "Daily post"}, {"job_id": "x-sensor"}],
+    "skills": ["viral-video-writing", " social-account-operations "],
+}
+
+
+def new_project(service, owner, space, name="Audience"):
+    return workspace_items.save(
+        service,
+        owner,
+        space,
+        workspace_items.SaveItem(
+            command_id=uuid4(),
+            item_id=uuid4(),
+            expected_revision=0,
+            kind="project",
+            data={"name": name},
+        ),
+    )
+
+
+def save_fields(service, owner, space, system=None, command_id=None, revision=None, **data):
+    """Save a system the way MCP and REST send it: only the keys given are in the request."""
+    request = {"command_id": str(command_id or uuid4()), "expected_revision": 0, "data": data}
+    if system is not None:
+        request |= {
+            "system_id": system["id"],
+            "expected_revision": system["revision"] if revision is None else revision,
+        }
+    return systems.save_system(service, owner, space, systems.SaveSystem.model_validate(request))
+
+
+def test_structured_fields_are_saved_listed_and_kept_when_an_update_leaves_them_out(lab):
+    service, owner, space, old, _ = lab
+    project = new_project(service, owner, space)
+    created = save_fields(
+        service,
+        owner,
+        space,
+        name="Outreach",
+        goal_metric="Replies",
+        description="Cold email to founders",
+        project_id=project["id"],
+        **FIELDS,
+    )
+    stored = {key: created[key] for key in systems.SUMMARY_FIELDS}
+    assert stored == FIELDS | {
+        "project_id": project["id"],
+        "machine": [
+            {"job_id": "x-daily", "label": "Daily post"},
+            {"job_id": "x-sensor", "label": ""},
+        ],
+        "skills": ["viral-video-writing", "social-account-operations"],
+    }
+    by_name = {s["name"]: s for s in systems.overview(service, owner, space)["systems"]}
+    assert {key: by_name["Outreach"][key] for key in systems.SUMMARY_FIELDS} == stored
+    # A system saved before the fields existed lists them empty.
+    assert {key: by_name["X audience"][key] for key in systems.SUMMARY_FIELDS} == {
+        "area": "",
+        "project_id": None,
+        "controllable_inputs": "",
+        "stop_conditions": "",
+        "outcome_delay": "",
+        "machine": [],
+        "skills": [],
+    }
+    summaries = systems.verdicts(service, owner, space, systems.VerdictQuery())["systems"]
+    by_name = {s["name"]: s for s in summaries}
+    assert {key: by_name["Outreach"][key] for key in systems.SUMMARY_FIELDS} == stored
+    assert by_name["X audience"]["machine"] == [] and by_name["X audience"]["area"] == ""
+
+    # An update that sends one field keeps every other one, the name included.
+    command_id = uuid4()
+    updated = save_fields(service, owner, space, created, command_id=command_id, current_value="12")
+    unchanged = [key for key in systems.SystemData.model_fields if key != "current_value"]
+    assert updated["current_value"] == "12" and updated["revision"] == created["revision"] + 1
+    assert {key: updated[key] for key in unchanged} == {key: created[key] for key in unchanged}
+    # Its retry merges onto the revision it read, so it lands once.
+    again = save_fields(service, owner, space, created, command_id=command_id, current_value="12")
+    assert again["revision"] == updated["revision"]
+    with pytest.raises(CommandError) as error:
+        save_fields(service, owner, space, created, current_value="13")
+    assert error.value.status == 409
+    # The old system gains fields without losing its goal.
+    grown = save_fields(service, owner, space, old, area="Audience", skills=["humanizer"])
+    assert grown["goal_metric"] == "Median views" and grown["goal_target"] == "300"
+    assert grown["area"] == "Audience" and grown["skills"] == ["humanizer"]
+
+    # A null or empty value clears; a null status goes back to not_measured.
+    updated = save_fields(service, owner, space, updated, status="healthy")
+    cleared = save_fields(
+        service,
+        owner,
+        space,
+        updated,
+        area="",
+        machine=[],
+        skills=None,
+        project_id=None,
+        stop_conditions=None,
+        status=None,
+        description="",
+    )
+    assert cleared["area"] == "" and cleared["machine"] == [] and cleared["skills"] == []
+    assert cleared["project_id"] is None and cleared["stop_conditions"] == ""
+    assert cleared["status"] == "not_measured" and cleared["description"] == ""
+    assert cleared["name"] == "Outreach" and cleared["goal_metric"] == "Replies"
+    assert cleared["controllable_inputs"] == FIELDS["controllable_inputs"]
+    assert cleared["outcome_delay"] == FIELDS["outcome_delay"]
+    assert cleared["current_value"] == "12"
+
+
+def test_structured_fields_are_bounded_and_a_project_must_be_active(lab):
+    from pydantic import ValidationError
+
+    service, owner, space, system, _ = lab
+    job = {"job_id": "cron-1"}
+    for good in (
+        {"area": "a" * 200, "outcome_delay": "d" * 200},
+        {"controllable_inputs": "i" * 2000, "stop_conditions": "s" * 2000},
+        {"machine": [job] * 50, "skills": [f"skill-{n}" for n in range(30)]},
+        {"machine": [{"job_id": "j" * 100, "label": "l" * 200}], "skills": ["s" * 100]},
+        {"machine": [{"job_id": "j", "label": None}]},
+    ):
+        systems.SystemData.model_validate({"name": "Ok"} | good)
+    for bad in (
+        {"area": "a" * 201},
+        {"outcome_delay": "d" * 201},
+        {"controllable_inputs": "i" * 2001},
+        {"stop_conditions": "s" * 2001},
+        {"machine": [job] * 51},
+        {"machine": [{"label": "No job"}]},
+        {"machine": [{"job_id": "  "}]},
+        {"machine": [{"job_id": "j" * 101}]},
+        {"machine": [{"job_id": "j", "label": "l" * 201}]},
+        {"machine": [{"job_id": "j", "schedule": "daily"}]},
+        {"machine": ["cron-1"]},
+        {"skills": [f"skill-{n}" for n in range(31)]},
+        {"skills": ["s" * 101]},
+        {"skills": ["  "]},
+        {"skills": "humanizer"},
+        {"project_id": "not-a-uuid"},
+    ):
+        for model in (systems.SystemData, systems.SystemChange):
+            with pytest.raises(ValidationError):
+                model.model_validate({"name": "Ok"} | bad)
+    with pytest.raises(ValidationError):
+        systems.SystemData.model_validate({"name": None})
+    # A create needs a name; an update may leave it out but never clears it.
+    for request in (
+        {"command_id": str(uuid4()), "expected_revision": 0, "data": {"area": "x"}},
+        {
+            "command_id": str(uuid4()),
+            "system_id": system["id"],
+            "expected_revision": system["revision"],
+            "data": {"name": None},
+        },
+        {
+            "command_id": str(uuid4()),
+            "system_id": system["id"],
+            "expected_revision": system["revision"],
+            "data": {"name": "  "},
+        },
+    ):
+        with pytest.raises(ValidationError, match="name is required"):
+            systems.SaveSystem.model_validate(request)
+
+    with pytest.raises(CommandError) as error:
+        save_fields(service, owner, space, system, project_id=str(uuid4()))
+    assert error.value.status == 404
+    project = new_project(service, owner, space)
+    workspace_items.visibility(
+        service,
+        owner,
+        space,
+        UUID(project["id"]),
+        workspace_items.ChangeVisibility(
+            command_id=uuid4(), expected_revision=project["revision"], deleted=True
+        ),
+    )
+    with pytest.raises(CommandError, match="active project"):
+        save_fields(service, owner, space, system, project_id=project["id"])
+
+
+def test_structured_fields_survive_export_and_a_copy_points_at_the_copied_project(lab):
+    from dataclasses import replace
+
+    from test_restore_staging import stage
+    from test_workspace_archive import read_archive
+
+    from space import restore_merge as merge
+
+    service, owner, space, _, _ = lab
+    project = new_project(service, owner, space)
+    system = save_fields(service, owner, space, name="Outreach", project_id=project["id"], **FIELDS)
+    expected = {key: system[key] for key in systems.SUMMARY_FIELDS}
+    archive = read_archive(service, owner, space)
+    assert archive_schema.validate_archive(archive)
+
+    target = replace(owner, subject=str(uuid4()))
+    target_space = UUID(service.bootstrap(target)["id"])
+    upload = stage(service, target, target_space, archive)
+    review = merge.review(service, target, target_space, upload.id, merge.Review())
+    merge.commit(
+        service, target, target_space, upload.id, merge.Commit(snapshot=review["snapshot"])
+    )
+    by_name = {s["name"]: s for s in systems.overview(service, target, target_space)["systems"]}
+    assert {key: by_name["Outreach"][key] for key in systems.SUMMARY_FIELDS} == expected
+
+    keys = ["item:" + system["id"], "item:" + project["id"]]
+    choices = dict.fromkeys(keys, "copy")
+    upload = stage(service, owner, space, archive)
+    review = merge.review(service, owner, space, upload.id, merge.Review(choices=choices))
+    target_ids = {item["key"]: item["target_id"] for item in review["items"]}
+    merge.commit(
+        service, owner, space, upload.id, merge.Commit(snapshot=review["snapshot"], choices=choices)
+    )
+    copy = workspace_items.get(service, owner, space, UUID(target_ids["item:" + system["id"]]))
+    assert copy["project_id"] == target_ids["item:" + project["id"]]
+    assert copy["machine"] == expected["machine"] and copy["skills"] == expected["skills"]
+
+    def broken(change):
+        archive = read_archive(service, owner, space)
+        for record in archive["entries"]:
+            if record["value"]["id"] == system["id"]:
+                change(record["value"])
+        return archive
+
+    # An archive written before the fields existed still validates.
+    assert archive_schema.validate_archive(
+        broken(lambda value: [value.pop(key) for key in systems.SUMMARY_FIELDS])
+    )
+    for change in (
+        lambda value: value["machine"].append({"label": "No job"}),
+        lambda value: value.update(machine="x-daily"),
+        lambda value: value.update(skills=[{"name": "humanizer"}]),
+        lambda value: value["machine"][0].pop("job_id"),
+    ):
+        with pytest.raises(ValueError):
+            archive_schema.validate_archive(broken(change))
+    with pytest.raises(ValueError, match="classification item"):
+        archive_schema.validate_archive(broken(lambda value: value.update(project_id=str(uuid4()))))
+
+
+def test_mcp_update_system_keeps_the_fields_it_is_not_sent(commands, signing):
+    service = commands[0]
+    with mcp_client(service, signing) as (owner, space, rpc, rest):
+        data = {
+            "name": "X audience",
+            "goal_metric": "Median views",
+            "counter_metric": "Unfollows",
+            "current_value": "180",
+            "machine": FIELDS["machine"],
+        }
+        created = rpc("create_system", {"command_id": str(uuid4()), "data": data})
+        common = {"system_id": created["id"], "command_id": str(uuid4())}
+        # The tool receives a SystemChange holding only current_value.
+        updated = rpc(
+            "update_system",
+            {**common, "expected_revision": created["revision"], "data": {"current_value": "240"}},
+        )
+        assert updated["current_value"] == "240" and updated["revision"] == created["revision"] + 1
+        for field in ("name", "goal_metric", "counter_metric", "machine"):
+            assert updated[field] == created[field], field
+        assert [job["job_id"] for job in updated["machine"]] == ["x-daily", "x-sensor"]
+        # A field sent as null is cleared; the others still keep their values.
+        cleared = rpc(
+            "update_system",
+            {
+                "system_id": created["id"],
+                "command_id": str(uuid4()),
+                "expected_revision": updated["revision"],
+                "data": {"counter_metric": None},
+            },
+        )
+        assert not cleared["counter_metric"]
+        assert cleared["current_value"] == "240" and cleared["machine"] == created["machine"]
+        [listed_system] = rest("GET", "/systems")["systems"]
+        assert listed_system["goal_metric"] == "Median views"
+        assert listed_system["machine"] == created["machine"]

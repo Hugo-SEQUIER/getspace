@@ -8,10 +8,30 @@ Systems and lab entries are packed workspace items (`space.workspace_items`, mig
 
 | Item | Fields |
 |---|---|
-| `system` | `name`, `description`, `status` (`healthy`, `needs_attention`, `broken`, `not_measured`, `paused`), `goal_metric`, `goal_target`, `current_value`, `counter_metric`, `source_of_truth`, `review_cadence` (`weekly`, `per_cohort`, `monthly`, `quarterly`), `last_review`, `next_decision` and `playbook_id`, the ID of a document in the Space |
+| `system` | `name`, `description`, `status` (`healthy`, `needs_attention`, `broken`, `not_measured`, `paused`), `goal_metric`, `goal_target`, `current_value`, `counter_metric`, `source_of_truth`, `review_cadence` (`weekly`, `per_cohort`, `monthly`, `quarterly`), `last_review`, `next_decision`, `playbook_id` (the ID of a document in the Space) and the structured fields below |
 | `lab_entry` | `name` (the hypothesis or lesson in one sentence, at most 280 characters), `system_id`, `domain`, `status` (`testing`, `validated`, `invalidated`, `retired`), `evidence` (`untested`, `suggestive`, `measured`, `owner_call`), `why`, `apply`, `applies_to`, `source`, `captured`, `note` (what this revision changed), `uses` (`used_in`, `at`, `by`), `verdict` and `retries` |
 
 The domains are fixed: Copy & hooks, Social, Outreach & sales, SEO/GEO, Product & positioning, Dev & engineering, Agents & automation, Video and Ops & business. A new entry starts in `testing`. Its status, uses and verdict change only through promotion, demotion and recorded uses; `save_workspace_item` does not accept either kind, and the Space map leaves them out. Full-text search finds systems and entries, not readings. A Space holds at most 5,000 active systems and entries together, and an entry keeps at most 500 uses.
+
+## Structured fields
+
+What a system's description used to hold as labelled lines has its own fields, so an agent reads them without parsing prose. All are optional with empty defaults, so a system saved before them stays valid and lists them empty:
+
+| Field | Value |
+|---|---|
+| `area` | The area of the business it serves, at most 200 characters |
+| `project_id` | An active project in this Space, or null |
+| `controllable_inputs` | What the owner can change, at most 2,000 characters |
+| `stop_conditions` | When to stop or pause the system, at most 2,000 characters |
+| `outcome_delay` | How long an input takes to show in the goal metric, at most 200 characters |
+| `machine` | At most 50 scheduled jobs that run it, each `{job_id, label}`: `job_id` 1 to 100 characters, `label` optional, at most 200 |
+| `skills` | At most 30 agent skill names, each 1 to 100 characters; blanks are refused, names are trimmed and duplicates dropped |
+
+`list_systems` returns them on every system and `list_verdicts` repeats them in each system summary beside `id`, `name`, `status`, `goal_metric`, `stats`, `latest_reading` and `reading_age_days`. Export carries them in the system's revisions; restore validates them as a system (a `machine` entry without a `job_id`, or a list that is not one, fails the archive instead of the restore), and a copied project moves the copy's `project_id` to the copy, as for folders and databases.
+
+## Updating a system
+
+`update_system` changes only the fields it is sent. A field left out keeps the value stored at `expected_revision`, the revision the caller read, so an agent that sends `current_value` alone no longer wipes the goal, the playbook or the structured fields. A field sent as null or empty (`""`, `[]`) is cleared: text becomes empty, a list empty, `project_id`, `playbook_id`, `review_cadence` and `last_review` null, and `status` goes back to `not_measured`. `name` may be left out of an update but never cleared, and a create needs it. `machine` and `skills` are replaced as whole lists. The playbook and project are checked only when the request names them, so a playbook deleted since does not block an unrelated update. A retry with the same command ID merges onto the same revision and lands once; an update from an older revision is refused with 409. The website's `POST /v1/spaces/{space_id}/systems` follows the same rule, so its save, which sends the fields it shows, keeps the structured fields it does not show yet. Before this change an update replaced every field, and a field left out was reset to its default.
 
 ## Readings
 
@@ -41,7 +61,7 @@ Recall reads only memory, so a testing or retired entry is never returned by `ge
 
 ## Interfaces
 
-MCP: `list_systems`, `list_verdicts` (by `system_id` or `domain`), `create_system`, `update_system`, `add_lab_entry`, `update_lab_entry`, `promote_lab_entry`, `demote_lab_entry`, `record_verdict_use`, `record_system_reading`, `record_system_readings` and `list_system_readings`. `update_system` and `update_lab_entry` replace every field, and `record_system_reading` and `record_system_readings` replace a reading on the same date and metric, so they are marked destructive. The [guide](../backend/src/space/guide.py) tells agents to read verdicts before recurring work, record their use, put untested ideas in the lab rather than in memory, and promote only on evidence.
+MCP: `list_systems`, `list_verdicts` (by `system_id` or `domain`), `create_system`, `update_system`, `add_lab_entry`, `update_lab_entry`, `promote_lab_entry`, `demote_lab_entry`, `record_verdict_use`, `record_system_reading`, `record_system_readings` and `list_system_readings`. `update_system` keeps every field it is not sent and clears one sent as null or empty, `update_lab_entry` replaces every field, and `record_system_reading` and `record_system_readings` replace a reading on the same date and metric, so they are marked destructive. The [guide](../backend/src/space/guide.py) tells agents to read verdicts before recurring work, record their use, put untested ideas in the lab rather than in memory, and promote only on evidence.
 
 The website calls browser-session routes that are not in the published API: `GET /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems`, `POST /v1/spaces/{space_id}/systems/entries`, `GET /v1/spaces/{space_id}/systems/activity` (the 30 latest lab changes, each with the revision it replaced, optionally for one `system_id`), under `/v1/spaces/{space_id}/systems/entries/{entry_id}` `promote`, `demote`, `uses` and `history`, and `POST` and `GET /v1/spaces/{space_id}/systems/{system_id}/readings` (the same request and `since`, `limit` and `metric` query parameters), and `POST /v1/spaces/{space_id}/systems/{system_id}/readings/batch` (the `record_system_readings` request). Archiving uses the item visibility route; readings follow their system.
 
