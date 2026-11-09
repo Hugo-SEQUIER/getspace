@@ -4,11 +4,16 @@ playbook) and their lab entries (hypotheses and lessons under test) as packed wo
 items. A lab entry reaches recall only when someone promotes it to a verdict: promotion
 writes a memory carrying the verdict, and demotion keeps that memory out of recall while
 both histories stay.
-Output: systems with their lab statistics, lab entries, their revision history and verdicts.
+Readings are the dated numbers a sensor script records for a system, each under a metric
+(`goal` unless named). They are rows of `space.system_readings`, one per system, date and
+metric, without revision history: a second write for that date and metric replaces the row,
+so the owner archive carries one entry per stored reading rather than a revision per write.
+Output: systems with their lab statistics and latest reading, lab entries, their revision
+history, verdicts and readings.
 """
 
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid5
 
 from pydantic import Field, field_validator, model_validator
@@ -40,11 +45,33 @@ VERDICT_LABELS = {"validated": "works", "invalidated": "does_not_work"}
 # Only these evidence levels may become a verdict; the rest stay in the lab.
 VERDICT_EVIDENCE = ("measured", "owner_call")
 REUSE_WINDOW = timedelta(days=30)
+# The structured fields list_verdicts repeats in each system summary.
+SUMMARY_FIELDS = (
+    "area",
+    "project_id",
+    "controllable_inputs",
+    "stop_conditions",
+    "outcome_delay",
+    "machine",
+    "skills",
+)
 # One read of the area unpacks every active system and lab entry.
 MAX_ITEMS = 5000
 MAX_HISTORY = 200
 MAX_USES = 500
+MAX_MACHINE = 50
+MAX_SKILLS = 30
 KINDS = ("system", "lab_entry")
+# A list call returns at most this many readings.
+MAX_READINGS = 1000
+# A Space keeps at most this many readings, fifteen systems with six metrics a day for three
+# years. Each one is an entry of the owner archive, which restore bounds by this number too.
+MAX_SPACE_READINGS = 100_000
+# One record_system_readings call writes at most this many readings of one system.
+MAX_BATCH_READINGS = 20
+# The metric a reading counts toward when none is named; the summaries report this one.
+GOAL_METRIC = "goal"
+METRIC_PATTERN = r"^[a-z0-9][a-z0-9_.-]*$"
 
 Domain = Literal[DOMAINS]
 Evidence = Literal[tuple(EVIDENCE_LABELS)]
@@ -54,8 +81,29 @@ def _text(maximum):
     return Field(default="", max_length=maximum)
 
 
-class SystemData(Input):
-    name: str = Field(min_length=1, max_length=200)
+class MachineJob(Input):
+    """A scheduled job that runs part of the system, such as a cron job."""
+
+    job_id: str = Field(min_length=1, max_length=100)
+    label: str = _text(200)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def no_label(cls, value):
+        return "" if value is None else value
+
+    @field_validator("job_id")
+    @classmethod
+    def named_job(cls, value):
+        if not value.strip():
+            raise ValueError("A job ID is required")
+        return value.strip()
+
+
+class SystemFields(Input):
+    """Every system field but its name, each with an empty default, so a system saved
+    before a field existed stays valid. A null resets a field to its default."""
+
     description: str = _text(10000)
     status: Literal[SYSTEM_STATUSES] = "not_measured"
     goal_metric: str = _text(2000)
@@ -68,13 +116,76 @@ class SystemData(Input):
     next_decision: str = _text(2000)
     # The system's playbook: a document in this Space.
     playbook_id: UUID | None = None
+    # The area of the business it serves, such as Growth or Sales.
+    area: str = _text(200)
+    # The project in this Space the system belongs to.
+    project_id: UUID | None = None
+    controllable_inputs: str = _text(2000)
+    # When to stop or pause the system.
+    stop_conditions: str = _text(2000)
+    # How long an input takes to show in the goal metric, such as "2 to 4 weeks".
+    outcome_delay: str = _text(200)
+    # The scheduled jobs that run it.
+    machine: list[MachineJob] = Field(default_factory=list, max_length=MAX_MACHINE)
+    # The names of the agent skills it uses.
+    skills: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        default_factory=list, max_length=MAX_SKILLS
+    )
 
-    @field_validator("name")
+    @model_validator(mode="before")
+    @classmethod
+    def null_resets(cls, data):
+        if not isinstance(data, dict):
+            return data
+        fields = cls.model_fields
+        return {
+            key: (
+                fields[key].get_default(call_default_factory=True)
+                if value is None
+                and key in fields
+                and not fields[key].is_required()
+                and fields[key].get_default(call_default_factory=True) is not None
+                else value
+            )
+            for key, value in data.items()
+        }
+
+    @field_validator("skills")
+    @classmethod
+    def named_skills(cls, value):
+        names = [name.strip() for name in value]
+        if not all(names):
+            raise ValueError("A skill needs a name")
+        return list(dict.fromkeys(names))
+
+    # The subclasses below define the name; a None name is never valid.
+    @field_validator("name", check_fields=False)
     @classmethod
     def visible_name(cls, value):
-        if not value.strip():
+        if value is None or not value.strip():
             raise ValueError("A name is required")
         return value.strip()
+
+
+def system_defaults():
+    """Every system field but the name at its default, for a system stored before it."""
+    return {
+        key: field.get_default(call_default_factory=True)
+        for key, field in SystemFields.model_fields.items()
+    }
+
+
+class SystemData(SystemFields):
+    """A stored system: a name and the fields above."""
+
+    name: str = Field(min_length=1, max_length=200)
+
+
+class SystemChange(SystemFields):
+    """What a create or update sends. An update keeps every field it leaves out; a null or
+    empty value clears that field. The name can be left out of an update, never cleared."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class Use(Input):
@@ -137,12 +248,23 @@ class SaveSystem(Input):
     command_id: UUID
     system_id: UUID | None = None
     expected_revision: int = Field(ge=0, strict=True)
-    data: SystemData
+    data: SystemChange
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def sent_fields(cls, value):
+        # A full SystemData keeps only the fields it was given, so an update built from one
+        # still leaves the others as stored.
+        if isinstance(value, SystemFields) and not isinstance(value, SystemChange):
+            return value.model_dump(exclude_unset=True)
+        return value
 
     @model_validator(mode="after")
     def create_or_update(self):
         if (self.system_id is None) != (self.expected_revision == 0):
             raise ValueError("Create with revision 0; updates require the system ID")
+        if self.system_id is None and self.data.name is None:
+            raise ValueError("A name is required")
         return self
 
 
@@ -182,6 +304,75 @@ class RecordUse(Input):
 class VerdictQuery(Input):
     system_id: UUID | None = None
     domain: Domain | None = None
+
+
+class ReadingFields(Input):
+    """One dated number: what a sensor measured, never an opinion."""
+
+    date: date
+    # A JSON number; a string, a boolean, NaN or infinity is refused.
+    value: float = Field(strict=True, allow_inf_nan=False)
+    unit: str = _text(40)
+    note: str = _text(500)
+    # Where the number came from, such as Search Console or Gmail.
+    source: str = Field(min_length=1, max_length=200)
+    # What the number measures: `goal` for the system's goal metric, or a short slug such as
+    # `replies` or `counter.unsubscribes` for an input or the counter-metric.
+    metric: str = Field(default=GOAL_METRIC, min_length=1, max_length=64, pattern=METRIC_PATTERN)
+
+    @field_validator("metric", mode="before")
+    @classmethod
+    def default_metric(cls, value):
+        return GOAL_METRIC if value is None else value
+
+    @field_validator("unit", "note")
+    @classmethod
+    def trimmed(cls, value):
+        return value.strip()
+
+    @field_validator("source")
+    @classmethod
+    def named_source(cls, value):
+        if not value.strip():
+            raise ValueError("Name where the number came from")
+        return value.strip()
+
+
+class Reading(ReadingFields):
+    # The agent that recorded it; None when the person did.
+    recorded_by: str | None = Field(default=None, max_length=200)
+
+
+class ArchivedReading(Reading):
+    """One reading as the owner archive carries it."""
+
+    system_id: UUID
+    recorded_at: datetime
+
+
+class RecordReading(ReadingFields):
+    command_id: UUID
+
+
+class RecordReadings(Input):
+    """Several readings of one system in one call, such as a sensor's whole daily run."""
+
+    command_id: UUID
+    readings: list[ReadingFields] = Field(min_length=1, max_length=MAX_BATCH_READINGS)
+
+    @model_validator(mode="after")
+    def one_per_date_and_metric(self):
+        keys = [(reading.date, reading.metric) for reading in self.readings]
+        if len(set(keys)) != len(keys):
+            raise ValueError("A call records one reading per date and metric")
+        return self
+
+
+class ReadingQuery(Input):
+    since: date | None = None
+    # Only this metric's readings; None lists every metric.
+    metric: str | None = Field(default=None, min_length=1, max_length=64, pattern=METRIC_PATTERN)
+    limit: int = Field(default=100, ge=1, le=MAX_READINGS)
 
 
 def _error(message, status=409):
@@ -251,7 +442,8 @@ def stats(entries):
 
 def overview(workspace, identity, space_id):
     """Parameters: Space.
-    What it does: reads every active system and lab entry and adds each system's statistics.
+    What it does: reads every active system and lab entry and adds each system's statistics
+    and latest reading.
     Output: {systems, entries, domains}; entries newest first.
     """
     items = _items(workspace, identity, space_id)
@@ -259,9 +451,14 @@ def overview(workspace, identity, space_id):
     by_system = {}
     for entry in entries:
         by_system.setdefault(entry["system_id"], []).append(entry)
+    latest = _latest(workspace, identity, space_id)
+    today = datetime.now(UTC).date()
     systems = sorted(
         (
-            item | {"stats": stats(by_system.get(item["id"], []))}
+            system_defaults()
+            | item
+            | {"stats": stats(by_system.get(item["id"], []))}
+            | freshness(latest.get(item["id"]), today)
             for item in items
             if item["kind"] == "system"
         ),
@@ -357,18 +554,45 @@ def _stored(item, model):
     return {key: item[key] for key in model.model_fields if key in item}
 
 
+def _base(workspace, identity, space_id, system_id, expected_revision):
+    """Parameters: Space, system and the revision the caller read.
+    What it does: reads that revision, so an update keeps what the caller saw for every
+    field it leaves out, and its retry merges the same data again.
+    Output: the stored fields of that revision.
+    """
+    current = _get(workspace, identity, space_id, system_id, "system")
+    if expected_revision > current["revision"]:
+        raise _error("This system changed. Refresh before saving.")
+    read = (
+        current
+        if current["revision"] == expected_revision
+        else _get(workspace, identity, space_id, system_id, "system", expected_revision)
+    )
+    return _stored(read, SystemData)
+
+
 def save_system(workspace, identity, space_id, request: SaveSystem):
     """Parameters: Space and a system create or update.
-    What it does: checks the playbook is a document in this Space and writes one revision.
+    What it does: an update keeps the stored value of every field the request leaves out,
+    and a null or empty value clears it. Checks a playbook or project the request names is
+    a document or an active project in this Space, then writes one revision.
     Output: the system with its lab statistics.
     """
     # A retried create must land on the same item, so its ID comes from the command.
     system_id = request.system_id or uuid5(request.command_id, "system")
+    sent = request.data.model_dump(mode="json", include=request.data.model_fields_set)
     playbook = request.data.playbook_id
     if playbook is not None:
         resource = workspace.get_resource(identity, space_id, playbook)
         if resource["kind"] != "document" or resource["recall"]["category"] != "source":
             raise _error("A playbook must be a document in this Space")
+    if request.data.project_id is not None:
+        project = _get(workspace, identity, space_id, request.data.project_id, "project")
+        if project["deleted"]:
+            raise _error("Choose an active project")
+    data = sent
+    if request.system_id is not None:
+        data = _base(workspace, identity, space_id, system_id, request.expected_revision) | sent
     _commit(
         workspace,
         identity,
@@ -377,7 +601,7 @@ def save_system(workspace, identity, space_id, request: SaveSystem):
         system_id,
         request.command_id,
         request.expected_revision,
-        request.data.model_dump(mode="json"),
+        data,
     )
     return _system(workspace, identity, space_id, system_id)
 
@@ -389,7 +613,7 @@ def _system(workspace, identity, space_id, system_id):
         for item in _items(workspace, identity, space_id, ("lab_entry",))
         if item["system_id"] == str(system_id)
     ]
-    return system | {"stats": stats(entries)}
+    return system_defaults() | system | {"stats": stats(entries)}
 
 
 def save_entry(workspace, identity, space_id, request: SaveLabEntry):
@@ -779,8 +1003,252 @@ def verdicts(workspace, identity, space_id, query: VerdictQuery):
         and (query.domain is None or entry["domain"] == query.domain)
     ]
     systems = [
-        {key: system[key] for key in ("id", "name", "status", "goal_metric", "stats")}
+        {
+            key: system[key]
+            for key in (
+                "id",
+                "name",
+                "status",
+                "goal_metric",
+                *SUMMARY_FIELDS,
+                "stats",
+                "latest_reading",
+                "reading_age_days",
+            )
+        }
         for system in area["systems"]
         if query.system_id is None or system["id"] == str(query.system_id)
     ]
     return {"systems": systems, "verdicts": selected}
+
+
+def _reading(row):
+    """A stored row as the tools show it."""
+    return {
+        "system_id": str(row["system_id"]),
+        "date": row["day"].isoformat(),
+        "value": row["value"],
+        "unit": row["unit"],
+        "note": row["note"],
+        "source": row["source"],
+        "metric": row["metric"],
+        "recorded_by": row["recorded_by"],
+    }
+
+
+def _latest(workspace, identity, space_id):
+    """Parameters: Space.
+    Output: each system ID's latest goal reading by date; other metrics are left out.
+    """
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        rows = connection.execute(
+            "SELECT DISTINCT ON (system_id) system_id,day,metric,value,unit,note,source,"
+            "recorded_by FROM space.system_readings "
+            "WHERE metric=%s ORDER BY system_id,day DESC",
+            (GOAL_METRIC,),
+        ).fetchall()
+    return {str(row["system_id"]): _reading(row) for row in rows}
+
+
+def freshness(reading, today):
+    """Parameters: a system's latest goal reading or None, and today's date.
+    What it does: shows how old the latest number is, so a sensor that stopped is visible.
+    Output: {latest_reading: {date, value, unit, metric} or None, reading_age_days: int or
+    None}.
+    """
+    if reading is None:
+        return {"latest_reading": None, "reading_age_days": None}
+    age = (today - date.fromisoformat(reading["date"])).days
+    return {
+        "latest_reading": {key: reading[key] for key in ("date", "value", "unit", "metric")},
+        "reading_age_days": max(age, 0),
+    }
+
+
+def _readings_replayed(connection, system_id, command_id, wanted):
+    """Parameters: a scoped connection, the system, the command ID and the readings the
+    command carries by (date, metric).
+    What it does: finds what this command ID already wrote. A retry answers with what it
+    wrote while any of its rows still holds it; the ID reused for another system, date,
+    metric, number or operation is refused.
+    Output: the committed readings in request order, or None when the command is new.
+    """
+    if connection.execute(
+        "SELECT 1 FROM space.workspace_item_commands WHERE id=%s", (command_id,)
+    ).fetchone():
+        raise _error("This command ID was already used for another operation")
+    rows = connection.execute(
+        "SELECT system_id,day,metric,value,unit,note,source,recorded_by "
+        "FROM space.system_readings WHERE command_id=%s",
+        (command_id,),
+    ).fetchall()
+    if not rows:
+        return None
+    stored = {(row["day"].isoformat(), row["metric"]): _reading(row) for row in rows}
+    for key, reading in stored.items():
+        mine = wanted.get(key)
+        if (
+            reading["system_id"] != str(system_id)
+            or mine is None
+            or any(reading[field] != value for field, value in mine.items())
+        ):
+            raise _error("This command ID was already used for another operation")
+    recorded_by = next(iter(stored.values()))["recorded_by"]
+    return [stored.get(key) or _saved(system_id, mine, recorded_by) for key, mine in wanted.items()]
+
+
+def _saved(system_id, reading, recorded_by):
+    return {"system_id": str(system_id), **reading, "recorded_by": recorded_by}
+
+
+def lock_readings(connection, space_id):
+    """Parameters: a scoped connection and its Space.
+    What it does: admits one reading writer per Space until the transaction ends, so the
+    reading count stays exact and a concurrent retry of a command sees what it wrote.
+    Output: none.
+    """
+    connection.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+        ("space.system_readings:" + str(space_id),),
+    )
+
+
+UPSERT = (
+    "INSERT INTO space.system_readings(organization_id,space_id,system_id,day,metric,value,"
+    "unit,note,source,recorded_by,command_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+    "ON CONFLICT (organization_id,space_id,system_id,day,metric) DO UPDATE SET "
+    "value=EXCLUDED.value,unit=EXCLUDED.unit,note=EXCLUDED.note,source=EXCLUDED.source,"
+    "recorded_by=EXCLUDED.recorded_by,command_id=EXCLUDED.command_id,recorded_at=now() "
+    "RETURNING (xmax=0) AS inserted"
+)
+
+
+def _record(workspace, identity, space_id, system_id, command_id, readings):
+    """Parameters: Space, an active system, the command ID and its readings.
+    What it does: upserts one row per date and metric with who recorded it, in one
+    transaction; a reading already on that date for the same metric is replaced.
+    Output: the stored readings in request order.
+    """
+    wanted = {
+        (reading.date.isoformat(), reading.metric): reading.model_dump(
+            mode="json", include=set(ReadingFields.model_fields)
+        )
+        for reading in readings
+    }
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        if replayed := _readings_replayed(connection, system_id, command_id, wanted):
+            return replayed
+    _active_system(workspace, identity, space_id, system_id)
+    if max(reading.date for reading in readings) > datetime.now(UTC).date() + timedelta(days=1):
+        raise _error("A reading cannot be dated after tomorrow", 422)
+    recorded_by = _actor(workspace, identity)
+    with workspace.db.transaction(identity) as connection:
+        scope = workspace._scope(connection, identity, space_id, write=True)
+        lock_readings(connection, scope["space_id"])
+        if replayed := _readings_replayed(connection, system_id, command_id, wanted):
+            return replayed
+        inserted = False
+        for (day, metric), reading in wanted.items():
+            row = connection.execute(
+                UPSERT,
+                (
+                    scope["organization_id"],
+                    scope["space_id"],
+                    system_id,
+                    day,
+                    metric,
+                    reading["value"],
+                    reading["unit"],
+                    reading["note"],
+                    reading["source"],
+                    recorded_by,
+                    command_id,
+                ),
+            ).fetchone()
+            inserted = inserted or row["inserted"]
+        if inserted:
+            held = connection.execute("SELECT count(*) AS n FROM space.system_readings").fetchone()[
+                "n"
+            ]
+            if held > MAX_SPACE_READINGS:
+                raise _error(f"A Space keeps at most {MAX_SPACE_READINGS:,} readings", 413)
+    return [_saved(system_id, reading, recorded_by) for reading in wanted.values()]
+
+
+def record_reading(workspace, identity, space_id, system_id, request: RecordReading):
+    """Parameters: Space, an active system and one dated number with where it came from.
+    What it does: stores the reading with who recorded it; a reading already on that date
+    for the same metric is replaced. Readings of other metrics on that date stay.
+    Output: {system_id, date, value, unit, note, source, metric, recorded_by}.
+    """
+    [saved] = _record(workspace, identity, space_id, system_id, request.command_id, [request])
+    return saved
+
+
+def record_readings(workspace, identity, space_id, system_id, request: RecordReadings):
+    """Parameters: Space, an active system and up to 20 readings, one per date and metric.
+    What it does: stores them all or none, like record_reading for each.
+    Output: {system_id, readings} in request order.
+    """
+    saved = _record(workspace, identity, space_id, system_id, request.command_id, request.readings)
+    return {"system_id": str(system_id), "readings": saved}
+
+
+def readings(workspace, identity, space_id, system_id, query: ReadingQuery):
+    """Parameters: Space, system (active or archived), an optional first date, an optional
+    metric and a limit.
+    What it does: reads the system's readings.
+    Output: {system_id, readings, more}; readings newest first (metrics of one date in name
+    order), more when the limit cut some.
+    """
+    _get(workspace, identity, space_id, system_id, "system")
+    with workspace.db.transaction(identity) as connection:
+        workspace._scope(connection, identity, space_id)
+        rows = connection.execute(
+            "SELECT system_id,day,metric,value,unit,note,source,recorded_by "
+            "FROM space.system_readings WHERE system_id=%s "
+            "AND (%s::date IS NULL OR day>=%s) AND (%s::text IS NULL OR metric=%s) "
+            'ORDER BY day DESC,metric COLLATE "C" LIMIT %s',
+            (system_id, query.since, query.since, query.metric, query.metric, query.limit + 1),
+        ).fetchall()
+    return {
+        "system_id": str(system_id),
+        "readings": [_reading(row) for row in rows[: query.limit]],
+        "more": len(rows) > query.limit,
+    }
+
+
+def restore_readings(entries, decisions, restore_id):
+    """Parameters: validated archive entries, the restore decisions and the restore ID.
+    What it does: points each archived reading at its system's restore target. A kept
+    system keeps the readings it has and gains the missing ones; a replaced, copied or new
+    one takes the archived readings.
+    Output: rows for restore_publish, as (replace, row parameters).
+    """
+    rows = []
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("entity") != "reading":
+            continue
+        reading = ArchivedReading.model_validate(entry["value"])
+        decision = decisions["item:" + str(reading.system_id)]
+        key = f"{reading.system_id}:{reading.date}:{reading.metric}"
+        rows.append(
+            (
+                decision["action"] != "keep",
+                (
+                    UUID(decision["target_id"]),
+                    reading.date,
+                    reading.metric,
+                    reading.value,
+                    reading.unit,
+                    reading.note,
+                    reading.source,
+                    reading.recorded_by,
+                    uuid5(restore_id, "reading:" + key),
+                    reading.recorded_at,
+                ),
+            )
+        )
+    return rows

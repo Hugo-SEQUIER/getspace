@@ -45,7 +45,7 @@ See [memory](MEMORY.md) for the provider settings.
 
 ## Limits
 
-The import accepts archives up to 200 MiB once unzipped and 10,000 archived revisions, and an upload expires after 24 hours. Databases take most of the space, because every saved version of a database holds all of its records.
+The import accepts archives up to 200 MiB once unzipped and 10,000 archived revisions, plus up to 100,000 [system readings](SYSTEMS.md#readings), which keep no revisions and do not count toward that limit; an upload expires after 24 hours. Databases take most of the space, because every saved version of a database holds all of its records.
 
 A large import needs memory for a minute: a 100 MB export takes about 700 MB in the server while it is checked and saved. On a server with 1 GB of memory, add a temporary swap file before importing, and remove it afterwards:
 

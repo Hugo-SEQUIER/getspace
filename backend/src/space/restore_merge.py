@@ -9,7 +9,7 @@ from uuid import UUID, uuid5
 
 from pydantic import Field
 
-from space import agents, brain, memory_pipeline, restore_staging, workspace_items
+from space import agents, brain, memory_pipeline, restore_staging, systems, workspace_items
 from space.memory import Input
 from space.model_provider import ModelError
 from space.workspace import CommandError, encode
@@ -557,4 +557,5 @@ def commit(workspace, identity, space_id, restore_id, request: Commit):
             archive["source_space"],
             fingerprint,
             task_columns=archive.get("task_columns", []),
+            readings=systems.restore_readings(archive["entries"], decisions, restore_id),
         )

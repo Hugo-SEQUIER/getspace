@@ -3,12 +3,17 @@
 An export spans many requests while agents keep writing. Each revision records the Space
 content revision it committed under, so every page reads the revisions that existed at
 the first page and the archive is the Space as it was when the export started.
+
+System readings keep no revisions. After the revisions, the pages carry one `reading` entry
+per stored reading of a system that existed at the snapshot, as each page reads it.
 """
 
 import json
+import re
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from time import monotonic
+from uuid import UUID
 
 from pydantic import Field, model_validator
 
@@ -39,17 +44,46 @@ CORPUS = (
     "FROM space.workspace_item_revisions WHERE space_revision IS NULL OR space_revision<=%s"
     ") corpus WHERE (%s::text IS NULL OR cursor>%s) ORDER BY cursor LIMIT %s"
 )
+# A page takes at most this many readings, about 300 bytes each.
+PAGE_READINGS = 2000
+# Reading cursors sort after every revision cursor: `s:` alone starts the readings.
+READING_CURSOR = re.compile(r"^s:(?:([0-9a-f-]{36}):([0-9]{4}-[0-9]{2}-[0-9]{2}):(.+))?$")
+READINGS = (
+    "SELECT r.system_id,r.day,r.metric,r.value,r.unit,r.note,r.source,r.recorded_by,"
+    "r.recorded_at FROM space.system_readings r WHERE EXISTS (SELECT 1 FROM "
+    "space.workspace_item_revisions v WHERE v.item_id=r.system_id AND "
+    "(v.space_revision IS NULL OR v.space_revision<=%s)) AND (%s::uuid IS NULL OR "
+    "(r.system_id,r.day,r.metric) > (%s::uuid,%s::date,%s::text)) "
+    "ORDER BY r.system_id,r.day,r.metric LIMIT %s"
+)
 
 
 class ExportPage(Input):
-    after: str | None = Field(default=None, max_length=100)
+    after: str | None = Field(default=None, max_length=120)
     snapshot: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def continuation(self):
         if self.after and self.snapshot is None:
             raise ValueError("Continuation requires the first page's snapshot")
+        if self.after and self.after.startswith("s:") and not READING_CURSOR.match(self.after):
+            raise ValueError("Unknown export cursor")
         return self
+
+
+def _reading_entry(row):
+    value = {
+        "system_id": str(row["system_id"]),
+        "date": row["day"].isoformat(),
+        "metric": row["metric"],
+        "value": row["value"],
+        "unit": row["unit"],
+        "note": row["note"],
+        "source": row["source"],
+        "recorded_by": row["recorded_by"],
+        "recorded_at": row["recorded_at"].isoformat(),
+    }
+    return {"entity": "reading", "current": True, "value": value}
 
 
 def _vector(row):
@@ -120,9 +154,29 @@ def export_page(workspace, identity, space_id, request: ExportPage):
         snapshot = current if request.snapshot is None else request.snapshot
         if snapshot > current:
             raise CommandError("Unknown snapshot. Start the export again.", 422)
-        rows = connection.execute(
-            CORPUS, (snapshot, snapshot, request.after, request.after, PAGE_ROWS + 1)
-        ).fetchall()
+        on_readings = bool(request.after and request.after.startswith("s:"))
+        rows = (
+            []
+            if on_readings
+            else connection.execute(
+                CORPUS, (snapshot, snapshot, request.after, request.after, PAGE_ROWS + 1)
+            ).fetchall()
+        )
+        reading_rows = []
+        if len(rows) <= PAGE_ROWS:  # The revisions end on this page.
+            found = READING_CURSOR.match(request.after or "") if on_readings else None
+            system, day, metric = found.groups() if found else (None, None, None)
+            reading_rows = connection.execute(
+                READINGS,
+                (
+                    snapshot,
+                    system,
+                    UUID(system) if system else None,
+                    date.fromisoformat(day) if day else None,
+                    metric,
+                    PAGE_READINGS + 1,
+                ),
+            ).fetchall()
     entries = []
     task_columns = None
     if not request.after:
@@ -146,6 +200,25 @@ def export_page(workspace, identity, space_id, request: ExportPage):
         taken += 1
         if entry:
             entries.append(entry)
+    if taken < len(rows):
+        next_cursor = rows[taken - 1]["cursor"]
+    else:
+        # Revisions are done: readings follow, from the start or after the cursor.
+        next_cursor = None if not reading_rows else "s:"
+        if reading_rows and on_readings:
+            next_cursor = request.after
+        read = 0
+        for row in reading_rows[:PAGE_READINGS]:
+            entry = _reading_entry(row)
+            cost = len(json.dumps(entry))
+            if entries and size + cost > PAGE_BYTES:
+                break
+            size += cost
+            read += 1
+            entries.append(entry)
+            next_cursor = f"s:{row['system_id']}:{row['day'].isoformat()}:{row['metric']}"
+        if read == len(reading_rows):
+            next_cursor = None
     content_revision(workspace, identity, space_id)  # Rechecks access after reading.
     return {
         **({"task_columns": task_columns} if task_columns is not None else {}),
@@ -154,5 +227,5 @@ def export_page(workspace, identity, space_id, request: ExportPage):
         "snapshot": snapshot,
         "exported_at": datetime.now(UTC).isoformat(),
         "entries": entries,
-        "next_cursor": rows[taken - 1]["cursor"] if taken < len(rows) else None,
+        "next_cursor": next_cursor,
     }

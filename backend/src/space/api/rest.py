@@ -1,6 +1,7 @@
 """REST transport: independently verified browser sessions and shared commands."""
 
 from dataclasses import replace
+from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -406,6 +407,32 @@ def create_routes(workspace: Workspace, verifier: TokenVerifier, settings: Setti
     @router.post("/spaces/{space_id}/systems/entries/{entry_id}/uses")
     def record_verdict_use(space_id: UUID, entry_id: UUID, body: systems.RecordUse, session=auth):
         return systems.record_use(workspace, session[0], space_id, entry_id, body)
+
+    @router.post("/spaces/{space_id}/systems/{system_id}/readings")
+    def record_system_reading(
+        space_id: UUID, system_id: UUID, body: systems.RecordReading, session=auth
+    ):
+        return systems.record_reading(workspace, session[0], space_id, system_id, body)
+
+    @router.post("/spaces/{space_id}/systems/{system_id}/readings/batch")
+    def record_system_readings(
+        space_id: UUID, system_id: UUID, body: systems.RecordReadings, session=auth
+    ):
+        return systems.record_readings(workspace, session[0], space_id, system_id, body)
+
+    @router.get("/spaces/{space_id}/systems/{system_id}/readings")
+    def system_readings(
+        space_id: UUID,
+        system_id: UUID,
+        since: date | None = None,
+        limit: Annotated[int, Query(ge=1, le=systems.MAX_READINGS)] = 100,
+        metric: Annotated[
+            str | None, Query(min_length=1, max_length=64, pattern=systems.METRIC_PATTERN)
+        ] = None,
+        session=auth,
+    ):
+        query = systems.ReadingQuery(since=since, limit=limit, metric=metric)
+        return systems.readings(workspace, session[0], space_id, system_id, query)
 
     @router.get("/spaces/{space_id}/systems/activity")
     def lab_activity(space_id: UUID, system_id: UUID | None = None, session=auth):

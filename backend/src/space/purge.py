@@ -68,6 +68,11 @@ STEPS: tuple[tuple[str, str, str], ...] = (
         "SELECT count(*) FROM space.restore_objects WHERE organization_id=%s AND space_id=%s",
     ),
     (
+        "system_readings",
+        "DELETE FROM space.system_readings WHERE organization_id=%s AND space_id=%s",
+        "SELECT count(*) FROM space.system_readings WHERE organization_id=%s AND space_id=%s",
+    ),
+    (
         "database_record_revisions",
         "DELETE FROM space.database_record_revisions WHERE organization_id=%s AND space_id=%s",
         "SELECT count(*) FROM space.database_record_revisions "

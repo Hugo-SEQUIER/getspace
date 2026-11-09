@@ -1,6 +1,7 @@
 """Official MCP SDK adapter for protected, shared Private Space commands."""
 
 import asyncio
+from datetime import date
 from time import perf_counter
 from typing import Any, Literal
 from uuid import UUID
@@ -744,7 +745,11 @@ def create_mcp(
             verdicts (validated = works, invalidated = does not work) reach get_context;
             testing entries are ideas, never rules. Read this before adding an entry, so
             you do not duplicate one. Output: systems with stats (entries, verdicts,
-            reused_30d, reuse_share), entries newest first, and the domain names.
+            reused_30d, reuse_share), the structured fields (area, project_id,
+            controllable_inputs, stop_conditions, outcome_delay, machine, skills, empty
+            when unset), latest_reading (the latest goal reading as {date,
+            value, unit, metric}, or null) and reading_age_days (null when the system has
+            no goal reading), entries newest first, and the domain names.
             """
             return await command(
                 lambda actor: systems.overview(workspace, actor, space_id), agent_id=agent_id
@@ -762,7 +767,9 @@ def create_mcp(
             evidence level, system, domain, how to apply and a link to the lab entry, plus
             each system's statistics. Read the verdicts of your system or domain before
             doing that work, and call record_verdict_use when you apply one.
-            Output: {systems, verdicts}.
+            Output: {systems, verdicts}; each system carries id, name, status,
+            goal_metric, area, project_id, controllable_inputs, stop_conditions,
+            outcome_delay, machine, skills, stats, latest_reading and reading_age_days.
             """
             return await command(
                 lambda actor: systems.verdicts(
@@ -781,8 +788,13 @@ def create_mcp(
             """Parameters: Space, a new command ID and the system: name, description,
             status (healthy, needs_attention, broken, not_measured, paused), goal_metric,
             goal_target, current_value, counter_metric, source_of_truth, review_cadence
-            (weekly, per_cohort, monthly, quarterly), last_review, next_decision and
-            playbook_id, the ID of a document in this Space.
+            (weekly, per_cohort, monthly, quarterly), last_review, next_decision,
+            playbook_id (the ID of a document in this Space), area (at most 200),
+            project_id (an active project in this Space), controllable_inputs and
+            stop_conditions (at most 2000 each), outcome_delay (at most 200), machine
+            (at most 50 scheduled jobs, each {job_id, label}) and skills (at most 30 skill
+            names). Every field but name is optional; put these in their own fields rather
+            than as labelled lines in the description.
             What it does: creates one system. Reuse command_id unchanged on retry.
             Output: the system with its revision and lab statistics.
             """
@@ -794,7 +806,7 @@ def create_mcp(
 
         @server.tool(
             title="Update a system",
-            # Every field is replaced, so one left out is cleared.
+            # A field sent as null or empty is cleared.
             annotations=ToolAnnotations(
                 readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
             ),
@@ -804,14 +816,17 @@ def create_mcp(
             system_id: UUID,
             expected_revision: int,
             command_id: UUID,
-            data: systems.SystemData,
+            data: systems.SystemChange,
             agent_id: UUID | None = None,
         ) -> dict[str, Any]:
             """Parameters: Space, system, the revision just read, a new command ID and the
-            complete system fields as in create_system.
+            system fields to change, as in create_system.
             What it does: saves a new revision of the system, such as a new current value,
-            status or last review. Read it with list_systems first and keep the fields you
-            do not change. Output: the saved system.
+            status or last review. Only the fields you send change: a field you leave out
+            keeps its stored value, and a field sent as null or empty ("" or []) is
+            cleared (to not_measured for status). The name can be left out, never
+            cleared. Send a whole list to change machine or skills.
+            Output: the saved system.
             """
             request = systems.SaveSystem(
                 command_id=command_id,
@@ -942,6 +957,90 @@ def create_mcp(
             """
             return await command(
                 lambda actor: systems.record_use(workspace, actor, space_id, entry_id, request),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Record a system reading",
+            # A second reading for the same date and metric replaces the first.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def record_system_reading(
+            space_id: UUID,
+            system_id: UUID,
+            request: systems.RecordReading,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, an active system and command_id, date (ISO, at most
+            tomorrow), value (a number), optional unit and note, source: where the
+            number came from, such as Search Console or Gmail, and optional metric: a
+            slug of lowercase letters, digits, `_`, `.` and `-` (at most 64, default
+            "goal") naming what the number measures, such as "replies" for an input or
+            "unsubscribes" for the counter-metric.
+            What it does: records one dated measurement for the system, credited to you.
+            One reading is kept per system, date and metric, so a second one for that
+            date and metric replaces it and other metrics stay. Record numbers a script
+            or tool measured, never an estimate or an opinion. Reuse command_id
+            unchanged on retry.
+            Output: {system_id, date, value, unit, note, source, metric, recorded_by}.
+            """
+            return await command(
+                lambda actor: systems.record_reading(
+                    workspace, actor, space_id, system_id, request
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(
+            title="Record several system readings",
+            # Each reading replaces one already on its date and metric.
+            annotations=ToolAnnotations(
+                readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+            ),
+        )
+        async def record_system_readings(
+            space_id: UUID,
+            system_id: UUID,
+            request: systems.RecordReadings,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, an active system and command_id plus readings: 1 to 20
+            of {date, value, unit?, note?, source, metric?}, one per date and metric, with
+            the same rules as record_system_reading.
+            What it does: records a sensor's whole run for one system in one call, all or
+            none, credited to you. Each reading replaces one already on its date and
+            metric. Reuse command_id unchanged on retry.
+            Output: {system_id, readings} in request order.
+            """
+            return await command(
+                lambda actor: systems.record_readings(
+                    workspace, actor, space_id, system_id, request
+                ),
+                agent_id=agent_id,
+            )
+
+        @server.tool(title="List system readings", annotations=read)
+        async def list_system_readings(
+            space_id: UUID,
+            system_id: UUID,
+            since: date | None = None,
+            limit: int = 100,
+            metric: str | None = None,
+            agent_id: UUID | None = None,
+        ) -> dict[str, Any]:
+            """Parameters: Space, system, an optional first date (ISO), a limit from 1
+            to 1000 (default 100) and an optional metric to list only its readings.
+            What it does: lists the system's dated readings, newest first, to compare a
+            metric week over week. list_systems already shows each system's latest goal
+            reading and reading_age_days.
+            Output: {system_id, readings: [{date, value, unit, note, source, metric,
+            recorded_by}], more}; more is true when the limit left older readings out.
+            """
+            query = systems.ReadingQuery(since=since, limit=limit, metric=metric)
+            return await command(
+                lambda actor: systems.readings(workspace, actor, space_id, system_id, query),
                 agent_id=agent_id,
             )
 
